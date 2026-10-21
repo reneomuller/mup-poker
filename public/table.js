@@ -2,7 +2,7 @@
   const { esc, fmtM, sign, get, timeLeft, clock, poll, PHASES, glassHTML, setGlass } = MUP;
   const $ = (id) => document.getElementById(id);
   const stage = $('stage');
-  const PLATE = [[24.5, 8.6], [75.5, 8.6], [93.4, 49], [75.5, 91.4], [24.5, 91.4], [6.6, 49]];
+  const PLATE = [[24.5, 8.6], [75.5, 8.6], [92.4, 49], [75.5, 91.4], [24.5, 91.4], [7.6, 49]];
   const SPOT = [[30, 27.6], [70, 27.6], [78.4, 49], [70, 70.6], [30, 70.6], [21.6, 49]];
   const SUITS = ['♠', '♥', '♦', '♣', '♠'];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

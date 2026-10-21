@@ -34,7 +34,7 @@ body {
 .brand { left: 50%; top: 97%; font-size: .78cqw; letter-spacing: .32em; text-transform: uppercase; color: rgba(242,234,214,.38); white-space: nowrap; }
 
 /* seats */
-.plate { width: 15.5cqw; padding: .7cqw 1cqw .8cqw; border-radius: 1cqw; text-align: center;
+.plate { width: 14.6cqw; padding: .7cqw 1cqw .8cqw; border-radius: 1cqw; text-align: center;
   background: linear-gradient(180deg, rgba(24,20,16,.96), rgba(10,9,8,.96)); border: .12cqw solid rgba(201,162,74,.55);
   box-shadow: 0 .8cqw 2cqw rgba(0,0,0,.6); transition: box-shadow .4s, transform .4s; }
 .plate .nm { display: flex; align-items: center; justify-content: center; gap: .5cqw; font-weight: 700; font-size: 1.15cqw; letter-spacing: .02em; }
@@ -66,7 +66,7 @@ body {
 .rjcards .pcard:nth-child(1).up { transform: rotate(-8deg) rotateY(180deg); }
 .rjcards .pcard .back { border-width: .18cqw; }
 .rjcards .pcard .face { font-family: var(--sans); font-weight: 800; font-size: .66cqw; letter-spacing: .12em; color: #b32a6c; text-align: center; line-height: 1.2; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.rjcards .pcard .face b { display: block; font-family: var(--serif); font-size: 1.25cqw; letter-spacing: 0; color: #8f1d55; }
+.rjcards .pcard .face b { display: block; font-family: var(--serif); font-size: 1.05cqw; letter-spacing: 0; color: #8f1d55; }
 
 /* community cards = the five blocks */
 .board { left: 50%; top: 41%; display: flex; gap: .9cqw; }
