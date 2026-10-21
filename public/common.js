@@ -19,6 +19,7 @@
     const r = await fetch(API + q, { headers, cache: 'no-store' });
     const j = await r.json();
     if (j.now) offset = j.now - Date.now();
+    if (j.content) setContent(j.content);
     return j;
   }
   let chain = Promise.resolve();
@@ -47,31 +48,159 @@
     return () => { stopped = true; clearTimeout(timer); };
   }
 
-  const PHASES = {
-    lobby: 'Připojte se ke stolu',
-    pitch: 'Pitch',
-    betting: 'Investujte!',
-    closed: 'Investování uzavřeno',
-    showdown: 'Showdown',
-    rj: 'Smart money odhaleno',
-    final: 'Demo Day',
-  };
+  // ---------- editable content (CMS) ----------
+  // Defaults; overrides come from the server (dealer → Upravit texty) and win.
+  const T = {
+    'phase.lobby': 'Připojte se ke stolu',
+    'phase.pitch': 'Pitch',
+    'phase.betting': 'Investujte!',
+    'phase.closed': 'Investování uzavřeno',
+    'phase.showdown': 'Showdown',
+    'phase.rj': 'Smart money odhaleno',
+    'phase.final': 'Demo Day',
 
-  // Founders who started narrow; portraits load from Wikipedia at runtime.
-  const FOUNDERS = [
-    { name: 'Jeff Bezos', wiki: 'en/Jeff_Bezos', co: 'Amazon', story: 'Amazon začal jako online knihkupectví.' },
-    { name: 'Mark Zuckerberg', wiki: 'en/Mark_Zuckerberg', co: 'Facebook', story: 'Facebook byl nejdřív jen pro studenty Harvardu.' },
-    { name: 'Tobi Lütke', wiki: 'en/Tobias_Lütke', co: 'Shopify', story: 'Shopify vznikl, když chtěl prodávat snowboardy online.' },
-    { name: 'Pavel Baudiš', wiki: 'cs/Pavel_Baudiš', co: 'Avast', story: 'Avast začal programem proti jedinému viru.' },
-    { name: 'Eduard Kučera', wiki: 'cs/Eduard_Kučera', co: 'Avast', story: 'Avast spoluzaložil v roce 1988 jako družstvo.' },
-    { name: 'Max Levchin', wiki: 'en/Max_Levchin', co: 'PayPal', story: 'PayPal se rozjel mezi uživateli eBay.' },
-    { name: 'Brian Chesky', wiki: 'en/Brian_Chesky', co: 'Airbnb', story: 'Airbnb začalo nafukovacími matracemi pro hosty jedné konference.' },
+    'table.block': 'Blok {block} / {max}',
+    'table.final': 'Finále',
+    'table.pitchTitle': 'Pitch · {team}',
+    'table.join.title': 'Připojte se ke stolu',
+    'table.join.hint': 'Naskenujte kód, vyberte svůj tým a zvolte si PIN.',
+    'table.qr': 'Hraj na mobilu',
+    'table.pot': '{n} / {total} investovalo',
+    'table.brand': 'RainbowJet × MUP',
+    'table.badge': 'PITCHUJE',
+    'table.seat.valuation': 'ocenění',
+    'table.seat.invested': 'investice {amount}',
+    'table.seat.leader': 'vede',
+    'table.timeUp': 'Čas!',
+    'table.board.kick': 'Blok {block} · ocenění startupů',
+    'table.board.title': 'Jak se mění ocenění',
+    'table.board.rankKick': 'Pořadí',
+    'table.board.rankTitle': 'Stůl',
+    'table.board.investors': 'Nejlepší investoři',
+    'table.board.noInvestors': 'Zatím nikdo neinvestoval.',
+    'table.board.same': 'beze změny',
+
+    'play.login.title': 'Investiční stůl',
+    'play.login.sub': 'RainbowJet × MUP',
+    'play.login.tabNew': 'Jsem tu poprvé',
+    'play.login.tabOld': 'Už hraju',
+    'play.login.name': 'Jméno a příjmení',
+    'play.login.team': 'Můj tým',
+    'play.login.pinNew': 'Zvol si PIN (4 číslice)',
+    'play.login.who': 'Kdo jsi',
+    'play.login.pin': 'PIN',
+    'play.login.goNew': 'Sednout ke stolu',
+    'play.login.goOld': 'Přihlásit',
+    'play.status.block': 'Blok {block} z {max}',
+    'play.status.lobby': 'Sedíš u stolu',
+    'play.status.lobbyHint': 'Počkej, až dealer otevře blok.',
+    'play.status.pitch': 'Pitchuje {team}',
+    'play.status.pitchHint': 'Piš si poznámky, investovat se bude po pitchích.',
+    'play.status.closedHint': 'Čeká se na showdown na plátně.',
+    'play.status.showdownHint': 'Peníze třídy jsou na stole. Sleduj plátno.',
+    'play.status.rjHint': 'RainbowJet odhalil své investice.',
+    'play.form.initTitle': 'Rozděl {capital}',
+    'play.form.initHint': 'Investuj všechno, klidně jen do jednoho týmu. Do vlastního nemůžeš. U každé investice napiš proč a ke každému týmu, co tě zaujalo a čemu nevěříš. Probereme to po kole.',
+    'play.form.go': 'Investovat',
+    'play.form.rebTitle': 'Přeskládej portfolio',
+    'play.form.rebHint': 'Můžeš vybrat až {max} a vložit je do jiných týmů. Nebo nech vše, jak je.',
+    'play.form.outLabel': 'Vybrat',
+    'play.form.inLabel': 'Vložit',
+    'play.form.confirm': 'Potvrdit přesun',
+    'play.form.hold': 'Nic neměním',
+    'play.form.whyIn': 'Proč investuješ? (povinné)',
+    'play.form.whyOut': 'Proč vybíráš? (povinné)',
+    'play.form.sent': 'Odesláno ✓ Dokud se investování neuzavře, můžeš to ještě změnit a odeslat znovu.',
+    'play.form.invested': 'Investováno ✓ Dokud se investování neuzavře, můžeš to ještě změnit.',
+    'play.wait.initTitle': 'Máš {capital}',
+    'play.wait.initHint': 'Po pitchích je rozdělíš mezi ostatní týmy. Investovat musíš všechno.',
+    'play.wait.rebTitle': 'Tvoje investice běží',
+    'play.wait.rebHint': 'V tomto bloku můžeš přesunout až {max}.',
+    'play.fan.left': 'Zbývá rozdělit',
+    'play.fan.done': 'Vše rozděleno ✓',
+    'play.notes.title': 'Poznámky ke startupům',
+    'play.notes.hint': 'Na diskusi po kole. Nejlepší odpovědi můžou jít bez jména na plátno.',
+    'play.notes.like': 'Co tě zaujalo',
+    'play.notes.likePh': 'Co tě na nápadu nebo týmu zaujalo?',
+    'play.notes.doubt': 'Čemu nevěříš',
+    'play.notes.doubtPh': 'Který předpoklad ti nesedí?',
+    'play.pf.title': 'Moje portfolio',
+    'play.pf.empty': 'Zatím nemáš žádné investice.',
+    'play.msgs.title': 'Zprávy od RainbowJet',
+    'play.msgs.hint': 'Vidí je jen tvůj tým.',
+
+    'q.in': 'Proč investuješ?',
+    'q.out': 'Proč vybíráš?',
+    'q.like': 'Co tě zaujalo?',
+    'q.doubt': 'Čemu nevěříš?',
+
+    'dealer.title': 'Dealer',
+    'dealer.btn.pitch': 'Spustit pitch',
+    'dealer.btn.qa': '+2 min otázky',
+    'dealer.btn.stop': 'Stop časovač',
+    'dealer.btn.lobby': 'Lobby (QR kód)',
+    'dealer.btn.open': 'Otevřít investování',
+    'dealer.btn.close': 'Zavřít investování',
+    'dealer.btn.showdown': 'Showdown třídy',
+    'dealer.btn.rj': 'Odhalit smart money',
+    'dealer.btn.next': 'Další blok →',
+    'dealer.btn.final': 'Demo Day',
+    'dealer.sec.bets': 'Investice v bloku {block}',
+    'dealer.sec.rj': 'Smart money (RainbowJet + Dominik)',
+    'dealer.sec.vals': 'Ocenění a zprávy týmům',
+    'dealer.sec.players': 'Hráči',
+    'dealer.sec.teams': 'Týmy',
+    'dealer.sec.tools': 'Export a záloha',
+  };
+  let O = {}; // overrides
+  let cv = '0'; // content version, part of re-render keys
+  const t = (k, vars) => {
+    let s = O[k] != null && O[k] !== '' ? O[k] : T[k] != null ? T[k] : k;
+    if (vars) s = s.replace(/\{(\w+)\}/g, (m, v) => (vars[v] != null ? vars[v] : m));
+    return s;
+  };
+  const PHASES = {};
+  for (const p of ['lobby', 'pitch', 'betting', 'closed', 'showdown', 'rj', 'final']) Object.defineProperty(PHASES, p, { get: () => t('phase.' + p), enumerable: true });
+
+  // Founders who started narrow; portraits load from Wikipedia at runtime unless a photo URL is set.
+  const DEFAULT_FOUNDERS = [
+    { name: 'Jeff Bezos', wiki: 'en/Jeff_Bezos', story: 'Amazon začal jako online knihkupectví.' },
+    { name: 'Mark Zuckerberg', wiki: 'en/Mark_Zuckerberg', story: 'Facebook byl nejdřív jen pro studenty Harvardu.' },
+    { name: 'Tobi Lütke', wiki: 'en/Tobias_Lütke', story: 'Shopify vznikl, když chtěl prodávat snowboardy online.' },
+    { name: 'Pavel Baudiš', wiki: 'cs/Pavel_Baudiš', story: 'Avast začal programem proti jedinému viru.' },
+    { name: 'Eduard Kučera', wiki: 'cs/Eduard_Kučera', story: 'Avast spoluzaložil v roce 1988 jako družstvo.' },
+    { name: 'Max Levchin', wiki: 'en/Max_Levchin', story: 'PayPal se rozjel mezi uživateli eBay.' },
+    { name: 'Brian Chesky', wiki: 'en/Brian_Chesky', story: 'Airbnb začalo nafukovacími matracemi pro hosty jedné konference.' },
   ];
+  const FOUNDERS = DEFAULT_FOUNDERS.map((f) => ({ ...f }));
+  let foundersKey = JSON.stringify(FOUNDERS);
+
+  function setContent(c) {
+    const next = (c && c.texts) || {};
+    const v = String((c && c.v) || '0');
+    if (v === cv) return false;
+    cv = v; O = next;
+    const f = c && Array.isArray(c.founders) && c.founders.length ? c.founders : DEFAULT_FOUNDERS;
+    const fk = JSON.stringify(f);
+    if (fk !== foundersKey) {
+      foundersKey = fk;
+      FOUNDERS.splice(0, FOUNDERS.length, ...f.map((x) => ({ ...x })));
+      for (const k of Object.keys(portraits)) delete portraits[k];
+      loadPortraits();
+    }
+    applyStatic();
+    return true;
+  }
+  function applyStatic(root = document) {
+    root.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
+  }
   const portraits = {};
   function loadPortraits() {
     let cached = {};
     try { cached = JSON.parse(localStorage.getItem('mup.portraits') || '{}'); } catch {}
     FOUNDERS.forEach((f, i) => {
+      if (f.photo) { portraits[i] = f.photo; paint(i); return; }
+      if (!f.wiki) return;
       if (cached[f.wiki]) { portraits[i] = cached[f.wiki]; paint(i); return; }
       const [lang, title] = f.wiki.split('/');
       fetch(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`)
@@ -89,7 +218,8 @@
   }
   function paint(i) {
     document.querySelectorAll(`.bill[data-f="${i}"] .bill-face`).forEach((el) => {
-      if (portraits[i] && !el.querySelector('img')) el.innerHTML = `<img alt="" src="${esc(portraits[i])}" referrerpolicy="no-referrer">`;
+      const img = el.querySelector('img');
+      if (portraits[i] && (!img || img.getAttribute('src') !== portraits[i])) el.innerHTML = `<img alt="" src="${esc(portraits[i])}" referrerpolicy="no-referrer">`;
     });
   }
   function billHTML(i, label = '100K') {
@@ -140,5 +270,5 @@
     s.setAttribute('opacity', frac > 0.02 ? 0.75 : 0);
   }
 
-  window.MUP = { esc, fmt, fmtM, sign, get, post, now, timeLeft, clock, poll, PHASES, FOUNDERS, loadPortraits, billHTML, glassHTML, setGlass };
+  window.MUP = { esc, fmt, fmtM, sign, get, post, now, timeLeft, clock, poll, PHASES, FOUNDERS, DEFAULT_FOUNDERS, T, t, setContent, applyStatic, cv: () => cv, loadPortraits, billHTML, glassHTML, setGlass };
 })();

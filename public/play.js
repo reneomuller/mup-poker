@@ -1,5 +1,6 @@
 (function () {
-  const { esc, fmt, fmtM, get, post, timeLeft, clock, poll, PHASES, billHTML, glassHTML, setGlass, loadPortraits } = MUP;
+  const { esc, fmt, fmtM, get, post, timeLeft, clock, poll, PHASES, billHTML, glassHTML, setGlass, loadPortraits, t: tx } = MUP;
+  const E = (k, v) => esc(tx(k, v));
   const $ = (id) => document.getElementById(id);
   const STEP = 10000;
   let sid = localStorage.getItem('mup.sid'), pin = localStorage.getItem('mup.pin');
@@ -17,7 +18,7 @@
     $('fan').classList.add('hidden');
     const el = $('login');
     el.classList.remove('hidden');
-    const key = JSON.stringify([S.teams, S.players.length, S.regOpen, tab]);
+    const key = JSON.stringify([S.teams, S.players.length, S.regOpen, tab, MUP.cv()]);
     if (key === loginKey) return;
     loginKey = key;
     if (!S.regOpen) tab = 'old';
@@ -28,17 +29,17 @@
     }).join('');
     el.innerHTML = `
       <div class="hero"><div class="bills">${[0, 1, 2, 3, 4].map((i) => billHTML(i)).join('')}</div>
-        <h1>Investiční stůl</h1><p>RainbowJet × MUP</p></div>
+        <h1>${E('play.login.title')}</h1><p>${E('play.login.sub')}</p></div>
       <div class="card">
-        <div class="tabs">${S.regOpen ? `<button data-tab="new" class="${tab === 'new' ? 'on' : ''}">Jsem tu poprvé</button>` : ''}<button data-tab="old" class="${tab === 'old' ? 'on' : ''}">Už hraju</button></div>
+        <div class="tabs">${S.regOpen ? `<button data-tab="new" class="${tab === 'new' ? 'on' : ''}">${E('play.login.tabNew')}</button>` : ''}<button data-tab="old" class="${tab === 'old' ? 'on' : ''}">${E('play.login.tabOld')}</button></div>
         ${tab === 'new' ? `
-          <div class="field"><label class="lbl">Jméno a příjmení</label><input class="input" id="lname" autocomplete="name" maxlength="40"></div>
-          <div class="field"><label class="lbl">Můj tým</label><select class="input" id="lteam"><option value="">Vyber tým…</option>${teamOpts}</select></div>
-          <div class="field"><label class="lbl">Zvol si PIN (4 číslice)</label><input class="input pin" id="lpin" inputmode="numeric" maxlength="4" autocomplete="off"></div>
-          <button class="btn" id="lgo" style="width:100%">Sednout ke stolu</button>` : `
-          <div class="field"><label class="lbl">Kdo jsi</label><select class="input" id="lwho"><option value="">Vyber své jméno…</option>${byTeam}</select></div>
-          <div class="field"><label class="lbl">PIN</label><input class="input pin" id="lpin" inputmode="numeric" maxlength="4" autocomplete="off"></div>
-          <button class="btn" id="lgo" style="width:100%">Přihlásit</button>`}
+          <div class="field"><label class="lbl">${E('play.login.name')}</label><input class="input" id="lname" autocomplete="name" maxlength="40"></div>
+          <div class="field"><label class="lbl">${E('play.login.team')}</label><select class="input" id="lteam"><option value="">Vyber tým…</option>${teamOpts}</select></div>
+          <div class="field"><label class="lbl">${E('play.login.pinNew')}</label><input class="input pin" id="lpin" inputmode="numeric" maxlength="4" autocomplete="off"></div>
+          <button class="btn" id="lgo" style="width:100%">${E('play.login.goNew')}</button>` : `
+          <div class="field"><label class="lbl">${E('play.login.who')}</label><select class="input" id="lwho"><option value="">Vyber své jméno…</option>${byTeam}</select></div>
+          <div class="field"><label class="lbl">${E('play.login.pin')}</label><input class="input pin" id="lpin" inputmode="numeric" maxlength="4" autocomplete="off"></div>
+          <button class="btn" id="lgo" style="width:100%">${E('play.login.goOld')}</button>`}
         <div class="err msg" id="lerr"></div>
       </div>`;
     el.querySelectorAll('.hero .bill').forEach((b, i) => { b.style.transform = `translateX(-50%) rotate(${(i - 2) * 9}deg)`; });
@@ -73,18 +74,18 @@
 
   function renderStatus() {
     const s = S;
-    let t1 = PHASES[s.phase] || '', t2 = `Blok ${s.block} z ${s.maxBlock}`;
-    if (s.phase === 'pitch' && s.presenting) { t1 = 'Pitchuje ' + team(s.presenting).name; t2 = 'Piš si poznámky, investovat se bude po pitchích.'; }
-    if (s.phase === 'lobby') { t1 = 'Sedíš u stolu'; t2 = 'Počkej, až dealer otevře blok.'; }
-    if (s.phase === 'closed') t2 = 'Čeká se na showdown na plátně.';
-    if (s.phase === 'showdown') t2 = 'Peníze třídy jsou na stole. Sleduj plátno.';
-    if (s.phase === 'rj') t2 = 'RainbowJet odhalil své investice.';
+    let t1 = PHASES[s.phase] || '', t2 = tx('play.status.block', { block: s.block, max: s.maxBlock });
+    if (s.phase === 'pitch' && s.presenting) { t1 = tx('play.status.pitch', { team: team(s.presenting).name }); t2 = tx('play.status.pitchHint'); }
+    if (s.phase === 'lobby') { t1 = tx('play.status.lobby'); t2 = tx('play.status.lobbyHint'); }
+    if (s.phase === 'closed') t2 = tx('play.status.closedHint');
+    if (s.phase === 'showdown') t2 = tx('play.status.showdownHint');
+    if (s.phase === 'rj') t2 = tx('play.status.rjHint');
     const left = timeLeft(s);
     const el = $('status');
     if (!el.querySelector('.glass')) el.innerHTML = glassHTML() + '<div><div class="st1"></div><div class="st2"></div></div><div class="clk"></div>';
     el.querySelector('.st1').textContent = t1;
     el.querySelector('.st2').textContent = t2;
-    el.querySelector('.clk').textContent = left === null ? '' : left > 0 ? clock(left) : 'Čas!';
+    el.querySelector('.clk').textContent = left === null ? '' : left > 0 ? clock(left) : tx('table.timeUp');
     setGlass(el.querySelector('.glass'), left === null ? 0.66 : s.timerTotal ? left / s.timerTotal : 0);
   }
 
@@ -119,7 +120,7 @@
   }
 
   function renderPortfolio() {
-    const key = JSON.stringify([me.portfolio, me.stakes, me.series.length, S.teams.map((t) => t.V), new Date().toDateString()]);
+    const key = JSON.stringify([me.portfolio, me.stakes, me.series.length, S.teams.map((t) => t.V), new Date().toDateString(), MUP.cv()]);
     if (key === pfKey) return;
     pfKey = key;
     const rows = S.teams.filter((t) => t.id !== me.team).map((t) => {
@@ -129,10 +130,10 @@
         <span class="pv">${v ? esc(fmt(v)) : '—'}</span>
         <span class="ps">ocenění ${esc(fmtM(t.V))}${v ? ` · vlastníš ${own.toLocaleString('cs-CZ', { maximumFractionDigits: 2 })} %` : ''}</span></div>`;
     }).join('');
-    let head = '<h3>Moje portfolio</h3><p class="hint">Zatím nemáš žádné investice.</p>';
+    let head = `<h3>${E('play.pf.title')}</h3><p class="hint">${E('play.pf.empty')}</p>`;
     if (me.invested) {
       const pl = me.portfolio - me.start, pct = (pl / me.start) * 100, up = pl >= 0;
-      head = `<div class="pfhead"><div><div class="lbl">Moje portfolio</div><div class="pfbig serif">${esc(fmt(me.portfolio))}</div>
+      head = `<div class="pfhead"><div><div class="lbl">${E('play.pf.title')}</div><div class="pfbig serif">${esc(fmt(me.portfolio))}</div>
           <div class="pl ${up ? 'up' : 'down'}">${up ? '+' : '−'}${esc(fmt(Math.abs(pl)))} · ${up ? '+' : '−'}${Math.abs(pct).toLocaleString('cs-CZ', { maximumFractionDigits: 1 })} %</div></div>
           <img class="meme" src="/img/${up ? 'stonks' : 'not-stonks'}.webp" alt="${up ? 'stonks' : 'not stonks'}"></div>${sparkHTML()}`;
     }
@@ -143,12 +144,12 @@
   let msgKey = null;
   function renderMsgs() {
     const m = me.msgs || [];
-    const key = me.team + JSON.stringify(m.map((x) => x.ts));
+    const key = me.team + JSON.stringify(m.map((x) => x.ts)) + MUP.cv();
     if (key === msgKey) return;
     msgKey = key;
     $('msgs').classList.toggle('hidden', !m.length);
     if (!m.length) return;
-    $('msgs').innerHTML = `<h3>Zprávy od RainbowJet</h3><p class="hint">Vidí je jen tvůj tým.</p>` + m.map((x) => {
+    $('msgs').innerHTML = `<h3>${E('play.msgs.title')}</h3><p class="hint">${E('play.msgs.hint')}</p>` + m.map((x) => {
       const head = x.kind === 'revalue' ? `Přecenění: ${fmtM(x.from)} → ${fmtM(x.to)}`
         : x.kind === 'smart' ? `Smart money: ${x.amt > 0 ? '+' : '−'}${fmtM(Math.abs(x.amt))}` : 'Zpráva';
       const d = new Date(x.ts);
@@ -158,10 +159,10 @@
 
   // ----- notes: they feed the discussion after each round -----
   let noteTimer = null, notesDraft = {};
-  const NOTE_Q = { like: ['Co tě zaujalo', 'Co tě na nápadu nebo týmu zaujalo?'], doubt: ['Čemu nevěříš', 'Který předpoklad ti nesedí?'] };
+  const NOTE_Q = { like: ['play.notes.like', 'play.notes.likePh'], doubt: ['play.notes.doubt', 'play.notes.doubtPh'] };
   function noteFields(t) {
     const n = notesDraft[t] || {};
-    return ['like', 'doubt'].map((k) => `<div class="nk">${NOTE_Q[k][0]}</div><textarea class="input note" data-n="${t}" data-k="${k}" rows="2" placeholder="${NOTE_Q[k][1]}">${esc(n[k] || '')}</textarea>`).join('');
+    return ['like', 'doubt'].map((k) => `<div class="nk">${E(NOTE_Q[k][0])}</div><textarea class="input note" data-n="${t}" data-k="${k}" rows="2" placeholder="${E(NOTE_Q[k][1])}">${esc(n[k] || '')}</textarea>`).join('');
   }
   const setSaved = (txt) => document.querySelectorAll('.nsaved').forEach((e) => { e.textContent = txt; });
   function wireNotes(root) {
@@ -175,12 +176,12 @@
     }));
   }
   function renderNotes() {
-    const key = S.block + '|' + me.id;
+    const key = S.block + '|' + me.id + '|' + MUP.cv();
     if (key !== notesKey) {
       notesKey = key;
       notesDraft = {};
       for (const [t, n] of Object.entries(me.slip?.notes || {})) notesDraft[t] = typeof n === 'string' ? { like: n, doubt: '' } : { like: n.like || '', doubt: n.doubt || '' };
-      $('notes').innerHTML = `<h3>Poznámky ke startupům</h3><p class="hint">Na diskusi po kole. Nejlepší odpovědi můžou jít bez jména na plátno.</p>` +
+      $('notes').innerHTML = `<h3>${E('play.notes.title')}</h3><p class="hint">${E('play.notes.hint')}</p>` +
         S.teams.filter((t) => t.id !== me.team).map((t) => `<div class="nrow"><div class="lbl"><span class="dot" style="background:${t.color}"></span>${esc(t.name)}</div>${noteFields(t.id)}</div>`).join('') +
         '<div class="saved nsaved"></div>';
       wireNotes($('notes'));
@@ -213,7 +214,7 @@
         <input class="amt" inputmode="numeric" value="${plain(e.amt || 0)}" aria-label="Částka"></div>
       <input type="range" min="0" max="1000000" step="${STEP}" value="${e.amt || 0}">
       <div class="qbtns"><button data-q="0">0</button><button data-q="-50000">−50 tis.</button><button data-q="50000">+50 tis.</button><button data-q="rest">+ zbytek</button></div>
-      <textarea class="input why" rows="2" placeholder="${kind === 'out' ? 'Proč vybíráš? (povinné)' : 'Proč investuješ? (povinné)'}">${esc(e.why || '')}</textarea>
+      <textarea class="input why" rows="2" placeholder="${kind === 'out' ? E('play.form.whyOut') : E('play.form.whyIn')}">${esc(e.why || '')}</textarea>
       ${withNotes ? `<div class="rnotes">${noteFields(t.id)}</div>` : ''}
     </div>`;
   }
@@ -224,25 +225,25 @@
     draft = loadDraft();
     let html = '';
     if (R.mode === 'initial') {
-      html = `<div class="card"><h3>Rozděl ${esc(fmt(R.capital))}</h3>
-        <p class="hint">Investuj všechno, klidně jen do jednoho týmu. Do vlastního nemůžeš. U každé investice napiš proč a ke každému týmu, co tě zaujalo a čemu nevěříš. Probereme to po kole.</p>
+      html = `<div class="card"><h3>${E('play.form.initTitle', { capital: fmt(R.capital) })}</h3>
+        <p class="hint">${E('play.form.initHint')}</p>
         <div id="done"></div>
         ${others.map((t) => rowHTML('in', t, draft.in[t.id] || {}, '', true)).join('')}
         <div class="saved nsaved"></div>
         <div class="sum" id="sum"></div>
-        <div class="actions"><button class="btn" id="go">Investovat</button></div>
+        <div class="actions"><button class="btn" id="go">${E('play.form.go')}</button></div>
         <div class="err msg" id="ferr"></div></div>`;
     } else {
       const held = others.filter((t) => (me.stakes[t.id] || 0) > 0);
-      html = `<div class="card"><h3>Přeskládej portfolio</h3>
-        <p class="hint">Můžeš vybrat až ${esc(fmt(R.cashoutMax))} a vložit je do jiných týmů. Nebo nech vše, jak je.</p>
+      html = `<div class="card"><h3>${E('play.form.rebTitle')}</h3>
+        <p class="hint">${E('play.form.rebHint', { max: fmt(R.cashoutMax) })}</p>
         <div id="done"></div>
-        <div class="lbl sec">Vybrat</div>
+        <div class="lbl sec">${E('play.form.outLabel')}</div>
         ${held.length ? held.map((t) => rowHTML('out', t, draft.out[t.id] || {}, ` <span class="have">máš ${esc(fmtM(me.stakes[t.id]))}</span>`)).join('') : '<p class="hint">Nemáš z čeho vybírat.</p>'}
-        <div class="lbl sec">Vložit</div>
+        <div class="lbl sec">${E('play.form.inLabel')}</div>
         ${others.map((t) => rowHTML('in', t, draft.in[t.id] || {})).join('')}
         <div class="sum" id="sum"></div>
-        <div class="actions"><button class="btn" id="go">Potvrdit přesun</button><button class="btn ghost" id="hold">Nic neměním</button></div>
+        <div class="actions"><button class="btn" id="go">${E('play.form.confirm')}</button><button class="btn ghost" id="hold">${E('play.form.hold')}</button></div>
         <div class="err msg" id="ferr"></div></div>`;
     }
     $('main').innerHTML = html;
@@ -311,7 +312,7 @@
     const errs = clientErrors();
     if (R.mode === 'initial') {
       $('sum').innerHTML = `<span>Rozděleno</span><b>${esc(fmt(inT))} / ${esc(fmtM(R.capital))}</b>`;
-      renderFan(R.capital - inT, 'Zbývá rozdělit', R.capital);
+      renderFan(R.capital - inT, tx('play.fan.left'), R.capital);
     } else {
       $('sum').innerHTML = `<span>Vybráno ${esc(fmt(outT))}</span><b>vloženo ${esc(fmt(inT))}</b>`;
       renderFan(outT - inT, outT ? 'Zbývá vložit' : 'Max. výběr', outT ? outT : R.cashoutMax, !outT);
@@ -320,7 +321,7 @@
     $('go').disabled = errs.length > 0 || (R.mode !== 'initial' && outT === 0);
     $('ferr').textContent = errs[0] && (inT > 0 || outT > 0) ? errs[0] : '';
     const sub = me.slip?.submitted;
-    $('done').innerHTML = sub ? '<div class="done">Odesláno ✓ Dokud se investování neuzavře, můžeš to ještě změnit a odeslat znovu.</div>' : '';
+    $('done').innerHTML = sub ? `<div class="done">${E('play.form.sent')}</div>` : '';
   }
 
   async function submit(hold) {
@@ -332,7 +333,7 @@
     me.slip = { ...(me.slip || {}), out: body.out, in: body.in, submitted: true };
     if (hold) { draft = { out: {}, in: {} }; $('main').querySelectorAll('.arow').forEach(syncRow); }
     updateForm();
-    $('done').innerHTML = `<div class="done">${hold ? 'Nic neměníš ✓' : 'Investováno ✓'} Dokud se investování neuzavře, můžeš to ještě změnit.</div>`;
+    $('done').innerHTML = `<div class="done">${hold ? 'Nic neměníš ✓' : E('play.form.invested')}</div>`;
   }
 
   function renderSummary() {
@@ -343,8 +344,8 @@
         Object.entries(s.out || {}).map(([t, e]) => `<div class="slipline">Vybráno z ${esc(team(t).name)}: <b>${esc(fmt(e.amt))}</b><br><span>${esc(e.why)}</span></div>`).join('') +
         Object.entries(s.in || {}).map(([t, e]) => `<div class="slipline">${esc(team(t).name)}: <b>${esc(fmt(e.amt))}</b><br><span>${esc(e.why)}</span></div>`).join('') + '</div>';
     } else if (S.phase === 'lobby' || S.phase === 'pitch') {
-      html = `<div class="card"><h3>${me.rules.mode === 'initial' ? `Máš ${esc(fmt(me.rules.capital))}` : 'Tvoje investice běží'}</h3>
-        <p class="hint">${me.rules.mode === 'initial' ? 'Po pitchích je rozdělíš mezi ostatní týmy. Investovat musíš všechno.' : `V tomto bloku můžeš přesunout až ${esc(fmt(me.rules.cashoutMax))}.`}</p></div>`;
+      html = `<div class="card"><h3>${me.rules.mode === 'initial' ? E('play.wait.initTitle', { capital: fmt(me.rules.capital) }) : E('play.wait.rebTitle')}</h3>
+        <p class="hint">${me.rules.mode === 'initial' ? E('play.wait.initHint') : E('play.wait.rebHint', { max: fmt(me.rules.cashoutMax) })}</p></div>`;
     }
     $('main').innerHTML = html;
     $('fan').classList.add('hidden');
@@ -361,11 +362,11 @@
       b.style.opacity = on ? 1 : 0;
       b.style.transform = on ? `rotate(${k * 7}deg)` : 'rotate(0deg) translateY(140px)';
     });
-    $('fanlab').innerHTML = remaining > 0 ? `${label}: <b>${esc(fmt(remaining))}</b>` : idle ? '' : 'Vše rozděleno ✓';
+    $('fanlab').innerHTML = remaining > 0 ? `${esc(label)}: <b>${esc(fmt(remaining))}</b>` : idle ? '' : E('play.fan.done');
   }
 
   function renderMain() {
-    const key = `${S.block}|${S.phase === 'betting' ? 'bet' : 'view'}|${me.rules.mode}|${me.id}`;
+    const key = `${S.block}|${S.phase === 'betting' ? 'bet' : 'view'}|${me.rules.mode}|${me.id}|${MUP.cv()}`;
     if (key === formKey && S.phase === 'betting') return;
     formKey = key;
     if (S.phase === 'betting') buildForm(); else renderSummary();

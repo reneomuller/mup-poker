@@ -14,8 +14,8 @@ async function load(fresh) {
   if (!fresh && cache.data && Date.now() - cache.t < 700) return cache.data;
   let meta = await S.getJSON('meta');
   if (!meta) { meta = G.newMeta(); await S.setJSON('meta', meta); }
-  const [players, slips] = await Promise.all([S.hgetall('players'), S.hgetall('slip:' + meta.block)]);
-  const data = { meta, players, slips };
+  const [players, slips, content] = await Promise.all([S.hgetall('players'), S.hgetall('slip:' + meta.block), S.getJSON('content')]);
+  const data = { meta, players, slips, content: content || { v: '0', texts: {}, founders: null } };
   cache = { t: Date.now(), data };
   return data;
 }
@@ -348,6 +348,22 @@ async function dealerAction(b) {
       await save();
       return ok();
     }
+    case 'content': {
+      const texts = {};
+      for (const [k, v] of Object.entries(b.texts || {})) {
+        if (/^[\w.]{1,80}$/.test(k) && typeof v === 'string' && v.trim()) texts[k] = v.slice(0, 2000);
+      }
+      let founders = null;
+      if (Array.isArray(b.founders)) {
+        founders = b.founders.slice(0, 12)
+          .map((f) => ({ name: String(f?.name || '').trim().slice(0, 40), wiki: String(f?.wiki || '').trim().slice(0, 120), story: String(f?.story || '').trim().slice(0, 200), photo: /^https:\/\//.test(f?.photo || '') ? String(f.photo).slice(0, 500) : '' }))
+          .filter((f) => f.name);
+        if (!founders.length) founders = null;
+      }
+      await S.setJSON('content', { v: String(Date.now()), texts, founders });
+      invalidate();
+      return ok();
+    }
     case 'teams': {
       for (const t of meta.teams) {
         const u = (b.teams || []).find((x) => x.id === t.id);
@@ -410,8 +426,9 @@ export default async function handler(req, res) {
   try {
     const url = new URL(req.url, 'http://local');
     if (req.method === 'GET') {
-      const { meta, players, slips } = await load(false);
+      const { meta, players, slips, content } = await load(false);
       const out = publicState(meta, players, slips);
+      out.content = content;
       const sid = req.headers['x-sid'], pin = req.headers['x-pin'];
       if (sid && pin) {
         const p = players[sid];

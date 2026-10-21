@@ -1,5 +1,5 @@
 (function () {
-  const { esc, fmtM, sign, get, timeLeft, clock, poll, PHASES, glassHTML, setGlass } = MUP;
+  const { esc, fmtM, sign, get, timeLeft, clock, poll, PHASES, glassHTML, setGlass, t: tx } = MUP;
   const $ = (id) => document.getElementById(id);
   const stage = $('stage');
   const PLATE = [[24.5, 8.6], [75.5, 8.6], [92.4, 49], [75.5, 91.4], [24.5, 91.4], [7.6, 49]];
@@ -42,8 +42,12 @@
     $('qr').innerHTML = qrSvg(playUrl());
     $('qrmini').innerHTML = qrSvg(playUrl());
     $('joinurl').textContent = playUrl().replace(/^https?:\/\//, '');
-    $('qrminil').innerHTML = `<b>Hraj na mobilu</b><br>${esc(playUrl().replace(/^https?:\/\//, ''))}`;
+    renderQrLabel();
     built = true;
+  }
+
+  function renderQrLabel() {
+    $('qrminil').innerHTML = `<b>${esc(tx('table.qr'))}</b><br>${esc(playUrl().replace(/^https?:\/\//, ''))}`;
   }
 
   function renderStack(el, cls, rj) {
@@ -189,22 +193,22 @@
       m.style.marginLeft = x * 0.4 + 'cqw'; m.style.marginTop = y * 0.25 + 'cqw';
       pile.appendChild(m);
     }
-    $('potlab').innerHTML = `<b>${s.betCount}</b> / ${s.playerCount} investovalo`;
+    $('potlab').innerHTML = esc(tx('table.pot', { n: '\u0001', total: s.playerCount })).replace('\u0001', `<b>${s.betCount}</b>`);
   }
 
   function renderGlass(s) {
     const w = $('glass'), left = timeLeft(s), svg = w.querySelector('svg');
     if (left === null) { setGlass(svg, 0.66); w.querySelector('.clock').textContent = ''; w.querySelector('.tl').textContent = ''; w.classList.remove('over'); return; }
     setGlass(svg, s.timerTotal ? left / s.timerTotal : 0);
-    w.querySelector('.clock').textContent = left > 0 ? clock(left) : 'Čas!';
+    w.querySelector('.clock').textContent = left > 0 ? clock(left) : tx('table.timeUp');
     w.querySelector('.tl').textContent = s.timerLabel || (PHASES[s.phase] || '');
     w.classList.toggle('over', left <= 0);
   }
 
   function renderBanner(s) {
-    $('blk').textContent = s.phase === 'final' ? 'Finále' : `Blok ${s.block} / ${s.maxBlock}`;
+    $('blk').textContent = s.phase === 'final' ? tx('table.final') : tx('table.block', { block: s.block, max: s.maxBlock });
     let ph = PHASES[s.phase] || '';
-    if (s.phase === 'pitch' && s.presenting) ph = 'Pitch · ' + (s.teams.find((t) => t.id === s.presenting)?.name || '');
+    if (s.phase === 'pitch' && s.presenting) ph = tx('table.pitchTitle', { team: s.teams.find((t) => t.id === s.presenting)?.name || '' });
     $('ph').textContent = ph;
   }
 
@@ -216,7 +220,8 @@
       e.plate.querySelector('.dot').style.background = t.color;
       e.plate.querySelector('.tn').textContent = t.name;
       const inv = t.cls + t.rj;
-      e.plate.querySelector('.sub').textContent = inv > 0 ? `investice ${fmtM(inv)}${t.id === leader && inv > 0 ? ' · vede' : ''}` : 'ocenění';
+      e.plate.querySelector('.sub').textContent = inv > 0 ? tx('table.seat.invested', { amount: fmtM(inv) }) + (t.id === leader ? ' · ' + tx('table.seat.leader') : '') : tx('table.seat.valuation');
+      e.plate.querySelector('.badge').textContent = tx('table.badge');
       e.plate.classList.toggle('presenting', s.phase === 'pitch' && s.presenting === t.id);
       if (!busy) {
         countTo(t.id, t.V, animateValues ? 900 : 0);
@@ -249,7 +254,7 @@
     const on = localBoard !== null ? localBoard : (s.screen === 'board' || s.phase === 'final');
     $('boardscreen').classList.toggle('on', on);
     if (!on) return;
-    $('bkick').textContent = s.phase === 'final' ? 'Demo Day' : `Blok ${s.block} · ocenění startupů`;
+    $('bkick').textContent = s.phase === 'final' ? tx('phase.final') : tx('table.board.kick', { block: s.block });
     const H = s.history.length ? s.history : [{ label: 'Start', V: {} }];
     const all = H.flatMap((h) => Object.values(h.V));
     const max = Math.max(1, ...all) * 1.12;
@@ -283,12 +288,12 @@
     $('rank').innerHTML = [...s.teams].sort((a, b) => b.V - a.V).map((t, i) => {
       const p = prev?.[t.id];
       const ch = p ? ((t.V - p) / p) * 100 : 0;
-      const chs = p && Math.abs(ch) >= 0.05 ? `<small class="${ch >= 0 ? 'up' : 'down'}">${ch >= 0 ? '▲' : '▼'} ${Math.abs(ch).toLocaleString('cs-CZ', { maximumFractionDigits: 1 })} %</small>` : '<small class="muted">beze změny</small>';
+      const chs = p && Math.abs(ch) >= 0.05 ? `<small class="${ch >= 0 ? 'up' : 'down'}">${ch >= 0 ? '▲' : '▼'} ${Math.abs(ch).toLocaleString('cs-CZ', { maximumFractionDigits: 1 })} %</small>` : `<small class="muted">${esc(tx('table.board.same'))}</small>`;
       return `<li><span class="pos">${i + 1}</span><span class="tn"><span class="dot" style="background:${t.color}"></span>${esc(t.name)}</span><span class="tv">${esc(fmtM(t.V))}${chs}</span></li>`;
     }).join('');
     $('inv').innerHTML = s.leaders.length
       ? s.leaders.map((l, i) => `<div class="row"><span>${i + 1}. ${esc(l.name)}</span><span>${esc(fmtM(l.value))}</span></div>`).join('')
-      : '<div class="row muted">Zatím nikdo neinvestoval.</div>';
+      : `<div class="row muted">${esc(tx('table.board.noInvestors'))}</div>`;
   }
 
   // answers the dealer puts on the shared screen (team, question, answer; no names)
@@ -333,7 +338,7 @@
       w.textContent = 'Chybí databáze: ve Vercelu připojte Upstash Redis (Storage) a nasaďte znovu.';
       stage.appendChild(w);
     }
-    renderBanner(s); renderBoardCards(s); renderJoin(s); renderGlass(s); renderBoardScreen(s);
+    renderBanner(s); renderBoardCards(s); renderJoin(s); renderGlass(s); renderBoardScreen(s); renderQrLabel();
     if (!first && s.reveal && s.reveal.seq > lastSeq && !busy) {
       lastSeq = s.reveal.seq;
       busy = true;

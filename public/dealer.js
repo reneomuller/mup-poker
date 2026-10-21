@@ -1,5 +1,6 @@
 (function () {
-  const { esc, fmt, fmtM, get, post, timeLeft, clock, poll, PHASES } = MUP;
+  const { esc, fmt, fmtM, get, post, timeLeft, clock, poll, PHASES, t: tx } = MUP;
+  const E = (k, v) => esc(tx(k, v));
   const $ = (id) => document.getElementById(id);
   let pw = localStorage.getItem('mup.dealer') || '';
   let S = null, D = null, keys = {};
@@ -7,7 +8,7 @@
   const team = (id) => S.teams.find((t) => t.id === id) || { name: id, color: '#888' };
   const parseAmt = (v) => Math.max(0, Math.round(Number(String(v).replace(/[^\d]/g, '')) || 0));
   const plain = (n) => Math.round(n || 0).toLocaleString('cs-CZ');
-  const once = (k, v) => { const j = JSON.stringify(v); if (keys[k] === j) return false; keys[k] = j; return true; };
+  const once = (k, v) => { const j = JSON.stringify([v, MUP.cv()]); if (keys[k] === j) return false; keys[k] = j; return true; };
 
   async function act(op, extra = {}, okMsg) {
     const r = await post({ op, ...extra }, H());
@@ -40,16 +41,16 @@
         <div class="muted small" id="tleft"></div>
         <div class="inline"><select class="input" id="pteam">${teamOpts}</select>
           <input class="input num" id="pmin" value="3" inputmode="decimal"> min
-          <button class="btn sm" id="bpitch">Spustit pitch</button>
-          <button class="btn sm ghost" id="bqa">+2 min otázky</button>
-          <button class="btn sm ghost" id="bstop">Stop časovač</button></div>
+          <button class="btn sm" id="bpitch">${E('dealer.btn.pitch')}</button>
+          <button class="btn sm ghost" id="bqa">${E('dealer.btn.qa')}</button>
+          <button class="btn sm ghost" id="bstop">${E('dealer.btn.stop')}</button></div>
         <div class="flow">
-          <button class="btn ghost ${s.phase === 'lobby' ? 'cur' : ''}" id="blobby">Lobby (QR kód)</button>
-          <button class="btn ${s.phase === 'betting' ? 'cur' : ''}" id="bbet" ${settledC ? 'disabled' : ''}>Otevřít investování</button>
-          <button class="btn ${s.phase === 'closed' ? 'cur' : ''}" id="bclose" ${settledC || s.phase !== 'betting' ? 'disabled' : ''}>Zavřít investování</button>
-          <button class="btn ${s.phase === 'showdown' ? 'cur' : ''}" id="bshow" ${settledC || !['betting', 'closed'].includes(s.phase) ? 'disabled' : ''}>Showdown třídy</button>
-          <button class="btn ${s.phase === 'rj' ? 'cur' : ''}" id="brj" ${!settledC || settledR ? 'disabled' : ''}>Odhalit smart money</button>
-          ${s.block < s.maxBlock ? `<button class="btn ghost" id="bnext">Další blok →</button>` : `<button class="btn ghost ${s.phase === 'final' ? 'cur' : ''}" id="bfinal">Demo Day</button>`}
+          <button class="btn ghost ${s.phase === 'lobby' ? 'cur' : ''}" id="blobby">${E('dealer.btn.lobby')}</button>
+          <button class="btn ${s.phase === 'betting' ? 'cur' : ''}" id="bbet" ${settledC ? 'disabled' : ''}>${E('dealer.btn.open')}</button>
+          <button class="btn ${s.phase === 'closed' ? 'cur' : ''}" id="bclose" ${settledC || s.phase !== 'betting' ? 'disabled' : ''}>${E('dealer.btn.close')}</button>
+          <button class="btn ${s.phase === 'showdown' ? 'cur' : ''}" id="bshow" ${settledC || !['betting', 'closed'].includes(s.phase) ? 'disabled' : ''}>${E('dealer.btn.showdown')}</button>
+          <button class="btn ${s.phase === 'rj' ? 'cur' : ''}" id="brj" ${!settledC || settledR ? 'disabled' : ''}>${E('dealer.btn.rj')}</button>
+          ${s.block < s.maxBlock ? `<button class="btn ghost" id="bnext">${E('dealer.btn.next')}</button>` : `<button class="btn ghost ${s.phase === 'final' ? 'cur' : ''}" id="bfinal">${E('dealer.btn.final')}</button>`}
         </div>
         <div class="inline"><span class="lbl">Investování na</span><input class="input num" id="bmin" value="8" inputmode="decimal"> min
           <span class="lbl" style="margin-left:auto">Plátno</span>
@@ -77,7 +78,7 @@
   }
 
   // ---------- investments, call list, pins ----------
-  const Q = { in: 'Proč investuješ?', out: 'Proč vybíráš?', like: 'Co tě zaujalo?', doubt: 'Čemu nevěříš?' };
+  const Q = { get in() { return tx('q.in'); }, get out() { return tx('q.out'); }, get like() { return tx('q.like'); }, get doubt() { return tx('q.doubt'); } };
   let pinData = [];
   const pinBtn = (team, q, a, amt) => {
     pinData.push({ team, q, a, amt: amt || 0 });
@@ -110,7 +111,7 @@
       ? `<div class="lbl sec">Na plátně (${pins.length})</div>` + pins.map((p) => `<div class="pinrow"><span><span class="dot" style="background:${team(p.team).color}"></span> <b>${esc(team(p.team).name)}</b> · ${esc(p.q)} ${esc(p.a)}</span><button class="btn sm ghost" data-unpin="${p.id}">✕</button></div>`).join('') + '<button class="btn sm ghost" id="unpinall" style="margin-top:6px">Smazat vše z plátna</button>'
       : '';
     const open = new Set([...$('bets').querySelectorAll('details[open]')].map((d) => d.dataset.k));
-    $('bets').innerHTML = `<h3>Investice v bloku ${S.block}</h3>
+    $('bets').innerHTML = `<h3>${E('dealer.sec.bets', { block: S.block })}</h3>
       <p class="hint">Rozklikněte hráče a tlačítkem „Na plátno“ pošlete odpověď na stůl. Jméno se nezobrazí.</p>
       ${onScreen}
       ${call('Koho vyvolat', [
@@ -138,7 +139,7 @@
     if (!once('rj', [S.block, R, rj.slip?.ts, settledR, rj.stakes, S.teams.map((t) => t.name)])) return;
     const init = R.mode === 'initial';
     const sl = rj.slip || {};
-    $('rj').innerHTML = `<h3>Smart money (RainbowJet + Dominik)</h3>
+    $('rj').innerHTML = `<h3>${E('dealer.sec.rj')}</h3>
       <p class="hint">${init ? `Rozdělte ${esc(fmt(R.capital))} (5 × 2 mil.).` : `Fond má ${esc(fmt(rj.portfolio))}. Můžete vybrat až ${esc(fmt(R.cashoutMax))} (30 %) a vložit jinam.`} Částky uvidí všichni až po odhalení. Důvod uvidí jen daný tým, v mobilu.</p>
       ${settledR ? '<div class="done">V tomto bloku už odhaleno ✓</div>' : sl.submitted ? '<div class="done">Uloženo, čeká na odhalení ✓</div>' : ''}
       <div class="rjrow rjhead"><span>Tým</span><span>${init ? '' : 'Vybrat $'}</span><span>Vložit $</span></div>
@@ -179,7 +180,7 @@
   function renderVals() {
     if (!once('vals', [S.teams.map((t) => [t.name, t.V, t.cls, t.rj]), S.phase])) return;
     const locked = ['betting', 'closed'].includes(S.phase);
-    $('vals').innerHTML = `<h3>Ocenění a zprávy týmům</h3><p class="hint">Nové ocenění v milionech $ (např. 14,5). Zprávu uvidí jen členové daného týmu v mobilu. Můžete poslat i samotnou zprávu bez přecenění.</p>
+    $('vals').innerHTML = `<h3>${E('dealer.sec.vals')}</h3><p class="hint">Nové ocenění v milionech $ (např. 14,5). Zprávu uvidí jen členové daného týmu v mobilu. Můžete poslat i samotnou zprávu bez přecenění.</p>
       ${S.teams.map((t) => `<div class="vblock" data-t="${t.id}"><div class="vrow"><div><span class="dot" style="background:${t.color}"></span> <b>${esc(t.name)}</b>
         <div class="meta">teď ${esc(fmtM(t.V))} · třída ${esc(fmtM(t.cls))} · RJ ${esc(fmtM(t.rj))}</div></div>
         <input class="input vv" inputmode="decimal" placeholder="${(t.V / 1e6).toLocaleString('cs-CZ', { maximumFractionDigits: 2 })}"></div>
@@ -203,7 +204,7 @@
   function renderPlayers() {
     if (!once('players', [D.rows.map((r) => [r.id, r.name, r.team, r.hasPin, r.holdings]), S.regOpen, S.teams.map((t) => t.name)])) return;
     const rows = D.rows.slice().sort((a, b) => a.team.localeCompare(b.team) || a.name.localeCompare(b.name));
-    $('players').innerHTML = `<h3>Hráči (${rows.length})</h3>
+    $('players').innerHTML = `<h3>${E('dealer.sec.players')} (${rows.length})</h3>
       <div class="inline"><span>Registrace nových hráčů:</span><button class="btn sm ${S.regOpen ? '' : 'ghost'}" id="regon">Otevřená</button><button class="btn sm ${S.regOpen ? 'ghost' : ''}" id="regoff">Zavřená</button></div>
       ${rows.map((r) => `<div class="prow2" data-id="${r.id}"><span>${esc(r.name)}${r.hasPin ? '' : ' <span class="no small">(PIN resetován)</span>'}</span>
         <span class="btns"><select class="input" data-move>${S.teams.map((t) => `<option value="${t.id}" ${t.id === r.team ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select>
@@ -222,7 +223,7 @@
   // ---------- teams ----------
   function renderTeams() {
     if (!once('teams', S.teams)) return;
-    $('teams').innerHTML = `<h3>Týmy</h3><p class="hint">Názvy startupů se ukážou na stole i v mobilech.</p>
+    $('teams').innerHTML = `<h3>${E('dealer.sec.teams')}</h3><p class="hint">Názvy startupů se ukážou na stole i v mobilech.</p>
       ${S.teams.map((t) => `<div class="trow" data-t="${t.id}"><input type="color" value="${t.color}"><input class="input" value="${esc(t.name)}" maxlength="30"></div>`).join('')}
       <div class="actions"><button class="btn" id="tsave">Uložit týmy</button></div>`;
     $('tsave').onclick = () => {
@@ -235,7 +236,7 @@
   // ---------- tools ----------
   function renderTools() {
     if (!once('tools', [S.block])) return;
-    $('tools').innerHTML = `<h3>Export a záloha</h3>
+    $('tools').innerHTML = `<h3>${E('dealer.sec.tools')}</h3>
       <div class="actions"><button class="btn ghost" id="csv">Stáhnout všechny investice (CSV)</button>
       <button class="btn ghost" id="undo">Vrátit poslední krok</button>
       <button class="btn danger" id="reset">Nová hra (smaže investice, hráči zůstanou)</button>

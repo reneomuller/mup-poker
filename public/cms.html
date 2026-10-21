@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b2a1e">
+<title>Texty a obsah · Investiční stůl</title>
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/cms.css">
+</head>
+<body>
+<header class="bar">
+  <a href="/dealer" class="back">← Dealer</a>
+  <h1>Texty a obsah</h1>
+  <div class="tabs" id="tabs">
+    <button data-tab="table" class="on">Plátno</button>
+    <button data-tab="play">Studenti</button>
+    <button data-tab="dealer">My (dealer)</button>
+    <button data-tab="bills">Bankovky</button>
+  </div>
+  <div class="save"><span id="status" class="muted"></span><button class="btn" id="save">Uložit</button></div>
+</header>
+<div class="wrap">
+  <section class="editor" id="editor"></section>
+  <section class="preview">
+    <div class="pvhead"><span class="lbl" id="pvlabel">Náhled</span><span class="muted small">Po uložení se náhled obnoví do 2 s. Dá se v něm i klikat.</span></div>
+    <div class="frame" id="frame"></div>
+  </section>
+</div>
+<script src="/common.js"></script>
+<script src="/cms.js"></script>
+</body>
+</html>
