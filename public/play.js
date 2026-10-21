@@ -101,21 +101,21 @@
     }
     let pts = days.length >= 2 ? days : raw;
     if (pts.length < 2) pts = [pts[0], pts[0]];
-    const W = 320, Hh = 92, pad = 6;
+    const W = 320, Hh = 160, pad = 8, padL = 108, padT = 84;
     const vals = pts.map((p) => p.v).concat(me.start);
     let lo = Math.min(...vals), hi = Math.max(...vals);
     if (hi - lo < 40000) { const m = (hi + lo) / 2; lo = m - 20000; hi = m + 20000; }
-    const x = (i) => pad + (i * (W - 2 * pad)) / (pts.length - 1);
-    const y = (v) => pad + (1 - (v - lo) / (hi - lo)) * (Hh - 2 * pad);
+    const x = (i) => padL + (i * (W - padL - pad)) / (pts.length - 1);
+    const y = (v) => padT + (1 - (v - lo) / (hi - lo)) * (Hh - padT - pad);
     const up = me.portfolio >= me.start, col = up ? '#3fbf7a' : '#e8505b';
     const line = pts.map((p, i) => `${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
     const base = y(me.start).toFixed(1);
     return `<svg class="spark" viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none" aria-label="Vývoj portfolia">
         <defs><linearGradient id="sg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".35"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
         <polygon points="${x(0)},${Hh} ${line} ${x(pts.length - 1)},${Hh}" fill="url(#sg)"/>
-        <line x1="0" x2="${W}" y1="${base}" y2="${base}" stroke="rgba(242,234,214,.35)" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
+        <line x1="${padL}" x2="${W}" y1="${base}" y2="${base}" stroke="rgba(242,234,214,.35)" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
         <polyline points="${line}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
-      </svg>
+      </svg><!--x-->
       <div class="sparkx"><span>${esc(dayLabel(pts[0].ts))}</span><span>čárkovaně: vklad ${esc(fmtM(me.start))}</span><span>dnes</span></div>`;
   }
 
@@ -133,9 +133,11 @@
     let head = `<h3>${E('play.pf.title')}</h3><p class="hint">${E('play.pf.empty')}</p>`;
     if (me.invested) {
       const pl = me.portfolio - me.start, pct = (pl / me.start) * 100, up = pl >= 0;
-      head = `<div class="pfhead"><div><div class="lbl">${E('play.pf.title')}</div><div class="pfbig serif">${esc(fmt(me.portfolio))}</div>
-          <div class="pl ${up ? 'up' : 'down'}">${up ? '+' : '−'}${esc(fmt(Math.abs(pl)))} · ${up ? '+' : '−'}${Math.abs(pct).toLocaleString('cs-CZ', { maximumFractionDigits: 1 })} %</div></div>
-          <img class="meme" src="/img/${up ? 'stonks' : 'not-stonks'}.webp" alt="${up ? 'stonks' : 'not stonks'}"></div>${sparkHTML()}`;
+      const [svg, labels] = sparkHTML().split('<!--x-->');
+      head = `<div class="pfpanel ${up ? 'up' : 'down'}">${svg}
+          <img class="man" src="/img/${up ? 'stonks' : 'not-stonks'}-cut.webp" alt="${up ? 'stonks' : 'not stonks'}">
+          <div class="pfnums"><div class="lbl">${E('play.pf.title')}</div><div class="pfbig serif">${esc(fmt(me.portfolio))}</div>
+          <div class="pl ${up ? 'up' : 'down'}">${up ? '+' : '−'}${esc(fmt(Math.abs(pl)))} · ${up ? '+' : '−'}${Math.abs(pct).toLocaleString('cs-CZ', { maximumFractionDigits: 1 })} %</div></div></div>${labels}`;
     }
     $('portfolio').innerHTML = head + rows;
   }
@@ -283,9 +285,21 @@
     const kind = row.dataset.k, t = row.dataset.t;
     const rng = row.querySelector('input[type=range]'), inp = row.querySelector('.amt'), why = row.querySelector('.why');
     rng.addEventListener('input', () => setAmt(kind, t, +rng.value));
-    inp.addEventListener('input', () => setAmt(kind, t, parseAmt(inp.value)));
-    inp.addEventListener('blur', () => syncRow(row));
-    inp.addEventListener('focus', () => inp.select());
+    inp.addEventListener('focus', () => {
+      inp.dataset.prev = draft[kind][t]?.amt || 0;
+      inp.placeholder = plain(+inp.dataset.prev);
+      inp.value = '';
+    });
+    inp.addEventListener('input', () => { if (inp.value.trim() !== '') setAmt(kind, t, parseAmt(inp.value)); });
+    inp.addEventListener('blur', () => {
+      if (inp.value.trim() === '') setAmt(kind, t, +inp.dataset.prev || 0);
+      inp.placeholder = '0';
+      syncRow(row);
+    });
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { inp.value = ''; inp.blur(); }
+      if (e.key === 'Enter') inp.blur();
+    });
     why.addEventListener('input', () => { (draft[kind][t] || (draft[kind][t] = { amt: 0, why: '' })).why = why.value; saveDraft(); updateForm(); });
     row.querySelectorAll('[data-q]').forEach((b) => (b.onclick = () => {
       const cur = draft[kind][t]?.amt || 0, q = b.dataset.q;
@@ -296,7 +310,6 @@
   function clientErrors() {
     const R = me.rules, errs = [];
     const inT = sumOf(draft.in), outT = sumOf(draft.out);
-    for (const k of ['out', 'in']) for (const [t, e] of Object.entries(draft[k])) if (e.amt > 0 && (e.why || '').trim().length < 3) errs.push(`Napiš proč u týmu ${team(t).name}.`);
     if (R.mode === 'initial' && inT !== R.capital) errs.unshift(`Zbývá rozdělit ${fmt(R.capital - inT)}.`);
     if (R.mode !== 'initial' && inT !== outT) errs.unshift(inT < outT ? `Zbývá vložit ${fmt(outT - inT)}.` : 'Vkládáš víc, než vybíráš.');
     return errs;
@@ -340,15 +353,31 @@
     const s = me.slip;
     let html = '';
     if (s?.submitted && (Object.keys(s.in || {}).length || Object.keys(s.out || {}).length)) {
-      html = `<div class="card"><h3>Tvoje rozhodnutí v bloku ${S.block}</h3>` +
-        Object.entries(s.out || {}).map(([t, e]) => `<div class="slipline">Vybráno z ${esc(team(t).name)}: <b>${esc(fmt(e.amt))}</b><br><span>${esc(e.why)}</span></div>`).join('') +
-        Object.entries(s.in || {}).map(([t, e]) => `<div class="slipline">${esc(team(t).name)}: <b>${esc(fmt(e.amt))}</b><br><span>${esc(e.why)}</span></div>`).join('') + '</div>';
+      const line = (k, t, e) => `<div class="slipline"><div>${k === 'out' ? 'Vybráno z ' : ''}${esc(team(t).name)}: <b>${esc(fmt(e.amt))}</b></div>
+        <textarea class="input rwhy" rows="2" data-rk="${k}" data-rt="${t}" placeholder="${k === 'out' ? E('play.form.whyOut') : E('play.form.whyIn')}">${esc(e.why || '')}</textarea></div>`;
+      html = `<div class="card"><h3>Tvoje rozhodnutí v bloku ${S.block}</h3><p class="hint">Částky už jsou dané, důvody můžeš ještě doplnit nebo opravit.</p>` +
+        Object.entries(s.out || {}).map(([t, e]) => line('out', t, e)).join('') +
+        Object.entries(s.in || {}).map(([t, e]) => line('in', t, e)).join('') + '<div class="saved rsaved"></div></div>';
     } else if (S.phase === 'lobby' || S.phase === 'pitch') {
       html = `<div class="card"><h3>${me.rules.mode === 'initial' ? E('play.wait.initTitle', { capital: fmt(me.rules.capital) }) : E('play.wait.rebTitle')}</h3>
         <p class="hint">${me.rules.mode === 'initial' ? E('play.wait.initHint') : E('play.wait.rebHint', { max: fmt(me.rules.cashoutMax) })}</p></div>`;
     }
     $('main').innerHTML = html;
     $('fan').classList.add('hidden');
+    let rt = null;
+    $('main').querySelectorAll('.rwhy').forEach((ta) => ta.addEventListener('input', () => {
+      const e = me.slip?.[ta.dataset.rk]?.[ta.dataset.rt];
+      if (e) e.why = ta.value;
+      $('main').querySelector('.rsaved').textContent = 'Ukládám…';
+      clearTimeout(rt);
+      rt = setTimeout(async () => {
+        const body = { op: 'reasons', sid, pin, in: {}, out: {} };
+        $('main').querySelectorAll('.rwhy').forEach((x) => { body[x.dataset.rk][x.dataset.rt] = x.value; });
+        const r = await post(body);
+        const el = $('main').querySelector('.rsaved');
+        if (el) el.textContent = r.ok ? 'Uloženo' : r.error;
+      }, 1000);
+    }));
   }
 
   function renderFan(remaining, label, total, idle) {
@@ -366,8 +395,11 @@
   }
 
   function renderMain() {
-    const key = `${S.block}|${S.phase === 'betting' ? 'bet' : 'view'}|${me.rules.mode}|${me.id}|${MUP.cv()}`;
-    if (key === formKey && S.phase === 'betting') return;
+    const amounts = JSON.stringify([me.slip?.submitted, Object.entries(me.slip?.in || {}).map(([t, e]) => [t, e.amt]), Object.entries(me.slip?.out || {}).map(([t, e]) => [t, e.amt])]);
+    const key = S.phase === 'betting'
+      ? `${S.block}|bet|${me.rules.mode}|${me.id}|${MUP.cv()}`
+      : `${S.block}|view|${S.phase}|${me.rules.mode}|${me.id}|${MUP.cv()}|${amounts}`;
+    if (key === formKey) return;
     formKey = key;
     if (S.phase === 'betting') buildForm(); else renderSummary();
   }

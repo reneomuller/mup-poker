@@ -60,6 +60,7 @@ function publicState(meta, players, slips) {
     presenting: meta.presenting, timerEnd: meta.timerEnd, timerTotal: meta.timerTotal, timerLabel: meta.timerLabel,
     screen: meta.screen, regOpen: meta.regOpen, history: meta.history, reveal: meta.reveal,
     betCount, playerCount: plist.length, players: plist, leaders, storage: S.storageMode, cfg: G.CFG,
+    startV: meta.startV || Math.round(meta.ledger.P[meta.teams[0].id] * G.CFG.FOUNDER_SHARES), anyHoldings: Object.keys(meta.ledger.H).some((k) => G.hasHoldings(meta, k)),
     pins: meta.pins || [],
   };
 }
@@ -198,6 +199,16 @@ async function studentAction(b) {
   if (b.op === 'notes') {
     const slip = slips[p.id] || {};
     slip.notes = cleanNotes(b.notes, meta);
+    await S.hset('slip:' + meta.block, p.id, slip);
+    invalidate();
+    return ok();
+  }
+  if (b.op === 'reasons') {
+    const slip = slips[p.id];
+    if (!slip?.submitted) return fail('Nejdřív investuj.');
+    for (const k of ['in', 'out']) {
+      for (const [t, why] of Object.entries(b[k] || {})) if (slip[k]?.[t]) slip[k][t].why = String(why || '').trim().slice(0, 600);
+    }
     await S.hset('slip:' + meta.block, p.id, slip);
     invalidate();
     return ok();
@@ -364,6 +375,17 @@ async function dealerAction(b) {
       invalidate();
       return ok();
     }
+    case 'startValuation': {
+      const v = Math.round(Number(b.V));
+      if (!(v >= 1000)) return fail('Zadej ocenění aspoň 1 000 $.');
+      if (Object.keys(meta.ledger.H).some((k) => G.hasHoldings(meta, k))) return fail('Už se investovalo. Výchozí ocenění jde změnit jen před prvním showdownem (nebo po „Nová hra“).');
+      for (const t of meta.teams) meta.ledger.P[t.id] = v / meta.ledger.S[t.id];
+      meta.startV = v;
+      meta.history = [G.snapshot(meta, 'Start')];
+      meta.pfHist = [];
+      await save();
+      return ok();
+    }
     case 'teams': {
       for (const t of meta.teams) {
         const u = (b.teams || []).find((x) => x.id === t.id);
@@ -409,7 +431,7 @@ async function dealerAction(b) {
     }
     case 'reset': {
       if (b.confirm !== 'RESET') return fail('Potvrď napsáním RESET.');
-      const fresh = G.newMeta(meta.teams);
+      const fresh = G.newMeta(meta.teams, meta.startV);
       for (let i = 1; i <= G.CFG.MAX_BLOCK; i++) await S.del('slip:' + i);
       await S.del('backups');
       if (!b.keepPlayers) await S.del('players');
@@ -450,7 +472,7 @@ export default async function handler(req, res) {
     }
     if (req.method === 'POST') {
       const b = await readBody(req);
-      const studentOps = ['register', 'login', 'notes', 'submit'];
+      const studentOps = ['register', 'login', 'notes', 'submit', 'reasons'];
       let r;
       if (studentOps.includes(b.op)) r = await studentAction(b);
       else {

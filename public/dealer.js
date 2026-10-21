@@ -157,7 +157,9 @@
     };
     $('rj').querySelectorAll('input.ro, input.ri').forEach((inp) => {
       inp.addEventListener('input', recalc);
-      inp.addEventListener('blur', () => { inp.value = plain(parseAmt(inp.value)); });
+      inp.addEventListener('focus', () => { inp.dataset.prev = inp.value; inp.placeholder = inp.value || '0'; inp.value = ''; });
+      inp.addEventListener('blur', () => { inp.value = inp.value.trim() === '' ? inp.dataset.prev || '' : plain(parseAmt(inp.value)); recalc(); });
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Escape') { inp.value = ''; inp.blur(); } if (e.key === 'Enter') inp.blur(); });
     });
     recalc();
     $('rjsave').onclick = async () => {
@@ -166,7 +168,6 @@
       $('rj').querySelectorAll('.rjblock').forEach((row) => {
         const t = row.dataset.t, o = parseAmt(row.querySelector('.ro')?.value || 0), i = parseAmt(row.querySelector('.ri').value);
         const why = row.querySelector('.rw').value.trim();
-        if ((o || i) && why.length < 3) missing = team(t).name;
         if (o) out[t] = { amt: o, why }; if (i) inn[t] = { amt: i, why };
       });
       if (missing) { $('rjerr').textContent = `Napište důvod pro ${missing}.`; return; }
@@ -222,14 +223,24 @@
 
   // ---------- teams ----------
   function renderTeams() {
-    if (!once('teams', S.teams)) return;
+    if (!once('teams', [S.teams, S.startV, S.anyHoldings])) return;
     $('teams').innerHTML = `<h3>${E('dealer.sec.teams')}</h3><p class="hint">Názvy startupů se ukážou na stole i v mobilech.</p>
       ${S.teams.map((t) => `<div class="trow" data-t="${t.id}"><input type="color" value="${t.color}"><input class="input" value="${esc(t.name)}" maxlength="30"></div>`).join('')}
-      <div class="actions"><button class="btn" id="tsave">Uložit týmy</button></div>`;
+      <div class="actions"><button class="btn" id="tsave">Uložit týmy</button></div>
+      <div class="lbl sec">Výchozí ocenění každého týmu</div>
+      <p class="hint">Za kolik mil. $ startupy začínají, než do nich kdokoli investuje. Jde změnit jen před prvním showdownem.</p>
+      <div class="inline"><input class="input num" id="startv" inputmode="decimal" value="${(S.startV / 1e6).toLocaleString('cs-CZ', { maximumFractionDigits: 2 })}" ${S.anyHoldings ? 'disabled' : ''}> mil. $
+        <button class="btn sm" id="startvgo" ${S.anyHoldings ? 'disabled' : ''}>Nastavit</button></div>`;
     $('tsave').onclick = () => {
       const teams = [...$('teams').querySelectorAll('.trow')].map((row) => ({ id: row.dataset.t, color: row.querySelector('[type=color]').value, name: row.querySelector('.input').value.trim() }));
       keys.teams = null;
       act('teams', { teams }, 'Týmy uloženy');
+    };
+    $('startvgo').onclick = () => {
+      const v = Math.round(Number($('startv').value.replace(/\s/g, '').replace(',', '.')) * 1e6);
+      if (!(v > 0)) return alert('Zadejte číslo, např. 1 nebo 0,5.');
+      keys.teams = null;
+      act('startValuation', { V: v }, 'Výchozí ocenění nastaveno');
     };
   }
 

@@ -1,6 +1,6 @@
 // Pure game rules: stakes ledger, limits, validation, settlement.
 export const CFG = {
-  START_VALUATION: 10_000_000,
+  START_VALUATION: 1_000_000, // pre-money of every team at the start (dealer can change it before the first showdown)
   FOUNDER_SHARES: 1_000_000,
   STUDENT_CAPITAL: 1_000_000,
   RJ_CAPITAL: 10_000_000,
@@ -11,12 +11,13 @@ export const CFG = {
 export const RJ = 'rj';
 const COLORS = ['#E8505B', '#F39C34', '#E9C046', '#3BB273', '#3A8DDE', '#9B6BE0'];
 
-export function newMeta(teams) {
+export function newMeta(teams, startV) {
   teams = teams || COLORS.map((c, i) => ({ id: 't' + (i + 1), name: 'Tým ' + (i + 1), color: c }));
+  startV = startV > 0 ? startV : CFG.START_VALUATION;
   const S = {}, P = {};
-  for (const t of teams) { S[t.id] = CFG.FOUNDER_SHARES; P[t.id] = CFG.START_VALUATION / CFG.FOUNDER_SHARES; }
+  for (const t of teams) { S[t.id] = CFG.FOUNDER_SHARES; P[t.id] = startV / CFG.FOUNDER_SHARES; }
   const m = {
-    v: 1, teams, block: 1, phase: 'lobby', presenting: null,
+    v: 1, teams, startV, block: 1, phase: 'lobby', presenting: null,
     timerEnd: null, timerTotal: 0, timerLabel: '', regOpen: true, screen: 'table',
     ledger: { S, P, H: {} }, history: [], reveal: null, settled: {}, seq: 0,
   };
@@ -97,13 +98,11 @@ export function validate(m, inv, ownTeam, raw) {
   for (const [t, e] of Object.entries(out)) {
     outTotal += e.amt;
     if (e.amt > st[t] + 1) errors.push(`Z týmu ${name(t)} můžeš vybrat nejvýš ${fmt(st[t])}.`);
-    if (e.why.length < 3) errors.push(`Napiš, proč vybíráš z týmu ${name(t)}.`);
   }
   for (const [t, e] of Object.entries(inn)) {
     inTotal += e.amt;
     if (t === ownTeam) errors.push('Do vlastního týmu investovat nemůžeš.');
     if (out[t]) errors.push(`Z týmu ${name(t)} nemůžeš ve stejném bloku vybírat a zároveň do něj vkládat.`);
-    if (e.why.length < 3) errors.push(`Napiš, proč investuješ do týmu ${name(t)}.`);
   }
   if (r.mode === 'initial') {
     if (inTotal !== r.capital) errors.push(`Rozděl přesně ${fmt(r.capital)} (zatím ${fmt(inTotal)}).`);

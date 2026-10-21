@@ -10,11 +10,11 @@ A poker-table investment game for the MUP course. Every student gets $1M to inve
 
 ## Rules the game enforces
 
-- Never into your own team; every investment needs a reason.
+- Never into your own team. Reasons are optional and can be added or edited after submitting.
 - First round (Block 1, or a student's first time): invest exactly $1M. Nothing can be taken out.
 - From Block 2: take out up to $300k per block and reinvest all of it the same block (or change nothing).
 - RainbowJet: $10M in Block 1, then up to 30 % of the fund per block. Hidden until "Odhalit smart money".
-- Stakes, not votes: money buys a share at the team's current valuation (all start at $10M). Revaluing a team moves every investor's stake.
+- Stakes, not votes: money buys a share at the team's current valuation (all start at $1M by default; change it in Dealer → Týmy → Výchozí ocenění before anyone has invested). Revaluing a team moves every investor's stake.
 
 ## Deploy on Vercel
 
