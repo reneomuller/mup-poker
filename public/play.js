@@ -1,0 +1,316 @@
+(function () {
+  const { esc, fmt, fmtM, get, post, timeLeft, clock, poll, PHASES, billHTML, glassHTML, setGlass, loadPortraits } = MUP;
+  const $ = (id) => document.getElementById(id);
+  const STEP = 10000;
+  let sid = localStorage.getItem('mup.sid'), pin = localStorage.getItem('mup.pin');
+  let S = null, me = null, meFail = 0, formKey = null, draft = null, loginKey = null, notesKey = null, tab = 'new';
+
+  const auth = () => (sid && pin ? { 'x-sid': sid, 'x-pin': pin } : {});
+  const team = (id) => S.teams.find((t) => t.id === id) || { name: id, color: '#888' };
+  const parseAmt = (v) => Math.max(0, Math.round(Number(String(v).replace(/[^\d]/g, '')) || 0));
+  const plain = (n) => Math.round(n).toLocaleString('cs-CZ');
+  const sumOf = (m) => Object.values(m).reduce((a, e) => a + (e.amt || 0), 0);
+
+  // ---------- login ----------
+  function showLogin() {
+    $('game').classList.add('hidden');
+    $('fan').classList.add('hidden');
+    const el = $('login');
+    el.classList.remove('hidden');
+    const key = JSON.stringify([S.teams, S.players.length, S.regOpen, tab]);
+    if (key === loginKey) return;
+    loginKey = key;
+    if (!S.regOpen) tab = 'old';
+    const teamOpts = S.teams.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
+    const byTeam = S.teams.map((t) => {
+      const ps = S.players.filter((p) => p.team === t.id);
+      return ps.length ? `<optgroup label="${esc(t.name)}">${ps.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</optgroup>` : '';
+    }).join('');
+    el.innerHTML = `
+      <div class="hero"><div class="bills">${[0, 1, 2, 3, 4].map((i) => billHTML(i)).join('')}</div>
+        <h1>Investiční stůl</h1><p>RainbowJet × MUP</p></div>
+      <div class="card">
+        <div class="tabs">${S.regOpen ? `<button data-tab="new" class="${tab === 'new' ? 'on' : ''}">Jsem tu poprvé</button>` : ''}<button data-tab="old" class="${tab === 'old' ? 'on' : ''}">Už hraju</button></div>
+        ${tab === 'new' ? `
+          <div class="field"><label class="lbl">Jméno a příjmení</label><input class="input" id="lname" autocomplete="name" maxlength="40"></div>
+          <div class="field"><label class="lbl">Můj tým</label><select class="input" id="lteam"><option value="">Vyber tým…</option>${teamOpts}</select></div>
+          <div class="field"><label class="lbl">Zvol si PIN (4 číslice)</label><input class="input pin" id="lpin" inputmode="numeric" maxlength="4" autocomplete="off"></div>
+          <button class="btn" id="lgo" style="width:100%">Sednout ke stolu</button>` : `
+          <div class="field"><label class="lbl">Kdo jsi</label><select class="input" id="lwho"><option value="">Vyber své jméno…</option>${byTeam}</select></div>
+          <div class="field"><label class="lbl">PIN</label><input class="input pin" id="lpin" inputmode="numeric" maxlength="4" autocomplete="off"></div>
+          <button class="btn" id="lgo" style="width:100%">Přihlásit</button>`}
+        <div class="err msg" id="lerr"></div>
+      </div>`;
+    el.querySelectorAll('.hero .bill').forEach((b, i) => { b.style.transform = `translateX(-50%) rotate(${(i - 2) * 9}deg)`; });
+    el.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; loginKey = null; showLogin(); }));
+    $('lgo').onclick = async () => {
+      const p = $('lpin').value.trim();
+      $('lerr').textContent = '';
+      let r;
+      if (tab === 'new') r = await post({ op: 'register', name: $('lname').value, team: $('lteam').value, pin: p });
+      else r = await post({ op: 'login', sid: $('lwho').value, pin: p });
+      if (!r.ok) { $('lerr').textContent = r.error; return; }
+      sid = r.sid; pin = p;
+      localStorage.setItem('mup.sid', sid); localStorage.setItem('mup.pin', pin);
+      meFail = 0; loginKey = null; formKey = null; notesKey = null;
+      setTimeout(tick, 300);
+    };
+  }
+  function logout() {
+    sid = pin = null; localStorage.removeItem('mup.sid'); localStorage.removeItem('mup.pin');
+    me = null; loginKey = null; formKey = null; notesKey = null; tab = 'old';
+    showLogin();
+  }
+  $('logout').onclick = (e) => { e.preventDefault(); logout(); };
+
+  // ---------- game ----------
+  function renderHeader() {
+    $('who').textContent = me.name;
+    const t = team(me.team);
+    $('myteam').innerHTML = `<span class="dot" style="background:${t.color}"></span>${esc(t.name)}`;
+    $('pfv').textContent = me.portfolio ? fmtM(me.portfolio) : fmtM(me.rules.capital || 0);
+  }
+
+  function renderStatus() {
+    const s = S;
+    let t1 = PHASES[s.phase] || '', t2 = `Blok ${s.block} z ${s.maxBlock}`;
+    if (s.phase === 'pitch' && s.presenting) { t1 = 'Pitchuje ' + team(s.presenting).name; t2 = 'Piš si poznámky, sázky se otevřou po pitchích.'; }
+    if (s.phase === 'lobby') { t1 = 'Sedíš u stolu'; t2 = 'Počkej, až dealer otevře blok.'; }
+    if (s.phase === 'closed') t2 = 'Čeká se na showdown na plátně.';
+    if (s.phase === 'showdown') t2 = 'Peníze třídy jsou na stole. Sleduj plátno.';
+    if (s.phase === 'rj') t2 = 'RainbowJet odhalil své investice.';
+    const left = timeLeft(s);
+    const el = $('status');
+    if (!el.querySelector('.glass')) el.innerHTML = glassHTML() + '<div><div class="st1"></div><div class="st2"></div></div><div class="clk"></div>';
+    el.querySelector('.st1').textContent = t1;
+    el.querySelector('.st2').textContent = t2;
+    el.querySelector('.clk').textContent = left === null ? '' : left > 0 ? clock(left) : 'Čas!';
+    setGlass(el.querySelector('.glass'), left === null ? 0.66 : s.timerTotal ? left / s.timerTotal : 0);
+  }
+
+  function renderPortfolio() {
+    const rows = S.teams.filter((t) => t.id !== me.team).map((t) => {
+      const v = me.stakes[t.id] || 0;
+      const own = t.V ? (v / t.V) * 100 : 0;
+      return `<div class="prow"><span class="pn"><span class="dot" style="background:${t.color}"></span>${esc(t.name)}</span>
+        <span class="pv">${v ? esc(fmt(v)) : '—'}</span>
+        <span class="ps">ocenění ${esc(fmtM(t.V))}${v ? ` · vlastníš ${own.toLocaleString('cs-CZ', { maximumFractionDigits: 2 })} %` : ''}</span></div>`;
+    }).join('');
+    $('portfolio').innerHTML = `<h3>Moje portfolio</h3>${me.portfolio ? '' : '<p class="hint">Zatím nemáš žádné investice.</p>'}${rows}`;
+  }
+
+  // ----- notes -----
+  let noteTimer = null;
+  function renderNotes() {
+    const key = S.block + '|' + me.id;
+    if (key === notesKey) return;
+    notesKey = key;
+    const notes = me.slip?.notes || {};
+    $('notes').innerHTML = `<h3>Poznámky ke startupům</h3><p class="hint">Uvidí je jen RainbowJet. Ukládají se samy.</p>` +
+      S.teams.filter((t) => t.id !== me.team).map((t) => `
+        <div class="nrow"><div class="lbl"><span class="dot" style="background:${t.color}"></span>${esc(t.name)}</div>
+        <textarea class="input" data-n="${t.id}" rows="2" placeholder="Co tě zaujalo, čemu nevěříš…">${esc(notes[t.id] || '')}</textarea></div>`).join('') +
+      '<div class="saved" id="nsaved"></div>';
+    $('notes').querySelectorAll('textarea').forEach((ta) => ta.addEventListener('input', () => {
+      $('nsaved').textContent = 'Ukládám…';
+      clearTimeout(noteTimer);
+      noteTimer = setTimeout(saveNotes, 1200);
+    }));
+  }
+  const collectNotes = () => {
+    const n = {};
+    $('notes').querySelectorAll('textarea').forEach((ta) => { if (ta.value.trim()) n[ta.dataset.n] = ta.value; });
+    return n;
+  };
+  async function saveNotes() {
+    const r = await post({ op: 'notes', sid, pin, notes: collectNotes() });
+    $('nsaved').textContent = r.ok ? 'Uloženo' : r.error;
+  }
+
+  // ----- allocation -----
+  function draftKey() { return `mup.draft.${me.id}.${S.block}`; }
+  function loadDraft() {
+    if (me.slip?.submitted) return { out: structuredClone(me.slip.out || {}), in: structuredClone(me.slip.in || {}) };
+    try { const d = JSON.parse(localStorage.getItem(draftKey()) || 'null'); if (d) return d; } catch {}
+    return { out: {}, in: {} };
+  }
+  const saveDraft = () => { try { localStorage.setItem(draftKey(), JSON.stringify(draft)); } catch {} };
+
+  function rowHTML(kind, t, e, extra = '') {
+    return `<div class="arow ${e.amt ? 'has' : ''}" data-k="${kind}" data-t="${t.id}">
+      <div class="ahead"><span class="dot" style="background:${t.color}"></span><span class="an">${esc(t.name)}${extra}</span>
+        <input class="amt" inputmode="numeric" value="${plain(e.amt || 0)}" aria-label="Částka"></div>
+      <input type="range" min="0" max="1000000" step="${STEP}" value="${e.amt || 0}">
+      <div class="qbtns"><button data-q="0">0</button><button data-q="-50000">−50 tis.</button><button data-q="50000">+50 tis.</button><button data-q="rest">+ zbytek</button></div>
+      <textarea class="input why" rows="2" placeholder="${kind === 'out' ? 'Proč vybíráš? (povinné)' : 'Proč investuješ? (povinné)'}">${esc(e.why || '')}</textarea>
+    </div>`;
+  }
+
+  function buildForm() {
+    const R = me.rules;
+    const others = S.teams.filter((t) => t.id !== me.team);
+    draft = loadDraft();
+    let html = '';
+    if (R.mode === 'initial') {
+      html = `<div class="card"><h3>Rozděl ${esc(fmt(R.capital))}</h3>
+        <p class="hint">Investuj všechno, klidně jen do jednoho týmu. Do vlastního nemůžeš. U každé investice napiš proč.</p>
+        <div id="done"></div>
+        ${others.map((t) => rowHTML('in', t, draft.in[t.id] || {})).join('')}
+        <div class="sum" id="sum"></div>
+        <div class="actions"><button class="btn" id="go">Vsadit</button></div>
+        <div class="err msg" id="ferr"></div></div>`;
+    } else {
+      const held = others.filter((t) => (me.stakes[t.id] || 0) > 0);
+      html = `<div class="card"><h3>Přeskládej portfolio</h3>
+        <p class="hint">Můžeš vybrat až ${esc(fmt(R.cashoutMax))} a vložit je do jiných týmů. Nebo nech vše, jak je.</p>
+        <div id="done"></div>
+        <div class="lbl sec">Vybrat</div>
+        ${held.length ? held.map((t) => rowHTML('out', t, draft.out[t.id] || {}, ` <span class="have">máš ${esc(fmtM(me.stakes[t.id]))}</span>`)).join('') : '<p class="hint">Nemáš z čeho vybírat.</p>'}
+        <div class="lbl sec">Vložit</div>
+        ${others.map((t) => rowHTML('in', t, draft.in[t.id] || {})).join('')}
+        <div class="sum" id="sum"></div>
+        <div class="actions"><button class="btn" id="go">Potvrdit přesun</button><button class="btn ghost" id="hold">Nic neměním</button></div>
+        <div class="err msg" id="ferr"></div></div>`;
+    }
+    $('main').innerHTML = html;
+    $('main').querySelectorAll('.arow').forEach(wireRow);
+    $('go').onclick = () => submit(false);
+    if ($('hold')) $('hold').onclick = () => submit(true);
+    updateForm();
+  }
+
+  function limitFor(kind, t) {
+    const R = me.rules;
+    const cur = draft[kind][t]?.amt || 0;
+    if (R.mode === 'initial') return cur + (R.capital - sumOf(draft.in));
+    if (kind === 'out') return Math.min(me.stakes[t] || 0, cur + (R.cashoutMax - sumOf(draft.out)));
+    return cur + (sumOf(draft.out) - sumOf(draft.in));
+  }
+
+  function setAmt(kind, t, v) {
+    v = Math.max(0, Math.min(Math.round(v), Math.max(0, limitFor(kind, t))));
+    const e = draft[kind][t] || (draft[kind][t] = { amt: 0, why: '' });
+    e.amt = v;
+    if (kind === 'out' && v > 0 && draft.in[t]) { delete draft.in[t]; const r = $('main').querySelector(`.arow[data-k="in"][data-t="${t}"]`); if (r) syncRow(r); }
+    saveDraft();
+    updateForm();
+  }
+
+  function syncRow(row) {
+    const kind = row.dataset.k, t = row.dataset.t, e = draft[kind][t] || { amt: 0, why: '' };
+    const inp = row.querySelector('.amt');
+    if (document.activeElement !== inp) inp.value = plain(e.amt);
+    row.querySelector('input[type=range]').value = e.amt;
+    row.classList.toggle('has', e.amt > 0);
+  }
+
+  function wireRow(row) {
+    const kind = row.dataset.k, t = row.dataset.t;
+    const rng = row.querySelector('input[type=range]'), inp = row.querySelector('.amt'), why = row.querySelector('.why');
+    rng.addEventListener('input', () => setAmt(kind, t, +rng.value));
+    inp.addEventListener('input', () => setAmt(kind, t, parseAmt(inp.value)));
+    inp.addEventListener('blur', () => syncRow(row));
+    inp.addEventListener('focus', () => inp.select());
+    why.addEventListener('input', () => { (draft[kind][t] || (draft[kind][t] = { amt: 0, why: '' })).why = why.value; saveDraft(); updateForm(); });
+    row.querySelectorAll('[data-q]').forEach((b) => (b.onclick = () => {
+      const cur = draft[kind][t]?.amt || 0, q = b.dataset.q;
+      setAmt(kind, t, q === 'rest' ? limitFor(kind, t) : q === '0' ? 0 : cur + Number(q));
+    }));
+  }
+
+  function clientErrors() {
+    const R = me.rules, errs = [];
+    const inT = sumOf(draft.in), outT = sumOf(draft.out);
+    for (const k of ['out', 'in']) for (const [t, e] of Object.entries(draft[k])) if (e.amt > 0 && (e.why || '').trim().length < 3) errs.push(`Napiš proč u týmu ${team(t).name}.`);
+    if (R.mode === 'initial' && inT !== R.capital) errs.unshift(`Zbývá rozdělit ${fmt(R.capital - inT)}.`);
+    if (R.mode !== 'initial' && inT !== outT) errs.unshift(inT < outT ? `Zbývá vložit ${fmt(outT - inT)}.` : 'Vkládáš víc, než vybíráš.');
+    return errs;
+  }
+
+  function updateForm() {
+    if (!$('sum')) return;
+    $('main').querySelectorAll('.arow').forEach((row) => {
+      syncRow(row);
+      if (row.dataset.k === 'in') row.classList.toggle('off', !!(draft.out[row.dataset.t]?.amt));
+    });
+    const R = me.rules, inT = sumOf(draft.in), outT = sumOf(draft.out);
+    const errs = clientErrors();
+    if (R.mode === 'initial') {
+      $('sum').innerHTML = `<span>Rozděleno</span><b>${esc(fmt(inT))} / ${esc(fmtM(R.capital))}</b>`;
+      renderFan(R.capital - inT, 'Zbývá rozdělit', R.capital);
+    } else {
+      $('sum').innerHTML = `<span>Vybráno ${esc(fmt(outT))}</span><b>vloženo ${esc(fmt(inT))}</b>`;
+      renderFan(outT - inT, outT ? 'Zbývá vložit' : 'Max. výběr', outT ? outT : R.cashoutMax, !outT);
+    }
+    $('sum').classList.toggle('good', !errs.length);
+    $('go').disabled = errs.length > 0 || (R.mode !== 'initial' && outT === 0);
+    $('ferr').textContent = errs[0] && (inT > 0 || outT > 0) ? errs[0] : '';
+    const sub = me.slip?.submitted;
+    $('done').innerHTML = sub ? '<div class="done">Odesláno ✓ Dokud se sázky nezavřou, můžeš to ještě změnit a odeslat znovu.</div>' : '';
+  }
+
+  async function submit(hold) {
+    $('ferr').textContent = '';
+    const body = { op: 'submit', sid, pin, notes: collectNotes(), out: hold ? {} : draft.out, in: hold ? {} : draft.in };
+    $('go').disabled = true;
+    const r = await post(body);
+    if (!r.ok) { $('ferr').textContent = r.error; updateForm(); return; }
+    me.slip = { ...(me.slip || {}), out: body.out, in: body.in, submitted: true };
+    if (hold) { draft = { out: {}, in: {} }; $('main').querySelectorAll('.arow').forEach(syncRow); }
+    updateForm();
+    $('done').innerHTML = `<div class="done">${hold ? 'Nic neměníš ✓' : 'Vsazeno ✓'} Dokud se sázky nezavřou, můžeš to ještě změnit.</div>`;
+  }
+
+  function renderSummary() {
+    const s = me.slip;
+    let html = '';
+    if (s?.submitted && (Object.keys(s.in || {}).length || Object.keys(s.out || {}).length)) {
+      html = `<div class="card"><h3>Tvoje rozhodnutí v bloku ${S.block}</h3>` +
+        Object.entries(s.out || {}).map(([t, e]) => `<div class="slipline">Vybráno z ${esc(team(t).name)}: <b>${esc(fmt(e.amt))}</b><br><span>${esc(e.why)}</span></div>`).join('') +
+        Object.entries(s.in || {}).map(([t, e]) => `<div class="slipline">${esc(team(t).name)}: <b>${esc(fmt(e.amt))}</b><br><span>${esc(e.why)}</span></div>`).join('') + '</div>';
+    } else if (S.phase === 'lobby' || S.phase === 'pitch') {
+      html = `<div class="card"><h3>${me.rules.mode === 'initial' ? `Máš ${esc(fmt(me.rules.capital))}` : 'Tvoje investice běží'}</h3>
+        <p class="hint">${me.rules.mode === 'initial' ? 'Po pitchích je rozdělíš mezi ostatní týmy. Vsadit musíš všechno.' : `V tomto bloku můžeš přesunout až ${esc(fmt(me.rules.cashoutMax))}.`}</p></div>`;
+    }
+    $('main').innerHTML = html;
+    $('fan').classList.add('hidden');
+  }
+
+  function renderFan(remaining, label, total, idle) {
+    const fan = $('fan');
+    fan.classList.remove('hidden');
+    const n = Math.max(0, Math.min(10, Math.ceil(remaining / 100000)));
+    const bills = $('bills');
+    if (bills.children.length !== 10) bills.innerHTML = Array.from({ length: 10 }, (_, i) => billHTML(i)).join('');
+    [...bills.children].forEach((b, i) => {
+      const on = i < n, k = n > 1 ? i - (n - 1) / 2 : 0;
+      b.style.opacity = on ? 1 : 0;
+      b.style.transform = on ? `rotate(${k * 7}deg)` : 'rotate(0deg) translateY(140px)';
+    });
+    $('fanlab').innerHTML = remaining > 0 ? `${label}: <b>${esc(fmt(remaining))}</b>` : idle ? '' : 'Vše rozděleno ✓';
+  }
+
+  function renderMain() {
+    const key = `${S.block}|${S.phase === 'betting' ? 'bet' : 'view'}|${me.rules.mode}|${me.id}`;
+    if (key === formKey && S.phase === 'betting') return;
+    formKey = key;
+    if (S.phase === 'betting') buildForm(); else renderSummary();
+  }
+
+  async function tick() {
+    const s = await get(auth());
+    S = s;
+    if (s.me) {
+      me = s.me; meFail = 0;
+      $('login').classList.add('hidden');
+      $('game').classList.remove('hidden');
+      renderHeader(); renderStatus(); renderMain(); renderPortfolio(); renderNotes();
+    } else if (sid && s.meError) {
+      if (++meFail >= 3) logout();
+    } else if (!sid) showLogin();
+  }
+
+  loadPortraits();
+  setInterval(() => { if (S && me) renderStatus(); }, 500);
+  poll(tick, 2500);
+})();

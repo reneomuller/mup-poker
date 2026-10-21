@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b2a1e">
+<title>Investiční stůl · hráč</title>
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/play.css">
+</head>
+<body>
+<main id="app">
+  <section id="login" class="hidden"></section>
+  <section id="game" class="hidden">
+    <header class="top">
+      <div><div class="who" id="who"></div><div class="pill" id="myteam"></div></div>
+      <div class="pf"><div class="lbl">Portfolio</div><div class="pfv serif" id="pfv">—</div></div>
+    </header>
+    <div class="card status" id="status"></div>
+    <div id="main"></div>
+    <div class="card" id="portfolio"></div>
+    <div class="card" id="notes"></div>
+    <p class="foot muted">Odhlásit se: <a href="#" id="logout">změnit hráče</a></p>
+  </section>
+</main>
+<div class="fan hidden" id="fan"><div class="fanlab" id="fanlab"></div><div class="bills" id="bills"></div></div>
+<script src="/common.js"></script>
+<script src="/play.js"></script>
+</body>
+</html>

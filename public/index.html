@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b2a1e">
+<title>Investiční stůl · RainbowJet × MUP</title>
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/play.css">
+</head>
+<body>
+<main>
+  <div class="hero"><div class="bills" id="b"></div><h1>Investiční stůl</h1><p>RainbowJet × MUP</p></div>
+  <a class="btn" href="/play" style="text-align:center;text-decoration:none">Jsem student</a>
+  <a class="btn ghost" href="/table" style="text-align:center;text-decoration:none">Stůl na projektor</a>
+  <a class="btn ghost" href="/dealer" style="text-align:center;text-decoration:none">Dealer</a>
+</main>
+<script src="/common.js"></script>
+<script>
+  document.getElementById('b').innerHTML = [0, 1, 2, 3, 4].map((i) => MUP.billHTML(i)).join('');
+  document.querySelectorAll('.hero .bill').forEach((b, i) => { b.style.transform = `translateX(-50%) rotate(${(i - 2) * 9}deg)`; });
+  MUP.loadPortraits();
+</script>
+</body>
+</html>

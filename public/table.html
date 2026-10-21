@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Investiční stůl · RainbowJet × MUP</title>
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/table.css">
+</head>
+<body>
+<div class="stage" id="stage">
+  <div class="tbl"><div class="felt"><div class="spot-light" id="light"></div><div class="track"></div></div></div>
+  <div class="abs banner"><div class="blk" id="blk">Blok 1 / 5</div><div class="ph" id="ph">Připojte se ke stolu</div></div>
+  <div class="abs board" id="board"></div>
+  <div class="abs pot hidden" id="pot"><div class="pile" id="pile"></div><div class="lab" id="potlab"></div></div>
+  <div class="abs join hidden" id="join"><div class="qr" id="qr"></div><div><div class="t1">Připojte se ke stolu</div><div class="t2" id="joinurl"></div><div class="t3">Naskenujte kód, vyberte svůj tým a zvolte si PIN.</div></div></div>
+  <div class="abs qr-mini hidden" id="qrmini"></div>
+  <div class="abs qr-mini-l hidden" id="qrminil"></div>
+  <div class="abs glasswrap" id="glass"></div>
+  <div class="abs brand">RainbowJet × MUP</div>
+  <div class="boardscreen" id="boardscreen">
+    <div>
+      <div class="kick" id="bkick">Ocenění startupů</div>
+      <h2>Jak se mění ocenění</h2>
+      <svg class="chart" id="chart" viewBox="0 0 1000 560" preserveAspectRatio="none"></svg>
+    </div>
+    <div>
+      <div class="kick">Pořadí</div>
+      <h2>Stůl</h2>
+      <ol class="rank" id="rank"></ol>
+      <div class="inv"><div class="kick">Nejlepší investoři</div><div id="inv"></div></div>
+    </div>
+  </div>
+  <div class="credits">Portréty: Wikipedia / Wikimedia Commons</div>
+</div>
+<script src="/vendor/qrcode.js"></script>
+<script src="/common.js"></script>
+<script src="/table.js"></script>
+</body>
+</html>

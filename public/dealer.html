@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b2a1e">
+<title>Dealer · Investiční stůl</title>
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/play.css">
+<link rel="stylesheet" href="/dealer.css">
+</head>
+<body>
+<main id="app" class="dealer">
+  <section id="dlogin" class="hidden">
+    <div class="hero"><h1>Dealer</h1><p>Investiční stůl · RainbowJet × MUP</p></div>
+    <div class="card"><div class="field"><label class="lbl">Heslo dealera</label><input class="input" id="dpw" type="password"></div>
+      <button class="btn" id="dgo" style="width:100%">Vstoupit</button><div class="err msg" id="derr"></div></div>
+  </section>
+  <section id="dgame" class="hidden">
+    <header class="top"><div><div class="who">Dealer</div><div class="muted small" id="dsub"></div></div>
+      <div class="links"><a href="/table" target="_blank">Stůl ↗</a> · <a href="/play" target="_blank">Hráč ↗</a></div></header>
+    <div id="warns"></div>
+    <div class="card" id="ctrl"></div>
+    <div class="card" id="bets"></div>
+    <div class="card" id="rj"></div>
+    <div class="card" id="vals"></div>
+    <div class="card" id="players"></div>
+    <div class="card" id="teams"></div>
+    <div class="card" id="tools"></div>
+  </section>
+</main>
+<script src="/common.js"></script>
+<script src="/dealer.js"></script>
+</body>
+</html>
