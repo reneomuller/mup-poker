@@ -189,7 +189,7 @@
       m.style.marginLeft = x * 0.4 + 'cqw'; m.style.marginTop = y * 0.25 + 'cqw';
       pile.appendChild(m);
     }
-    $('potlab').innerHTML = `<b>${s.betCount}</b> / ${s.playerCount} investorů vsadilo`;
+    $('potlab').innerHTML = `<b>${s.betCount}</b> / ${s.playerCount} investovalo`;
   }
 
   function renderGlass(s) {
@@ -291,6 +291,38 @@
       : '<div class="row muted">Zatím nikdo neinvestoval.</div>';
   }
 
+  // answers the dealer puts on the shared screen (team, question, answer; no names)
+  const SLOTS = [[27, 33], [73, 33], [27, 66], [73, 66], [50, 66], [50, 23], [15, 49], [85, 49], [38, 80], [62, 80], [38, 21], [62, 21]];
+  const cloudEls = new Map();
+  function cloudSize(p) {
+    const a = Math.abs(p.amt || 0), n = (p.a || '').length;
+    if (a >= 400000 || n > 160) return 'l';
+    if (a >= 150000 || n > 70) return 'm';
+    return 's';
+  }
+  function renderClouds(s) {
+    const pins = s.pins || [], box = $('clouds');
+    const ids = new Set(pins.map((p) => p.id));
+    for (const [id, el] of cloudEls) if (!ids.has(id)) { el.classList.add('out'); setTimeout(() => el.remove(), 400); cloudEls.delete(id); }
+    pins.forEach((p, i) => {
+      let el = cloudEls.get(p.id);
+      const t = s.teams.find((x) => x.id === p.team) || { name: '', color: '#888' };
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'cloud ' + cloudSize(p);
+        const amt = p.amt ? `<span class="camt ${p.amt < 0 ? 'neg' : ''}">${p.amt < 0 ? '−' : '+'}${esc(fmtM(Math.abs(p.amt)))}</span>` : '';
+        el.innerHTML = `<div class="ch"><span class="dot" style="background:${t.color}"></span><b>${esc(t.name)}</b>${amt}</div>
+          <div class="cq">${esc(p.q)}</div><div class="ca">${esc(p.a)}</div>`;
+        el.style.setProperty('--tc', t.color);
+        el.style.setProperty('--r', ((((p.id.charCodeAt(0) + p.id.charCodeAt(1)) % 7) - 3) * 0.8) + 'deg');
+        box.appendChild(el);
+        cloudEls.set(p.id, el);
+      }
+      const [x, y] = SLOTS[i % SLOTS.length];
+      el.style.left = x + '%'; el.style.top = y + '%';
+    });
+  }
+
   async function tick() {
     const s = await get();
     const first = !built;
@@ -314,6 +346,7 @@
       renderSeats(s, !first);
     }
     renderPot(s);
+    renderClouds(s);
   }
 
   setInterval(() => { if (S) renderGlass(S); }, 250);

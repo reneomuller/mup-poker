@@ -74,7 +74,7 @@
   function renderStatus() {
     const s = S;
     let t1 = PHASES[s.phase] || '', t2 = `Blok ${s.block} z ${s.maxBlock}`;
-    if (s.phase === 'pitch' && s.presenting) { t1 = 'Pitchuje ' + team(s.presenting).name; t2 = 'Piš si poznámky, sázky se otevřou po pitchích.'; }
+    if (s.phase === 'pitch' && s.presenting) { t1 = 'Pitchuje ' + team(s.presenting).name; t2 = 'Piš si poznámky, investovat se bude po pitchích.'; }
     if (s.phase === 'lobby') { t1 = 'Sedíš u stolu'; t2 = 'Počkej, až dealer otevře blok.'; }
     if (s.phase === 'closed') t2 = 'Čeká se na showdown na plátně.';
     if (s.phase === 'showdown') t2 = 'Peníze třídy jsou na stole. Sleduj plátno.';
@@ -139,38 +139,63 @@
     $('portfolio').innerHTML = head + rows;
   }
 
-  // ----- notes -----
-  let noteTimer = null;
-  function renderNotes() {
-    const key = S.block + '|' + me.id;
-    if (key === notesKey) return;
-    notesKey = key;
-    const notes = me.slip?.notes || {};
-    $('notes').innerHTML = `<h3>Poznámky ke startupům</h3><p class="hint">Uvidí je jen RainbowJet. Ukládají se samy.</p>` +
-      S.teams.filter((t) => t.id !== me.team).map((t) => {
-        const n = typeof notes[t.id] === 'string' ? { like: notes[t.id] } : notes[t.id] || {};
-        return `<div class="nrow"><div class="lbl"><span class="dot" style="background:${t.color}"></span>${esc(t.name)}</div>
-          <div class="nk">Co tě zaujalo</div><textarea class="input" data-n="${t.id}" data-k="like" rows="2" placeholder="Co tě na nápadu nebo týmu zaujalo?">${esc(n.like || '')}</textarea>
-          <div class="nk">Čemu nevěříš</div><textarea class="input" data-n="${t.id}" data-k="doubt" rows="2" placeholder="Který předpoklad ti nesedí?">${esc(n.doubt || '')}</textarea></div>`;
-      }).join('') +
-      '<div class="saved" id="nsaved"></div>';
-    $('notes').querySelectorAll('textarea').forEach((ta) => ta.addEventListener('input', () => {
-      $('nsaved').textContent = 'Ukládám…';
+  // ----- private messages from RainbowJet to my team -----
+  let msgKey = null;
+  function renderMsgs() {
+    const m = me.msgs || [];
+    const key = me.team + JSON.stringify(m.map((x) => x.ts));
+    if (key === msgKey) return;
+    msgKey = key;
+    $('msgs').classList.toggle('hidden', !m.length);
+    if (!m.length) return;
+    $('msgs').innerHTML = `<h3>Zprávy od RainbowJet</h3><p class="hint">Vidí je jen tvůj tým.</p>` + m.map((x) => {
+      const head = x.kind === 'revalue' ? `Přecenění: ${fmtM(x.from)} → ${fmtM(x.to)}`
+        : x.kind === 'smart' ? `Smart money: ${x.amt > 0 ? '+' : '−'}${fmtM(Math.abs(x.amt))}` : 'Zpráva';
+      const d = new Date(x.ts);
+      return `<div class="msg1"><div class="mh"><b>${esc(head)}</b><span>Blok ${x.block} · ${d.getDate()}. ${d.getMonth() + 1}.</span></div>${x.text ? `<div class="mt">${esc(x.text)}</div>` : ''}</div>`;
+    }).join('');
+  }
+
+  // ----- notes: they feed the discussion after each round -----
+  let noteTimer = null, notesDraft = {};
+  const NOTE_Q = { like: ['Co tě zaujalo', 'Co tě na nápadu nebo týmu zaujalo?'], doubt: ['Čemu nevěříš', 'Který předpoklad ti nesedí?'] };
+  function noteFields(t) {
+    const n = notesDraft[t] || {};
+    return ['like', 'doubt'].map((k) => `<div class="nk">${NOTE_Q[k][0]}</div><textarea class="input note" data-n="${t}" data-k="${k}" rows="2" placeholder="${NOTE_Q[k][1]}">${esc(n[k] || '')}</textarea>`).join('');
+  }
+  const setSaved = (txt) => document.querySelectorAll('.nsaved').forEach((e) => { e.textContent = txt; });
+  function wireNotes(root) {
+    root.querySelectorAll('textarea.note').forEach((ta) => ta.addEventListener('input', () => {
+      const t = ta.dataset.n, k = ta.dataset.k;
+      (notesDraft[t] = notesDraft[t] || { like: '', doubt: '' })[k] = ta.value;
+      document.querySelectorAll(`textarea.note[data-n="${t}"][data-k="${k}"]`).forEach((o) => { if (o !== ta) o.value = ta.value; });
+      setSaved('Ukládám…');
       clearTimeout(noteTimer);
       noteTimer = setTimeout(saveNotes, 1200);
     }));
   }
+  function renderNotes() {
+    const key = S.block + '|' + me.id;
+    if (key !== notesKey) {
+      notesKey = key;
+      notesDraft = {};
+      for (const [t, n] of Object.entries(me.slip?.notes || {})) notesDraft[t] = typeof n === 'string' ? { like: n, doubt: '' } : { like: n.like || '', doubt: n.doubt || '' };
+      $('notes').innerHTML = `<h3>Poznámky ke startupům</h3><p class="hint">Na diskusi po kole. Nejlepší odpovědi můžou jít bez jména na plátno.</p>` +
+        S.teams.filter((t) => t.id !== me.team).map((t) => `<div class="nrow"><div class="lbl"><span class="dot" style="background:${t.color}"></span>${esc(t.name)}</div>${noteFields(t.id)}</div>`).join('') +
+        '<div class="saved nsaved"></div>';
+      wireNotes($('notes'));
+    }
+    // in the first investing round the notes sit inside the investing form
+    $('notes').classList.toggle('hidden', S.phase === 'betting' && me.rules.mode === 'initial');
+  }
   const collectNotes = () => {
     const n = {};
-    $('notes').querySelectorAll('textarea').forEach((ta) => {
-      if (!ta.value.trim()) return;
-      (n[ta.dataset.n] = n[ta.dataset.n] || { like: '', doubt: '' })[ta.dataset.k] = ta.value;
-    });
+    for (const [t, v] of Object.entries(notesDraft)) if ((v.like || '').trim() || (v.doubt || '').trim()) n[t] = v;
     return n;
   };
   async function saveNotes() {
     const r = await post({ op: 'notes', sid, pin, notes: collectNotes() });
-    $('nsaved').textContent = r.ok ? 'Uloženo' : r.error;
+    setSaved(r.ok ? 'Uloženo' : r.error);
   }
 
   // ----- allocation -----
@@ -182,13 +207,14 @@
   }
   const saveDraft = () => { try { localStorage.setItem(draftKey(), JSON.stringify(draft)); } catch {} };
 
-  function rowHTML(kind, t, e, extra = '') {
+  function rowHTML(kind, t, e, extra = '', withNotes = false) {
     return `<div class="arow ${e.amt ? 'has' : ''}" data-k="${kind}" data-t="${t.id}">
       <div class="ahead"><span class="dot" style="background:${t.color}"></span><span class="an">${esc(t.name)}${extra}</span>
         <input class="amt" inputmode="numeric" value="${plain(e.amt || 0)}" aria-label="Částka"></div>
       <input type="range" min="0" max="1000000" step="${STEP}" value="${e.amt || 0}">
       <div class="qbtns"><button data-q="0">0</button><button data-q="-50000">−50 tis.</button><button data-q="50000">+50 tis.</button><button data-q="rest">+ zbytek</button></div>
       <textarea class="input why" rows="2" placeholder="${kind === 'out' ? 'Proč vybíráš? (povinné)' : 'Proč investuješ? (povinné)'}">${esc(e.why || '')}</textarea>
+      ${withNotes ? `<div class="rnotes">${noteFields(t.id)}</div>` : ''}
     </div>`;
   }
 
@@ -199,11 +225,12 @@
     let html = '';
     if (R.mode === 'initial') {
       html = `<div class="card"><h3>Rozděl ${esc(fmt(R.capital))}</h3>
-        <p class="hint">Investuj všechno, klidně jen do jednoho týmu. Do vlastního nemůžeš. U každé investice napiš proč.</p>
+        <p class="hint">Investuj všechno, klidně jen do jednoho týmu. Do vlastního nemůžeš. U každé investice napiš proč a ke každému týmu, co tě zaujalo a čemu nevěříš. Probereme to po kole.</p>
         <div id="done"></div>
-        ${others.map((t) => rowHTML('in', t, draft.in[t.id] || {})).join('')}
+        ${others.map((t) => rowHTML('in', t, draft.in[t.id] || {}, '', true)).join('')}
+        <div class="saved nsaved"></div>
         <div class="sum" id="sum"></div>
-        <div class="actions"><button class="btn" id="go">Vsadit</button></div>
+        <div class="actions"><button class="btn" id="go">Investovat</button></div>
         <div class="err msg" id="ferr"></div></div>`;
     } else {
       const held = others.filter((t) => (me.stakes[t.id] || 0) > 0);
@@ -220,6 +247,7 @@
     }
     $('main').innerHTML = html;
     $('main').querySelectorAll('.arow').forEach(wireRow);
+    wireNotes($('main'));
     $('go').onclick = () => submit(false);
     if ($('hold')) $('hold').onclick = () => submit(true);
     updateForm();
@@ -292,7 +320,7 @@
     $('go').disabled = errs.length > 0 || (R.mode !== 'initial' && outT === 0);
     $('ferr').textContent = errs[0] && (inT > 0 || outT > 0) ? errs[0] : '';
     const sub = me.slip?.submitted;
-    $('done').innerHTML = sub ? '<div class="done">Odesláno ✓ Dokud se sázky nezavřou, můžeš to ještě změnit a odeslat znovu.</div>' : '';
+    $('done').innerHTML = sub ? '<div class="done">Odesláno ✓ Dokud se investování neuzavře, můžeš to ještě změnit a odeslat znovu.</div>' : '';
   }
 
   async function submit(hold) {
@@ -304,7 +332,7 @@
     me.slip = { ...(me.slip || {}), out: body.out, in: body.in, submitted: true };
     if (hold) { draft = { out: {}, in: {} }; $('main').querySelectorAll('.arow').forEach(syncRow); }
     updateForm();
-    $('done').innerHTML = `<div class="done">${hold ? 'Nic neměníš ✓' : 'Vsazeno ✓'} Dokud se sázky nezavřou, můžeš to ještě změnit.</div>`;
+    $('done').innerHTML = `<div class="done">${hold ? 'Nic neměníš ✓' : 'Investováno ✓'} Dokud se investování neuzavře, můžeš to ještě změnit.</div>`;
   }
 
   function renderSummary() {
@@ -316,7 +344,7 @@
         Object.entries(s.in || {}).map(([t, e]) => `<div class="slipline">${esc(team(t).name)}: <b>${esc(fmt(e.amt))}</b><br><span>${esc(e.why)}</span></div>`).join('') + '</div>';
     } else if (S.phase === 'lobby' || S.phase === 'pitch') {
       html = `<div class="card"><h3>${me.rules.mode === 'initial' ? `Máš ${esc(fmt(me.rules.capital))}` : 'Tvoje investice běží'}</h3>
-        <p class="hint">${me.rules.mode === 'initial' ? 'Po pitchích je rozdělíš mezi ostatní týmy. Vsadit musíš všechno.' : `V tomto bloku můžeš přesunout až ${esc(fmt(me.rules.cashoutMax))}.`}</p></div>`;
+        <p class="hint">${me.rules.mode === 'initial' ? 'Po pitchích je rozdělíš mezi ostatní týmy. Investovat musíš všechno.' : `V tomto bloku můžeš přesunout až ${esc(fmt(me.rules.cashoutMax))}.`}</p></div>`;
     }
     $('main').innerHTML = html;
     $('fan').classList.add('hidden');
@@ -350,7 +378,7 @@
       me = s.me; meFail = 0;
       $('login').classList.add('hidden');
       $('game').classList.remove('hidden');
-      renderHeader(); renderStatus(); renderMain(); renderPortfolio(); renderNotes();
+      renderHeader(); renderStatus(); renderMsgs(); renderNotes(); renderMain(); renderPortfolio();
     } else if (sid && s.meError) {
       if (++meFail >= 3) logout();
     } else if (!sid) showLogin();

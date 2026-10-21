@@ -60,6 +60,7 @@ function publicState(meta, players, slips) {
     presenting: meta.presenting, timerEnd: meta.timerEnd, timerTotal: meta.timerTotal, timerLabel: meta.timerLabel,
     screen: meta.screen, regOpen: meta.regOpen, history: meta.history, reveal: meta.reveal,
     betCount, playerCount: plist.length, players: plist, leaders, storage: S.storageMode, cfg: G.CFG,
+    pins: meta.pins || [],
   };
 }
 
@@ -82,6 +83,7 @@ function meState(meta, p, slips) {
   return {
     id: p.id, name: p.name, team: p.team, stakes, portfolio: r0(G.portfolio(meta, p.id)), invested: G.hasHoldings(meta, p.id),
     start: G.CFG.STUDENT_CAPITAL, series, rules: G.rules(meta, p.id), slip: slips[p.id] || null,
+    msgs: ((meta.fb || {})[p.team] || []).slice().reverse(),
   };
 }
 
@@ -131,6 +133,12 @@ function dealerState(meta, players, slips) {
 }
 
 // ---------- actions ----------
+// Private feedback from RainbowJet, visible only to members of that team.
+function addMsg(meta, team, msg) {
+  meta.fb = meta.fb || {};
+  (meta.fb[team] = meta.fb[team] || []).push({ ts: Date.now(), block: meta.block, ...msg });
+}
+
 async function backup(meta) {
   const b = (await S.getJSON('backups')) || [];
   b.push(meta);
@@ -195,7 +203,7 @@ async function studentAction(b) {
     return ok();
   }
   if (b.op === 'submit') {
-    if (meta.phase !== 'betting') return fail('Sázky teď nejsou otevřené.');
+    if (meta.phase !== 'betting') return fail('Investování teď není otevřené.');
     const v = G.validate(meta, p.id, p.team, { out: b.out, in: b.in });
     if (!v.ok) return fail(v.errors[0], { errors: v.errors });
     const prev = slips[p.id] || {};
@@ -234,7 +242,7 @@ async function dealerAction(b) {
 
     case 'showdown': {
       if (meta.settled[blk + 'c']) return fail('Showdown už proběhl.');
-      if (!['betting', 'closed'].includes(meta.phase)) return fail('Nejdřív otevři a zavři sázky.');
+      if (!['betting', 'closed'].includes(meta.phase)) return fail('Nejdřív otevři a zavři investování.');
       await backup(structuredClone(meta));
       const delta = {}, skipped = [];
       let n = 0;
@@ -275,6 +283,11 @@ async function dealerAction(b) {
       await backup(structuredClone(meta));
       const d = G.apply(meta, G.RJ, v);
       for (const t in d) d[t] = r0(d[t]);
+      for (const t of meta.teams) {
+        const i = v.in[t.id], o = v.out[t.id];
+        if (i) addMsg(meta, t.id, { kind: 'smart', amt: i.amt, text: i.why });
+        if (o) addMsg(meta, t.id, { kind: 'smart', amt: -o.amt, text: o.why });
+      }
       meta.settled[blk + 'r'] = true;
       meta.phase = 'rj';
       meta.reveal = { seq: ++meta.seq, block: blk, kind: 'rj', delta: d };
@@ -285,17 +298,28 @@ async function dealerAction(b) {
       return ok();
     }
     case 'revalue': {
-      if (['betting', 'closed'].includes(meta.phase)) return fail('Během sázek nelze přeceňovat.');
+      if (['betting', 'closed'].includes(meta.phase)) return fail('Během investování nelze přeceňovat.');
+      const V = Object.fromEntries(Object.entries(b.V || {}).filter(([, v]) => Number(v) > 0));
+      const why = b.why || {};
+      const hasV = Object.keys(V).length > 0;
+      if (!hasV && !Object.values(why).some((w) => String(w || '').trim())) return fail('Zadej nové ocenění nebo zprávu pro tým.');
       await backup(structuredClone(meta));
       const before = {};
       for (const t of meta.teams) before[t.id] = G.valuation(meta, t.id);
-      G.revalue(meta, b.V || {});
+      if (hasV) G.revalue(meta, V);
       const delta = {};
       for (const t of meta.teams) delta[t.id] = r0(G.valuation(meta, t.id) - before[t.id]);
-      const d = new Date();
-      meta.history.push(G.snapshot(meta, `Přecenění ${d.getDate()}. ${d.getMonth() + 1}.`));
-      recordPf(meta);
-      meta.reveal = { seq: ++meta.seq, block: blk, kind: 'revalue', delta };
+      for (const t of meta.teams) {
+        const text = String(why[t.id] || '').trim().slice(0, 600);
+        const moved = V[t.id] !== undefined;
+        if (moved || text) addMsg(meta, t.id, moved ? { kind: 'revalue', from: r0(before[t.id]), to: r0(G.valuation(meta, t.id)), text } : { kind: 'note', text });
+      }
+      if (hasV) {
+        const d = new Date();
+        meta.history.push(G.snapshot(meta, `Přecenění ${d.getDate()}. ${d.getMonth() + 1}.`));
+        recordPf(meta);
+        meta.reveal = { seq: ++meta.seq, block: blk, kind: 'revalue', delta };
+      }
       await save();
       return ok();
     }
@@ -303,8 +327,24 @@ async function dealerAction(b) {
       if (blk >= G.CFG.MAX_BLOCK) return fail('Toto je poslední blok. Použij Demo Day.');
       await backup(structuredClone(meta));
       meta.block = blk + 1;
-      meta.phase = 'lobby'; meta.presenting = null; meta.reveal = null;
+      meta.phase = 'lobby'; meta.presenting = null; meta.reveal = null; meta.pins = [];
       setTimer(meta, 0);
+      await save();
+      return ok();
+    }
+    case 'pin': {
+      if (!meta.teams.some((t) => t.id === b.team)) return fail('Neznámý tým.');
+      const a = String(b.a || '').trim().slice(0, 600);
+      if (!a) return fail('Prázdná odpověď.');
+      meta.pins = meta.pins || [];
+      if (meta.pins.some((p) => p.team === b.team && p.a === a)) return ok();
+      meta.pins.push({ id: crypto.randomBytes(4).toString('hex'), team: b.team, q: String(b.q || '').slice(0, 60), a, amt: Math.round(Number(b.amt) || 0) });
+      if (meta.pins.length > 12) meta.pins.shift();
+      await save();
+      return ok();
+    }
+    case 'unpin': {
+      meta.pins = b.all ? [] : (meta.pins || []).filter((p) => p.id !== b.id);
       await save();
       return ok();
     }

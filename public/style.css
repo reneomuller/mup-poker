@@ -45,7 +45,7 @@ a { color: var(--gold-2); }
   box-shadow: 0 0 0 1.5px rgba(42,74,44,.7), 0 0 0 4px rgba(219,233,207,.6);
   display: grid; place-items: center;
 }
-.bill-face img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%; filter: grayscale(1) sepia(.9) hue-rotate(55deg) saturate(1.6) contrast(1.25) brightness(.92); mix-blend-mode: multiply; }
+.bill-face img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 12%; filter: grayscale(1) sepia(.9) hue-rotate(55deg) saturate(1.6) contrast(1.25) brightness(.92); mix-blend-mode: multiply; }
 .bill-face .ini { font-weight: 900; font-size: 18px; opacity: .7; }
 .bill-name { position: absolute; left: 0; right: 0; bottom: 3px; text-align: center; font-size: 6.5px; letter-spacing: .14em; text-transform: uppercase; font-family: var(--sans); font-weight: 700; opacity: .8; }
 

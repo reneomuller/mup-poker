@@ -50,8 +50,8 @@
   const PHASES = {
     lobby: 'Připojte se ke stolu',
     pitch: 'Pitch',
-    betting: 'Sázky jsou otevřené',
-    closed: 'Sázky jsou zavřené',
+    betting: 'Investujte!',
+    closed: 'Investování uzavřeno',
     showdown: 'Showdown',
     rj: 'Smart money odhaleno',
     final: 'Demo Day',
