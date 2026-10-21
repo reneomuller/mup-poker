@@ -87,7 +87,10 @@
       const reasons = [
         ...Object.entries(s?.out || {}).map(([t, e]) => `<div class="reason">Vybral z ${esc(team(t).name)} (${esc(fmt(e.amt))}): ${esc(e.why)}</div>`),
         ...Object.entries(s?.in || {}).map(([t, e]) => `<div class="reason">${esc(team(t).name)} (${esc(fmt(e.amt))}): ${esc(e.why)}</div>`),
-        ...Object.entries(s?.notes || {}).map(([t, n]) => `<div class="reason">Poznámka k ${esc(team(t).name)}: ${esc(n)}</div>`),
+        ...Object.entries(s?.notes || {}).map(([t, n]) => {
+          const o = typeof n === 'string' ? { like: n } : n;
+          return `<div class="reason">${esc(team(t).name)}: ${o.like ? `zaujalo – ${esc(o.like)}` : ''}${o.like && o.doubt ? '; ' : ''}${o.doubt ? `nevěří – ${esc(o.doubt)}` : ''}</div>`;
+        }),
       ].join('');
       return `<details class="brow"><summary><span><span class="dot" style="background:${team(r.team).color}"></span> ${esc(r.name)}</span>
         <span class="${sub ? 'ok' : 'no'}">${sub ? (parts.length ? esc(parts.join(', ')) : 'beze změny') : 'ještě nevsadil'}</span></summary>${reasons || '<div class="reason">Nic.</div>'}</details>`;
@@ -224,7 +227,11 @@
         if (!p) continue;
         for (const [t, e] of Object.entries(s.in || {})) rows.push([b, p.name, tn(p.team), 'vloženo', tn(t), e.amt, e.why]);
         for (const [t, e] of Object.entries(s.out || {})) rows.push([b, p.name, tn(p.team), 'vybráno', tn(t), e.amt, e.why]);
-        for (const [t, n] of Object.entries(s.notes || {})) rows.push([b, p.name, tn(p.team), 'poznámka', tn(t), '', n]);
+        for (const [t, n] of Object.entries(s.notes || {})) {
+          const o = typeof n === 'string' ? { like: n } : n;
+          if (o.like) rows.push([b, p.name, tn(p.team), 'zaujalo', tn(t), '', o.like]);
+          if (o.doubt) rows.push([b, p.name, tn(p.team), 'nevěří', tn(t), '', o.doubt]);
+        }
       }
     }
     const csv = '﻿' + rows.map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
@@ -237,7 +244,7 @@
   function renderWarns() {
     const w = [];
     if (S.storage === 'memory' && !/localhost|127\.0\.0\.1/.test(location.hostname)) w.push('Chybí databáze. Ve Vercelu: Storage → Upstash for Redis → Connect, pak Redeploy. Bez ní se sázky ztrácejí.');
-    if (D.dealerDefault) w.push('Heslo dealera je výchozí („mup-dealer“). Nastavte ve Vercelu proměnnou DEALER_PASSWORD.');
+    if (D.dealerDefault) w.push('Dealer je bez hesla (na testování). Před hodinou ho zamkněte: ve Vercelu nastavte DEALER_LOCK = 1 a DEALER_PASSWORD, pak Redeploy.');
     if (once('warns', w)) $('warns').innerHTML = w.map((x) => `<div class="warnbox">${esc(x)}</div>`).join('');
   }
 
@@ -258,6 +265,5 @@
     setInterval(() => { if (S) { const left = timeLeft(S); $('tleft') && ($('tleft').textContent = left === null ? 'Bez časovače' : `${S.timerLabel || 'Časovač'}: ${left > 0 ? clock(left) : 'čas vypršel'}`); } }, 500);
   }
 
-  if (pw) tryLogin(pw).then((ok) => { if (!ok) $('dlogin').classList.remove('hidden'); });
-  else $('dlogin').classList.remove('hidden');
+  tryLogin(pw || '').then((ok) => { if (!ok) $('dlogin').classList.remove('hidden'); });
 })();

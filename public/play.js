@@ -88,7 +88,40 @@
     setGlass(el.querySelector('.glass'), left === null ? 0.66 : s.timerTotal ? left / s.timerTotal : 0);
   }
 
+  let pfKey = null;
+  const dayLabel = (ts) => { const d = new Date(ts); return `${d.getDate()}. ${d.getMonth() + 1}.`; };
+  function sparkHTML() {
+    const raw = me.series.map(([ts, v]) => ({ ts, v }));
+    raw.push({ ts: MUP.now(), v: me.portfolio });
+    const days = [];
+    for (const p of raw) {
+      const key = new Date(p.ts).toDateString(), last = days[days.length - 1];
+      if (last && last.key === key) { last.v = p.v; last.ts = p.ts; } else days.push({ key, ...p });
+    }
+    let pts = days.length >= 2 ? days : raw;
+    if (pts.length < 2) pts = [pts[0], pts[0]];
+    const W = 320, Hh = 92, pad = 6;
+    const vals = pts.map((p) => p.v).concat(me.start);
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    if (hi - lo < 40000) { const m = (hi + lo) / 2; lo = m - 20000; hi = m + 20000; }
+    const x = (i) => pad + (i * (W - 2 * pad)) / (pts.length - 1);
+    const y = (v) => pad + (1 - (v - lo) / (hi - lo)) * (Hh - 2 * pad);
+    const up = me.portfolio >= me.start, col = up ? '#3fbf7a' : '#e8505b';
+    const line = pts.map((p, i) => `${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
+    const base = y(me.start).toFixed(1);
+    return `<svg class="spark" viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none" aria-label="Vývoj portfolia">
+        <defs><linearGradient id="sg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".35"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+        <polygon points="${x(0)},${Hh} ${line} ${x(pts.length - 1)},${Hh}" fill="url(#sg)"/>
+        <line x1="0" x2="${W}" y1="${base}" y2="${base}" stroke="rgba(242,234,214,.35)" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
+        <polyline points="${line}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+      </svg>
+      <div class="sparkx"><span>${esc(dayLabel(pts[0].ts))}</span><span>čárkovaně: vklad ${esc(fmtM(me.start))}</span><span>dnes</span></div>`;
+  }
+
   function renderPortfolio() {
+    const key = JSON.stringify([me.portfolio, me.stakes, me.series.length, S.teams.map((t) => t.V), new Date().toDateString()]);
+    if (key === pfKey) return;
+    pfKey = key;
     const rows = S.teams.filter((t) => t.id !== me.team).map((t) => {
       const v = me.stakes[t.id] || 0;
       const own = t.V ? (v / t.V) * 100 : 0;
@@ -96,7 +129,14 @@
         <span class="pv">${v ? esc(fmt(v)) : '—'}</span>
         <span class="ps">ocenění ${esc(fmtM(t.V))}${v ? ` · vlastníš ${own.toLocaleString('cs-CZ', { maximumFractionDigits: 2 })} %` : ''}</span></div>`;
     }).join('');
-    $('portfolio').innerHTML = `<h3>Moje portfolio</h3>${me.portfolio ? '' : '<p class="hint">Zatím nemáš žádné investice.</p>'}${rows}`;
+    let head = '<h3>Moje portfolio</h3><p class="hint">Zatím nemáš žádné investice.</p>';
+    if (me.invested) {
+      const pl = me.portfolio - me.start, pct = (pl / me.start) * 100, up = pl >= 0;
+      head = `<div class="pfhead"><div><div class="lbl">Moje portfolio</div><div class="pfbig serif">${esc(fmt(me.portfolio))}</div>
+          <div class="pl ${up ? 'up' : 'down'}">${up ? '+' : '−'}${esc(fmt(Math.abs(pl)))} · ${up ? '+' : '−'}${Math.abs(pct).toLocaleString('cs-CZ', { maximumFractionDigits: 1 })} %</div></div>
+          <img class="meme" src="/img/${up ? 'stonks' : 'not-stonks'}.webp" alt="${up ? 'stonks' : 'not stonks'}"></div>${sparkHTML()}`;
+    }
+    $('portfolio').innerHTML = head + rows;
   }
 
   // ----- notes -----
@@ -107,9 +147,12 @@
     notesKey = key;
     const notes = me.slip?.notes || {};
     $('notes').innerHTML = `<h3>Poznámky ke startupům</h3><p class="hint">Uvidí je jen RainbowJet. Ukládají se samy.</p>` +
-      S.teams.filter((t) => t.id !== me.team).map((t) => `
-        <div class="nrow"><div class="lbl"><span class="dot" style="background:${t.color}"></span>${esc(t.name)}</div>
-        <textarea class="input" data-n="${t.id}" rows="2" placeholder="Co tě zaujalo, čemu nevěříš…">${esc(notes[t.id] || '')}</textarea></div>`).join('') +
+      S.teams.filter((t) => t.id !== me.team).map((t) => {
+        const n = typeof notes[t.id] === 'string' ? { like: notes[t.id] } : notes[t.id] || {};
+        return `<div class="nrow"><div class="lbl"><span class="dot" style="background:${t.color}"></span>${esc(t.name)}</div>
+          <div class="nk">Co tě zaujalo</div><textarea class="input" data-n="${t.id}" data-k="like" rows="2" placeholder="Co tě na nápadu nebo týmu zaujalo?">${esc(n.like || '')}</textarea>
+          <div class="nk">Čemu nevěříš</div><textarea class="input" data-n="${t.id}" data-k="doubt" rows="2" placeholder="Který předpoklad ti nesedí?">${esc(n.doubt || '')}</textarea></div>`;
+      }).join('') +
       '<div class="saved" id="nsaved"></div>';
     $('notes').querySelectorAll('textarea').forEach((ta) => ta.addEventListener('input', () => {
       $('nsaved').textContent = 'Ukládám…';
@@ -119,7 +162,10 @@
   }
   const collectNotes = () => {
     const n = {};
-    $('notes').querySelectorAll('textarea').forEach((ta) => { if (ta.value.trim()) n[ta.dataset.n] = ta.value; });
+    $('notes').querySelectorAll('textarea').forEach((ta) => {
+      if (!ta.value.trim()) return;
+      (n[ta.dataset.n] = n[ta.dataset.n] || { like: '', doubt: '' })[ta.dataset.k] = ta.value;
+    });
     return n;
   };
   async function saveNotes() {

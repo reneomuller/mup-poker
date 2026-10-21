@@ -20,9 +20,10 @@ A poker-table investment game for the MUP course. Every student gets $1M to inve
 
 1. vercel.com → **Add New… → Project** → import `reneomuller/mup-poker` → **Deploy** (no settings needed).
 2. In the project: **Storage → Create Database → Upstash for Redis** (free plan) → **Connect** to this project.
-3. **Settings → Environment Variables** → add `DEALER_PASSWORD` = your dealer password.
-4. **Deployments → ⋯ → Redeploy**, so the database and password are picked up.
-5. Open `/dealer`, log in, and check there's no red warning at the top.
+3. **Deployments → ⋯ → Redeploy**, so the database is picked up.
+4. Open `/dealer` and check there's no "Chybí databáze" warning.
+
+The dealer screen is open (no password) for testing. To lock it: **Settings → Environment Variables** → `DEALER_LOCK` = `1` and `DEALER_PASSWORD` = your password → Redeploy.
 
 ## Before class
 
@@ -41,5 +42,5 @@ Mistake? **Vrátit poslední krok** undoes the last showdown, reveal, revaluatio
 
 ```
 npm install
-npm run dev   # http://localhost:3000, in-memory data, dealer password "mup-dealer"
+npm run dev   # http://localhost:3000, in-memory data
 ```

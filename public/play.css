@@ -69,3 +69,13 @@ input[type=range] { width: 100%; margin: 12px 0 6px; accent-color: var(--gold); 
 .fanlab b { font-family: var(--serif); font-size: 18px; color: var(--gold-2); }
 .fan .bills { position: absolute; left: 50%; bottom: -34px; width: 0; height: 0; }
 .fan .bill { position: absolute; left: -75px; bottom: 0; transform-origin: 50% 190%; transition: transform .45s cubic-bezier(.2,.8,.2,1), opacity .35s; }
+
+/* portfolio + stonks */
+.pfhead { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.pfbig { font-size: 26px; font-weight: 900; line-height: 1.1; margin-top: 2px; }
+.pl { font-weight: 700; font-size: 14px; margin-top: 2px; }
+.pl.up { color: #8be3b0; } .pl.down { color: #ffb4ba; }
+.meme { height: 74px; width: auto; max-width: 46%; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.5); flex: none; }
+.spark { display: block; width: 100%; height: 92px; margin-top: 12px; }
+.sparkx { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin: 4px 0 6px; }
+.nrow .nk { font-size: 12px; color: var(--muted); margin: 6px 0 4px; }

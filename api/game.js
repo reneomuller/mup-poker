@@ -3,8 +3,10 @@ import crypto from 'node:crypto';
 import * as S from './_lib/store.js';
 import * as G from './_lib/game.js';
 
-const DEALER_PW = process.env.DEALER_PASSWORD || 'mup-dealer';
-const DEALER_DEFAULT = !process.env.DEALER_PASSWORD;
+// Dealer is open (no password) unless DEALER_LOCK=1 and DEALER_PASSWORD are set in Vercel.
+const DEALER_PW = process.env.DEALER_LOCK === '1' ? process.env.DEALER_PASSWORD || 'mup-dealer' : '';
+const DEALER_DEFAULT = !DEALER_PW;
+const dealerOk = (req) => !DEALER_PW || req.headers['x-dealer'] === DEALER_PW;
 
 let cache = { t: 0, data: null };
 
@@ -61,11 +63,26 @@ function publicState(meta, players, slips) {
   };
 }
 
+// Every student's portfolio value at each showdown and revaluation (for the stonks chart).
+function recordPf(meta) {
+  const v = {};
+  for (const inv of Object.keys(meta.ledger.H)) {
+    if (inv !== G.RJ && G.hasHoldings(meta, inv)) v[inv] = r0(G.portfolio(meta, inv));
+  }
+  meta.pfHist = meta.pfHist || [];
+  meta.pfHist.push({ ts: Date.now(), v });
+  if (meta.pfHist.length > 250) meta.pfHist.splice(0, meta.pfHist.length - 250);
+}
+
 function meState(meta, p, slips) {
   const st = G.stakes(meta, p.id);
   const stakes = {};
   for (const [t, v] of Object.entries(st)) stakes[t] = r0(v);
-  return { id: p.id, name: p.name, team: p.team, stakes, portfolio: r0(G.portfolio(meta, p.id)), rules: G.rules(meta, p.id), slip: slips[p.id] || null };
+  const series = (meta.pfHist || []).filter((h) => h.v[p.id] !== undefined).map((h) => [h.ts, h.v[p.id]]);
+  return {
+    id: p.id, name: p.name, team: p.team, stakes, portfolio: r0(G.portfolio(meta, p.id)), invested: G.hasHoldings(meta, p.id),
+    start: G.CFG.STUDENT_CAPITAL, series, rules: G.rules(meta, p.id), slip: slips[p.id] || null,
+  };
 }
 
 function callList(meta, players, slips) {
@@ -121,10 +138,17 @@ async function backup(meta) {
   await S.setJSON('backups', b);
 }
 
+// Notes per startup: { like: 'Co mě zaujalo', doubt: 'Čemu nevěřím' }
 function cleanNotes(notes, meta) {
   const out = {};
   if (notes && typeof notes === 'object') {
-    for (const t of meta.teams) if (notes[t.id]) out[t.id] = String(notes[t.id]).slice(0, 1000);
+    for (const t of meta.teams) {
+      const n = notes[t.id];
+      if (!n) continue;
+      const like = String(typeof n === 'string' ? n : n.like || '').trim().slice(0, 1000);
+      const doubt = String(typeof n === 'string' ? '' : n.doubt || '').trim().slice(0, 1000);
+      if (like || doubt) out[t.id] = { like, doubt };
+    }
   }
   return out;
 }
@@ -229,6 +253,7 @@ async function dealerAction(b) {
       setTimer(meta, 0);
       meta.reveal = { seq: ++meta.seq, block: blk, kind: 'class', delta, n };
       meta.history.push(G.snapshot(meta, `Blok ${blk}`));
+      recordPf(meta);
       await save();
       return ok({ n, skipped });
     }
@@ -269,6 +294,7 @@ async function dealerAction(b) {
       for (const t of meta.teams) delta[t.id] = r0(G.valuation(meta, t.id) - before[t.id]);
       const d = new Date();
       meta.history.push(G.snapshot(meta, `Přecenění ${d.getDate()}. ${d.getMonth() + 1}.`));
+      recordPf(meta);
       meta.reveal = { seq: ++meta.seq, block: blk, kind: 'revalue', delta };
       await save();
       return ok();
@@ -352,7 +378,7 @@ export default async function handler(req, res) {
         if (p && p.pin && p.pin === pinHash(p.id, pin)) out.me = meState(meta, p, slips);
         else out.meError = true;
       }
-      if (url.searchParams.get('view') === 'dealer' && req.headers['x-dealer'] === DEALER_PW) {
+      if (url.searchParams.get('view') === 'dealer' && dealerOk(req)) {
         out.dealer = dealerState(meta, players, slips);
         if (url.searchParams.get('all') === '1') {
           const all = {};
@@ -371,7 +397,7 @@ export default async function handler(req, res) {
       let r;
       if (studentOps.includes(b.op)) r = await studentAction(b);
       else {
-        if (req.headers['x-dealer'] !== DEALER_PW) return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
+        if (!dealerOk(req)) return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
         r = await dealerAction(b);
       }
       return send(res, r.status, r.body);
