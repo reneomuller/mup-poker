@@ -55,6 +55,8 @@ export async function hgetall(key) {
     return out;
   }
   const r = await redis.hgetall(P + key);
-  if (r) for (const [f, v] of Object.entries(r)) out[f] = parse(v);
+  // with automaticDeserialization off, Upstash returns the raw [field, value, ...] array
+  if (Array.isArray(r)) for (let i = 0; i + 1 < r.length; i += 2) out[r[i]] = parse(r[i + 1]);
+  else if (r) for (const [f, v] of Object.entries(r)) out[f] = parse(v);
   return out;
 }
