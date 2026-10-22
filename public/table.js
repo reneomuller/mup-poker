@@ -333,11 +333,7 @@
     const first = !built;
     if (first) { build(s); lastSeq = s.reveal?.seq || 0; }
     S = s;
-    if (s.storage === 'memory' && !/localhost|127\.0\.0\.1/.test(location.hostname) && !$('warn')) {
-      const w = document.createElement('div'); w.id = 'warn'; w.className = 'warn';
-      w.textContent = 'Chybí databáze: ve Vercelu připojte Upstash Redis (Storage) a nasaďte znovu.';
-      stage.appendChild(w);
-    }
+    $('warn')?.remove();
     renderBanner(s); renderBoardCards(s); renderJoin(s); renderGlass(s); renderBoardScreen(s); renderQrLabel();
     if (!first && s.reveal && s.reveal.seq > lastSeq && !busy) {
       lastSeq = s.reveal.seq;
