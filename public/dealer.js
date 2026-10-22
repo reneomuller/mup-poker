@@ -269,7 +269,10 @@
   $('ghosthdr') && ($('ghosthdr').onclick = (e) => { e.preventDefault(); openGhost(); });
 
   // ---------- teams ----------
+  let teamsDirty = false;
   function renderTeams() {
+    // never overwrite what the dealer is typing; reload from storage only after saving
+    if (teamsDirty || $('teams').contains(document.activeElement)) return;
     if (!once('teams', [S.teams, S.startV, S.anyHoldings])) return;
     $('teams').innerHTML = `<h3>${E('dealer.sec.teams')}</h3><p class="hint">Názvy startupů se ukážou na stole i v mobilech.</p>
       ${S.teams.map((t) => `<div class="trow" data-t="${t.id}"><input type="color" value="${t.color}"><input class="input" value="${esc(t.name)}" maxlength="30"></div>`).join('')}
@@ -278,7 +281,9 @@
       <p class="hint">Za kolik mil. $ startupy začínají, než do nich kdokoli investuje. Jde změnit jen před prvním showdownem.</p>
       <div class="inline"><input class="input num" id="startv" inputmode="decimal" value="${(S.startV / 1e6).toLocaleString('cs-CZ', { maximumFractionDigits: 2 })}" ${S.anyHoldings ? 'disabled' : ''}> mil. $
         <button class="btn sm" id="startvgo" ${S.anyHoldings ? 'disabled' : ''}>Nastavit</button></div>`;
+    $('teams').querySelectorAll('input').forEach((i) => i.addEventListener('input', () => { teamsDirty = true; }));
     $('tsave').onclick = () => {
+      teamsDirty = false;
       const teams = [...$('teams').querySelectorAll('.trow')].map((row) => ({ id: row.dataset.t, color: row.querySelector('[type=color]').value, name: row.querySelector('.input').value.trim() }));
       keys.teams = null;
       act('teams', { teams }, 'Týmy uloženy');
@@ -286,6 +291,7 @@
     $('startvgo').onclick = () => {
       const v = Math.round(Number($('startv').value.replace(/\s/g, '').replace(',', '.')) * 1e6);
       if (!(v > 0)) return alert('Zadejte číslo, např. 1 nebo 0,5.');
+      teamsDirty = false;
       keys.teams = null;
       act('startValuation', { V: v }, 'Výchozí ocenění nastaveno');
     };

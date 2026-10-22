@@ -561,6 +561,9 @@ export default async function handler(req, res) {
         if (p && p.pin && p.pin === pinHash(p.id, pin)) out.me = meState(meta, p, slips);
         else out.meError = p ? 'pin' : 'unknown';
       }
+      if (url.searchParams.get('view') === 'log' && dealerOk(req)) {
+        return send(res, 200, { ok: true, storage: S.storageMode, log: await S.readLog(Number(url.searchParams.get('limit')) || 5000) });
+      }
       if (url.searchParams.get('view') === 'dealer' && dealerOk(req)) {
         out.dealer = dealerState(meta, players, slips);
         if (url.searchParams.get('dump') === '1') out.dealer.dump = await makeDump();
@@ -583,12 +586,18 @@ export default async function handler(req, res) {
       const b = await readBody(req);
       const studentOps = ['register', 'login', 'notes', 'submit', 'reasons', 'restore'];
       let r;
-      if (studentOps.includes(b.op)) r = await studentAction(b);
+      const student = studentOps.includes(b.op);
+      if (student) r = await studentAction(b);
       else {
         if (!dealerOk(req)) return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
         r = await dealerAction(b);
-        if (r.body.ok) r.body.dump = await makeDump();
       }
+      if (b.op !== 'auth') {
+        // action log: what every student / the dealer sent, without PINs and big backup blobs
+        const { pin, dump, ...rest } = b;
+        await S.logAction({ ts: Date.now(), op: b.op, actor: student ? b.sid || r.body.sid || '' : 'dealer', ok: !!r.body.ok, error: r.body.ok ? undefined : r.body.error, body: rest, sid: r.body.sid });
+      }
+      if (!student && r.body.ok) r.body.dump = await makeDump();
       return send(res, r.status, r.body);
     }
     return send(res, 405, { ok: false, error: 'Method not allowed' });
