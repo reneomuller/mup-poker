@@ -48,7 +48,16 @@ async function readBody(req) {
 // ---------- views ----------
 function publicState(meta, players, slips) {
   const r = G.raised(meta);
-  const teams = meta.teams.map((t) => ({ ...t, V: r0(G.valuation(meta, t.id)), cls: r0(r[t.id].cls), rj: r0(r[t.id].rj) }));
+  // money students have sent in this round, shown live on the table before the showdown (RJ stays hidden)
+  const live = {};
+  if (['betting', 'closed'].includes(meta.phase) && !meta.settled[meta.block + 'c']) {
+    for (const [k, sl] of Object.entries(slips)) {
+      if (k === G.RJ || !players[k] || players[k].ghost || !sl?.submitted) continue;
+      for (const [t, e] of Object.entries(sl.in || {})) live[t] = (live[t] || 0) + (e.amt || 0);
+      for (const [t, e] of Object.entries(sl.out || {})) live[t] = (live[t] || 0) - (e.amt || 0);
+    }
+  }
+  const teams = meta.teams.map((t) => ({ ...t, V: r0(G.valuation(meta, t.id)), cls: r0(r[t.id].cls), rj: r0(r[t.id].rj), live: r0(live[t.id] || 0) }));
   const plist = Object.values(players).filter((p) => !p.ghost).map((p) => ({ id: p.id, name: p.name, team: p.team }));
   const betCount = Object.entries(slips).filter(([k, s]) => k !== G.RJ && players[k] && !players[k].ghost && s?.submitted).length;
   const leaders = plist

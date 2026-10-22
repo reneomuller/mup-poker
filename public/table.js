@@ -219,13 +219,15 @@
       if (!e) return;
       e.plate.querySelector('.dot').style.background = t.color;
       e.plate.querySelector('.tn').textContent = t.name;
-      const inv = t.cls + t.rj;
-      e.plate.querySelector('.sub').textContent = inv > 0 ? tx('table.seat.invested', { amount: fmtM(inv) }) + (t.id === leader ? ' · ' + tx('table.seat.leader') : '') : tx('table.seat.valuation');
+      const inv = t.cls + t.rj, lv = t.live || 0;
+      e.plate.querySelector('.sub').textContent = lv
+        ? (lv > 0 ? '+' : '−') + fmtM(Math.abs(lv)) + ' v tomto kole'
+        : inv > 0 ? tx('table.seat.invested', { amount: fmtM(inv) }) + (t.id === leader ? ' · ' + tx('table.seat.leader') : '') : tx('table.seat.valuation');
       e.plate.querySelector('.badge').textContent = tx('table.badge');
       e.plate.classList.toggle('presenting', s.phase === 'pitch' && s.presenting === t.id);
       if (!busy) {
         countTo(t.id, t.V, animateValues ? 900 : 0);
-        renderStack(e.spot.querySelector('.stack'), t.cls, t.rj);
+        renderStack(e.spot.querySelector('.stack'), Math.max(0, t.cls + lv), t.rj);
       }
       const rjUp = s.reveal && s.reveal.kind === 'rj' && s.reveal.block === s.block;
       const card = e.spot.querySelector('.rjcards .pcard:last-child');
