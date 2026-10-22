@@ -302,6 +302,7 @@
     if (!once('tools', [S.block])) return;
     $('tools').innerHTML = `<h3>${E('dealer.sec.tools')}</h3>
       <div class="actions"><button class="btn ghost" id="csv">Stáhnout všechny investice (CSV)</button>
+      <button class="btn ghost" id="logdl">Stáhnout log všech akcí (JSON)</button>
       <button class="btn ghost" id="undo">Vrátit poslední krok</button>
       <button class="btn danger" id="reset">Nová hra (smaže investice, hráči zůstanou)</button>
       <button class="btn danger" id="wipe">Smazat vše včetně hráčů</button></div>
@@ -310,6 +311,13 @@
     $('reset').onclick = () => prompt('Napište RESET pro novou hru (hráči zůstanou):') === 'RESET' && act('reset', { confirm: 'RESET', keepPlayers: true }, 'Nová hra');
     $('wipe').onclick = () => prompt('Napište RESET pro smazání všeho:') === 'RESET' && act('reset', { confirm: 'RESET', keepPlayers: false }, 'Smazáno');
     $('csv').onclick = exportCSV;
+    $('logdl').onclick = async () => {
+      const j = await get(H(), '?view=log&limit=20000');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(j.log || [], null, 1)], { type: 'application/json' }));
+      a.download = `investicni-stul-log-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.json`;
+      a.click();
+    };
   }
 
   async function exportCSV() {

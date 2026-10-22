@@ -219,7 +219,6 @@ async function studentAction(b) {
     const sameGame = b.gid === meta.gid || meta.auto;
     if ((meta.removed || []).includes(sid)) return fail('Přihlas se znovu.', { relogin: true });
     let p = players[sid];
-    if (!p && !sameGame) return fail('Hra začala znovu. Přihlas se.', { relogin: true });
     if (p) {
       if (p.pin && p.pin !== pinHash(sid, b.pin)) return fail('Špatný PIN.', { relogin: true });
       if (!p.pin) { p.pin = pinHash(sid, b.pin); await S.hset('players', sid, p); }
@@ -254,7 +253,8 @@ async function studentAction(b) {
   if (b.op === 'login') return ok({ sid: p.id });
 
   if (b.op === 'notes') {
-    const slip = slips[p.id] || {};
+    // re-read right before writing so a notes autosave never undoes an investment sent a moment earlier
+    const slip = (await S.hgetall('slip:' + meta.block))[p.id] || {};
     slip.notes = cleanNotes(b.notes, meta);
     slip.ts = Date.now();
     await S.hset('slip:' + meta.block, p.id, slip);
@@ -276,7 +276,7 @@ async function studentAction(b) {
     if (meta.phase !== 'betting') return fail('Investování teď není otevřené.');
     const v = G.validate(meta, p.id, p.team, { out: b.out, in: b.in });
     if (!v.ok) return fail(v.errors[0], { errors: v.errors });
-    const prev = slips[p.id] || {};
+    const prev = (await S.hgetall('slip:' + meta.block))[p.id] || {};
     await S.hset('slip:' + meta.block, p.id, {
       out: v.out, in: v.in, notes: b.notes ? cleanNotes(b.notes, meta) : prev.notes || {}, submitted: true, ts: Date.now(),
     });
