@@ -12,7 +12,13 @@ import { Redis } from '@upstash/redis';
 const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
 const redis = url && token ? new Redis({ url, token, automaticDeserialization: false }) : null;
-const pgUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.NEON_DATABASE_URL || null;
+// Neon via Vercel sets DATABASE_URL / POSTGRES_URL, possibly with a custom prefix (e.g. STORAGE_DATABASE_URL).
+const PG_KEYS = ['DATABASE_URL', 'POSTGRES_URL', 'NEON_DATABASE_URL'];
+const pgKey = PG_KEYS.find((k) => process.env[k]) ||
+  Object.keys(process.env).find((k) => /(DATABASE_URL|POSTGRES_URL)$/.test(k) && /^postgres(ql)?:\/\//.test(process.env[k] || '')) ||
+  Object.keys(process.env).find((k) => /(DATABASE_URL|POSTGRES_URL)/.test(k) && !/UNPOOLED|NON_POOLING|PRISMA/.test(k) && /^postgres(ql)?:\/\//.test(process.env[k] || '')) || null;
+export const pgEnvKey = pgKey;
+const pgUrl = pgKey ? process.env[pgKey] : null;
 
 // q(text, params) -> rows
 let q = null;

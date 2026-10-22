@@ -562,7 +562,7 @@ export default async function handler(req, res) {
         else out.meError = p ? 'pin' : 'unknown';
       }
       if (url.searchParams.get('view') === 'log' && dealerOk(req)) {
-        return send(res, 200, { ok: true, storage: S.storageMode, log: await S.readLog(Number(url.searchParams.get('limit')) || 5000) });
+        return send(res, 200, { ok: true, storage: S.storageMode, pgEnv: S.pgEnvKey, log: await S.readLog(Number(url.searchParams.get('limit')) || 5000) });
       }
       if (url.searchParams.get('view') === 'dealer' && dealerOk(req)) {
         out.dealer = dealerState(meta, players, slips);
