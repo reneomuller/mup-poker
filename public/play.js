@@ -6,6 +6,40 @@
   let sid = localStorage.getItem('mup.sid'), pin = localStorage.getItem('mup.pin');
   let S = null, me = null, meFail = 0, formKey = null, draft = null, loginKey = null, notesKey = null, tab = 'new';
 
+  // The dealer's "Ghost" button opens /play#ghost=<sid>:<pin>
+  const gh = /^#ghost=([\w-]+):(\d{4})$/.exec(location.hash);
+  if (gh) {
+    sid = gh[1]; pin = gh[2];
+    localStorage.setItem('mup.sid', sid); localStorage.setItem('mup.pin', pin);
+    localStorage.removeItem('mup.profile');
+    history.replaceState(null, '', location.pathname);
+  }
+
+  // This phone keeps its own copy of the account and decisions. If the server forgets them
+  // (no database, new server instance), the phone quietly pushes them back.
+  const LS = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  };
+  const slipsKey = () => 'mup.slips.' + sid;
+  function rememberSlip(slip) {
+    if (!slip || !S) return;
+    let all = LS.get(slipsKey()) || {};
+    if (all.gid !== S.gid) all = { gid: S.gid, blocks: {} };
+    const cur = all.blocks[S.block];
+    if (!cur || (slip.ts || 0) >= (cur.ts || 0)) all.blocks[S.block] = slip;
+    LS.set(slipsKey(), all);
+  }
+  let lastRestore = 0;
+  async function restore() {
+    if (Date.now() - lastRestore < 3000) return null;
+    lastRestore = Date.now();
+    const prof = LS.get('mup.profile');
+    if (!prof || prof.sid !== sid) return null;
+    const all = LS.get(slipsKey()) || {};
+    return post({ op: 'restore', sid, pin, name: prof.name, team: prof.team, gid: prof.gid, slips: all.gid === prof.gid ? all.blocks || {} : {} });
+  }
+
   const auth = () => (sid && pin ? { 'x-sid': sid, 'x-pin': pin } : {});
   const team = (id) => S.teams.find((t) => t.id === id) || { name: id, color: '#888' };
   const parseAmt = (v) => Math.max(0, Math.round(Number(String(v).replace(/[^\d]/g, '')) || 0));
@@ -52,13 +86,13 @@
       else r = await post({ op: 'login', sid: $('lwho').value, pin: p });
       if (!r.ok) { $('lerr').textContent = r.error; return; }
       sid = r.sid; pin = p;
-      localStorage.setItem('mup.sid', sid); localStorage.setItem('mup.pin', pin);
+      localStorage.setItem('mup.sid', sid); localStorage.setItem('mup.pin', pin); localStorage.removeItem('mup.profile');
       meFail = 0; loginKey = null; formKey = null; notesKey = null;
       setTimeout(tick, 300);
     };
   }
   function logout() {
-    sid = pin = null; localStorage.removeItem('mup.sid'); localStorage.removeItem('mup.pin');
+    sid = pin = null; localStorage.removeItem('mup.sid'); localStorage.removeItem('mup.pin'); localStorage.removeItem('mup.profile');
     me = null; loginKey = null; formKey = null; notesKey = null; tab = 'old';
     showLogin();
   }
@@ -197,7 +231,9 @@
     return n;
   };
   async function saveNotes() {
-    const r = await post({ op: 'notes', sid, pin, notes: collectNotes() });
+    const notes = collectNotes();
+    const r = await post({ op: 'notes', sid, pin, notes });
+    if (r.ok) rememberSlip({ ...(me.slip || {}), notes, ts: Date.now() });
     setSaved(r.ok ? 'Uloženo' : r.error);
   }
 
@@ -332,7 +368,7 @@
     }
     $('sum').classList.toggle('good', !errs.length);
     $('go').disabled = errs.length > 0 || (R.mode !== 'initial' && outT === 0);
-    $('ferr').textContent = errs[0] && (inT > 0 || outT > 0) ? errs[0] : '';
+    $('ferr').textContent = '';
     const sub = me.slip?.submitted;
     $('done').innerHTML = sub ? `<div class="done">${E('play.form.sent')}</div>` : '';
   }
@@ -343,7 +379,8 @@
     $('go').disabled = true;
     const r = await post(body);
     if (!r.ok) { $('ferr').textContent = r.error; updateForm(); return; }
-    me.slip = { ...(me.slip || {}), out: body.out, in: body.in, submitted: true };
+    me.slip = { ...(me.slip || {}), out: body.out, in: body.in, notes: body.notes, submitted: true, ts: Date.now() };
+    rememberSlip(me.slip);
     if (hold) { draft = { out: {}, in: {} }; $('main').querySelectorAll('.arow').forEach(syncRow); }
     updateForm();
     $('done').innerHTML = `<div class="done">${hold ? 'Nic neměníš ✓' : E('play.form.invested')}</div>`;
@@ -374,6 +411,7 @@
         const body = { op: 'reasons', sid, pin, in: {}, out: {} };
         $('main').querySelectorAll('.rwhy').forEach((x) => { body[x.dataset.rk][x.dataset.rt] = x.value; });
         const r = await post(body);
+        if (r.ok && me.slip) rememberSlip({ ...me.slip, ts: Date.now() });
         const el = $('main').querySelector('.rsaved');
         if (el) el.textContent = r.ok ? 'Uloženo' : r.error;
       }, 1000);
@@ -409,10 +447,21 @@
     S = s;
     if (s.me) {
       me = s.me; meFail = 0;
+      LS.set('mup.profile', { sid, pin, name: me.name, team: me.team, gid: s.gid });
+      const local = LS.get(slipsKey()) || {};
+      const mine = local.gid === s.gid ? local.blocks?.[s.block] : null;
+      if (mine && (mine.ts || 0) > (me.slip?.ts || 0)) restore(); // server is missing something this phone has
+      else if (me.slip) rememberSlip(me.slip);
       $('login').classList.add('hidden');
       $('game').classList.remove('hidden');
       renderHeader(); renderStatus(); renderMsgs(); renderNotes(); renderMain(); renderPortfolio();
     } else if (sid && s.meError) {
+      if (s.meError === 'unknown' && LS.get('mup.profile')?.sid === sid) {
+        const r = await restore();
+        if (r?.ok) setTimeout(tick, 300);
+        else if (r?.relogin) logout();
+        return; // keep the last screen while reconnecting
+      }
       if (++meFail >= 3) logout();
     } else if (!sid) showLogin();
   }

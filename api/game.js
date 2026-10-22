@@ -13,7 +13,8 @@ let cache = { t: 0, data: null };
 async function load(fresh) {
   if (!fresh && cache.data && Date.now() - cache.t < 700) return cache.data;
   let meta = await S.getJSON('meta');
-  if (!meta) { meta = G.newMeta(); await S.setJSON('meta', meta); }
+  if (!meta) { meta = G.newMeta(); meta.auto = true; await S.setJSON('meta', meta); }
+  else if (!meta.gid) { meta.gid = crypto.randomBytes(5).toString('hex'); meta.rev = meta.rev || 1; meta.removed = meta.removed || []; await S.setJSON('meta', meta); }
   const [players, slips, content] = await Promise.all([S.hgetall('players'), S.hgetall('slip:' + meta.block), S.getJSON('content')]);
   const data = { meta, players, slips, content: content || { v: '0', texts: {}, founders: null } };
   cache = { t: Date.now(), data };
@@ -48,8 +49,8 @@ async function readBody(req) {
 function publicState(meta, players, slips) {
   const r = G.raised(meta);
   const teams = meta.teams.map((t) => ({ ...t, V: r0(G.valuation(meta, t.id)), cls: r0(r[t.id].cls), rj: r0(r[t.id].rj) }));
-  const plist = Object.values(players).map((p) => ({ id: p.id, name: p.name, team: p.team }));
-  const betCount = Object.entries(slips).filter(([k, s]) => k !== G.RJ && players[k] && s?.submitted).length;
+  const plist = Object.values(players).filter((p) => !p.ghost).map((p) => ({ id: p.id, name: p.name, team: p.team }));
+  const betCount = Object.entries(slips).filter(([k, s]) => k !== G.RJ && players[k] && !players[k].ghost && s?.submitted).length;
   const leaders = plist
     .filter((p) => G.hasHoldings(meta, p.id))
     .map((p) => ({ name: p.name, team: p.team, value: r0(G.portfolio(meta, p.id)) }))
@@ -61,7 +62,7 @@ function publicState(meta, players, slips) {
     screen: meta.screen, regOpen: meta.regOpen, history: meta.history, reveal: meta.reveal,
     betCount, playerCount: plist.length, players: plist, leaders, storage: S.storageMode, cfg: G.CFG,
     startV: meta.startV || Math.round(meta.ledger.P[meta.teams[0].id] * G.CFG.FOUNDER_SHARES), anyHoldings: Object.keys(meta.ledger.H).some((k) => G.hasHoldings(meta, k)),
-    pins: meta.pins || [],
+    pins: meta.pins || [], gid: meta.gid, rev: meta.rev || 0, auto: !!meta.auto,
   };
 }
 
@@ -93,7 +94,7 @@ function callList(meta, players, slips) {
   const bets = [], outs = [], backers = {}, conc = [];
   for (const [sid, s] of Object.entries(slips)) {
     const p = players[sid];
-    if (!p || !s?.submitted) continue;
+    if (!p || p.ghost || !s?.submitted) continue;
     let total = 0, max = 0, maxT = null;
     for (const [t, e] of Object.entries(s.in || {})) {
       bets.push({ name: p.name, team: tname(p.team), target: tname(t), amt: e.amt, why: e.why });
@@ -119,7 +120,7 @@ function callList(meta, players, slips) {
 }
 
 function dealerState(meta, players, slips) {
-  const rows = Object.values(players).map((p) => ({
+  const rows = Object.values(players).filter((p) => !p.ghost).map((p) => ({
     id: p.id, name: p.name, team: p.team, hasPin: !!p.pin,
     portfolio: r0(G.portfolio(meta, p.id)), holdings: G.hasHoldings(meta, p.id), slip: slips[p.id] || null,
   }));
@@ -128,6 +129,7 @@ function dealerState(meta, players, slips) {
   for (const [t, v] of Object.entries(st)) stakes[t] = r0(v);
   return {
     rows, dealerDefault: DEALER_DEFAULT, settled: meta.settled,
+    ghosts: Object.values(players).filter((p) => p.ghost).map((p) => ({ id: p.id, name: p.name, team: p.team })),
     rj: { stakes, portfolio: r0(G.portfolio(meta, G.RJ)), rules: G.rules(meta, G.RJ), slip: slips[G.RJ] || null },
     calls: callList(meta, players, slips),
   };
@@ -145,6 +147,29 @@ async function backup(meta) {
   b.push(meta);
   while (b.length > 15) b.shift();
   await S.setJSON('backups', b);
+}
+
+// Full copy of the game for the dealer's laptop. Without a database the server can forget everything
+// (new instance, redeploy); the dealer page keeps this copy and pushes it back with op 'restore'.
+async function makeDump() {
+  const { meta, players, content } = await load(true);
+  const slips = {};
+  for (let i = 1; i <= G.CFG.MAX_BLOCK; i++) {
+    const h = await S.hgetall('slip:' + i);
+    if (Object.keys(h).length) slips[i] = h;
+  }
+  return { meta, players, slips, content };
+}
+
+function cleanEntries(x, meta) {
+  const out = {};
+  if (!x || typeof x !== 'object') return out;
+  for (const t of meta.teams) {
+    const e = x[t.id];
+    const amt = Math.round(Number(e?.amt) || 0);
+    if (amt > 0) out[t.id] = { amt, why: String(e.why || '').trim().slice(0, 600) };
+  }
+  return out;
 }
 
 // Notes per startup: { like: 'Co mě zaujalo', doubt: 'Čemu nevěřím' }
@@ -188,6 +213,38 @@ async function studentAction(b) {
     invalidate();
     return ok({ sid: id });
   }
+  if (b.op === 'restore') {
+    const sid = String(b.sid || '');
+    if (!/^[\w-]{4,24}$/.test(sid) || !/^\d{4}$/.test(String(b.pin || ''))) return fail('Přihlas se znovu.', { relogin: true });
+    const sameGame = b.gid === meta.gid || meta.auto;
+    if ((meta.removed || []).includes(sid)) return fail('Přihlas se znovu.', { relogin: true });
+    let p = players[sid];
+    if (!p && !sameGame) return fail('Hra začala znovu. Přihlas se.', { relogin: true });
+    if (p) {
+      if (p.pin && p.pin !== pinHash(sid, b.pin)) return fail('Špatný PIN.', { relogin: true });
+      if (!p.pin) { p.pin = pinHash(sid, b.pin); await S.hset('players', sid, p); }
+    } else {
+      const name = String(b.name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+      if (name.length < 2 || !meta.teams.some((t) => t.id === b.team)) return fail('Přihlas se znovu.', { relogin: true });
+      p = { id: sid, name, team: b.team, pin: pinHash(sid, b.pin), created: Date.now() };
+      if (sid.startsWith('g_')) p.ghost = true;
+      await S.hset('players', sid, p);
+    }
+    if (sameGame) {
+      for (const [k, sl] of Object.entries(b.slips || {})) {
+        const blk = Number(k);
+        if (!(blk >= 1 && blk <= G.CFG.MAX_BLOCK) || !sl || typeof sl !== 'object') continue;
+        const cur = blk === meta.block ? slips[sid] : (await S.hgetall('slip:' + blk))[sid];
+        const ts = Number(sl.ts) || 0;
+        if (cur && (Number(cur.ts) || 0) >= ts) continue;
+        await S.hset('slip:' + blk, sid, {
+          out: cleanEntries(sl.out, meta), in: cleanEntries(sl.in, meta), notes: cleanNotes(sl.notes, meta), submitted: !!sl.submitted, ts: ts || Date.now(),
+        });
+      }
+    }
+    invalidate();
+    return ok({ sid });
+  }
   const p = players[b.sid];
   if (!p) return fail('Hráč nenalezen. Přihlas se znovu.', { relogin: true });
   if (!/^\d{4}$/.test(String(b.pin || ''))) return fail('PIN musí mít 4 číslice.');
@@ -199,6 +256,7 @@ async function studentAction(b) {
   if (b.op === 'notes') {
     const slip = slips[p.id] || {};
     slip.notes = cleanNotes(b.notes, meta);
+    slip.ts = Date.now();
     await S.hset('slip:' + meta.block, p.id, slip);
     invalidate();
     return ok();
@@ -209,6 +267,7 @@ async function studentAction(b) {
     for (const k of ['in', 'out']) {
       for (const [t, why] of Object.entries(b[k] || {})) if (slip[k]?.[t]) slip[k][t].why = String(why || '').trim().slice(0, 600);
     }
+    slip.ts = Date.now();
     await S.hset('slip:' + meta.block, p.id, slip);
     invalidate();
     return ok();
@@ -227,13 +286,56 @@ async function studentAction(b) {
   return fail('Neznámá akce.');
 }
 
+async function restoreFrom(d) {
+  if (!d?.meta?.teams || !d.meta.ledger) return fail('Záloha je neplatná.');
+  const { meta, players, content } = await load(true);
+  const sameGame = d.meta.gid === meta.gid;
+  if (!meta.auto && !sameGame) return ok({ skipped: true });
+  let restored = false;
+  if (meta.auto || (d.meta.rev || 0) > (meta.rev || 0)) {
+    const nm = { ...d.meta, auto: false };
+    await S.setJSON('meta', nm);
+    restored = true;
+  }
+  const removed = new Set((restored ? d.meta.removed : meta.removed) || []);
+  for (const [id, p] of Object.entries(d.players || {})) {
+    if (!players[id] && !removed.has(id) && p && p.id === id) await S.hset('players', id, p);
+  }
+  for (const [k, map] of Object.entries(d.slips || {})) {
+    const blk = Number(k);
+    if (!(blk >= 1 && blk <= G.CFG.MAX_BLOCK)) continue;
+    const cur = await S.hgetall('slip:' + blk);
+    for (const [id, sl] of Object.entries(map || {})) {
+      if (!sl || typeof sl !== 'object') continue;
+      const c = cur[id];
+      if (!c || (Number(sl.ts) || 0) > (Number(c.ts) || 0)) await S.hset('slip:' + blk, id, sl);
+    }
+  }
+  if (d.content && Number(d.content.v || 0) > Number(content.v || 0)) await S.setJSON('content', d.content);
+  invalidate();
+  return ok({ restored });
+}
+
 async function dealerAction(b) {
+  if (b.op === 'restore') return restoreFrom(b.dump);
   const { meta, players, slips } = await load(true);
   const blk = meta.block;
-  const save = async () => { await S.setJSON('meta', meta); invalidate(); };
+  const save = async () => { meta.rev = (meta.rev || 0) + 1; meta.auto = false; await S.setJSON('meta', meta); invalidate(); };
 
   switch (b.op) {
     case 'auth': return ok();
+
+    case 'ghost': {
+      // a test account that sees the students' view but never counts anywhere
+      const teamId = meta.teams.some((t) => t.id === b.team) ? b.team : meta.teams[0].id;
+      let g = Object.values(players).find((p) => p.ghost && p.team === teamId);
+      if (!g) g = { id: 'g_' + crypto.randomBytes(6).toString('base64url'), name: 'Ghost', team: teamId, ghost: true, created: Date.now() };
+      const pin = String(crypto.randomInt(0, 10000)).padStart(4, '0');
+      g.pin = pinHash(g.id, pin);
+      await S.hset('players', g.id, g);
+      invalidate();
+      return ok({ sid: g.id, pin });
+    }
 
     case 'phase': {
       const allowed = ['lobby', 'pitch', 'betting', 'closed', 'final'];
@@ -259,7 +361,7 @@ async function dealerAction(b) {
       let n = 0;
       for (const [sid, s] of Object.entries(slips)) {
         const p = players[sid];
-        if (sid === G.RJ || !p || !s?.submitted) continue;
+        if (sid === G.RJ || !p || p.ghost || !s?.submitted) continue;
         const v = G.validate(meta, sid, p.team, s);
         if (!v.ok) { skipped.push({ name: p.name, error: v.errors[0] }); continue; }
         const d = G.apply(meta, sid, v);
@@ -417,7 +519,8 @@ async function dealerAction(b) {
       if (G.hasHoldings(meta, p.id)) return fail('Hráč už má investice, nejde smazat. Můžeš mu resetovat PIN.');
       await S.hdel('players', p.id);
       await S.hdel('slip:' + blk, p.id);
-      invalidate();
+      meta.removed = [...(meta.removed || []), p.id].slice(-200);
+      await save();
       return ok();
     }
     case 'undo': {
@@ -425,6 +528,7 @@ async function dealerAction(b) {
       const prev = bk.pop();
       if (!prev) return fail('Není co vracet.');
       await S.setJSON('backups', bk);
+      prev.rev = (meta.rev || 0) + 1; prev.auto = false; prev.gid = meta.gid;
       await S.setJSON('meta', prev);
       invalidate();
       return ok();
@@ -455,13 +559,18 @@ export default async function handler(req, res) {
       if (sid && pin) {
         const p = players[sid];
         if (p && p.pin && p.pin === pinHash(p.id, pin)) out.me = meState(meta, p, slips);
-        else out.meError = true;
+        else out.meError = p ? 'pin' : 'unknown';
       }
       if (url.searchParams.get('view') === 'dealer' && dealerOk(req)) {
         out.dealer = dealerState(meta, players, slips);
+        if (url.searchParams.get('dump') === '1') out.dealer.dump = await makeDump();
         if (url.searchParams.get('all') === '1') {
           const all = {};
-          for (let i = 1; i <= meta.block; i++) all[i] = await S.hgetall('slip:' + i);
+          for (let i = 1; i <= meta.block; i++) {
+            const h = await S.hgetall('slip:' + i);
+            for (const k of Object.keys(h)) if (players[k]?.ghost) delete h[k];
+            all[i] = h;
+          }
           out.dealer.all = all;
           out.dealer.players = Object.fromEntries(
             Object.entries(players).map(([k, p]) => [k, { id: p.id, name: p.name, team: p.team }]),
@@ -472,12 +581,13 @@ export default async function handler(req, res) {
     }
     if (req.method === 'POST') {
       const b = await readBody(req);
-      const studentOps = ['register', 'login', 'notes', 'submit', 'reasons'];
+      const studentOps = ['register', 'login', 'notes', 'submit', 'reasons', 'restore'];
       let r;
       if (studentOps.includes(b.op)) r = await studentAction(b);
       else {
         if (!dealerOk(req)) return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
         r = await dealerAction(b);
+        if (r.body.ok) r.body.dump = await makeDump();
       }
       return send(res, r.status, r.body);
     }

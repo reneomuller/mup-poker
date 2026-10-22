@@ -26,8 +26,12 @@
   function post(body, headers = {}) {
     // one request at a time per device, so autosaves never race a submit
     const run = async () => {
-      const r = await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
-      return r.json();
+      try {
+        const r = await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
+        return await r.json();
+      } catch {
+        return { ok: false, net: true, error: 'Spojení vypadlo, zkus to za chvíli znovu.' };
+      }
     };
     const p = chain.then(run, run);
     chain = p.catch(() => {});

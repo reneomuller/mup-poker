@@ -10,8 +10,45 @@
   const plain = (n) => Math.round(n || 0).toLocaleString('cs-CZ');
   const once = (k, v) => { const j = JSON.stringify([v, MUP.cv()]); if (keys[k] === j) return false; keys[k] = j; return true; };
 
+  // ---------- backup on this laptop (keeps the game alive without a database) ----------
+  const BK = 'mup.backup';
+  const loadBk = () => { try { return JSON.parse(localStorage.getItem(BK) || 'null'); } catch { return null; } };
+  const saveBk = (b) => { try { localStorage.setItem(BK, JSON.stringify(b)); } catch {} };
+  function mergeBk(d) {
+    if (!d?.meta) return;
+    const b = loadBk();
+    if (b && d.meta.auto && !b.meta.auto && b.meta.gid !== d.meta.gid) return; // server forgot the game: keep ours, guard() pushes it back
+    if (!b || b.meta.gid !== d.meta.gid) { saveBk(d); return; }
+    if ((d.meta.rev || 0) >= (b.meta.rev || 0)) b.meta = d.meta;
+    b.players = { ...(b.players || {}), ...(d.players || {}) };
+    for (const id of b.meta.removed || []) delete b.players[id];
+    b.slips = b.slips || {};
+    for (const [k, map] of Object.entries(d.slips || {})) {
+      const cur = (b.slips[k] = b.slips[k] || {});
+      for (const [id, sl] of Object.entries(map || {})) if (!cur[id] || (sl.ts || 0) >= (cur[id].ts || 0)) cur[id] = sl;
+    }
+    if (d.content && Number(d.content.v || 0) >= Number(b.content?.v || 0)) b.content = d.content;
+    saveBk(b);
+  }
+  let restoring = false;
+  async function guard(j) {
+    const b = loadBk();
+    if (!b || restoring) return;
+    const lost = j.auto && !b.meta.auto && b.meta.gid !== j.gid;
+    const behind = j.gid === b.meta.gid && (j.rev || 0) < (b.meta.rev || 0);
+    if (!lost && !behind) return;
+    restoring = true;
+    try {
+      const r = await post({ op: 'restore', dump: b }, H());
+      if (r.ok && r.dump) mergeBk(r.dump);
+      if (r.ok && lost) flash('Hra obnovena ze zálohy');
+    } finally { restoring = false; }
+  }
+
   async function act(op, extra = {}, okMsg) {
+    if (op === 'reset') localStorage.removeItem(BK);
     const r = await post({ op, ...extra }, H());
+    if (r.dump) mergeBk(r.dump);
     if (!r.ok) { alert(r.error || 'Chyba'); return r; }
     if (okMsg) flash(okMsg);
     setTimeout(tick, 150);
@@ -207,9 +244,11 @@
     const rows = D.rows.slice().sort((a, b) => a.team.localeCompare(b.team) || a.name.localeCompare(b.name));
     $('players').innerHTML = `<h3>${E('dealer.sec.players')} (${rows.length})</h3>
       <div class="inline"><span>Registrace nových hráčů:</span><button class="btn sm ${S.regOpen ? '' : 'ghost'}" id="regon">Otevřená</button><button class="btn sm ${S.regOpen ? 'ghost' : ''}" id="regoff">Zavřená</button></div>
+      <div class="inline"><span>Ghost (pohled studenta, nikde se nepočítá):</span><select class="input" id="ghteam">${S.teams.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select><button class="btn sm" id="ghgo">Otevřít jako student ↗</button></div>
       ${rows.map((r) => `<div class="prow2" data-id="${r.id}"><span>${esc(r.name)}${r.hasPin ? '' : ' <span class="no small">(PIN resetován)</span>'}</span>
         <span class="btns"><select class="input" data-move>${S.teams.map((t) => `<option value="${t.id}" ${t.id === r.team ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select>
         <button class="btn sm ghost" data-reset>PIN</button>${r.holdings ? '' : '<button class="btn sm danger" data-del>×</button>'}</span></div>`).join('')}`;
+    $('ghgo').onclick = () => openGhost($('ghteam').value);
     $('regon').onclick = () => act('reg', { open: true });
     $('regoff').onclick = () => act('reg', { open: false });
     $('players').querySelectorAll('.prow2').forEach((row) => {
@@ -220,6 +259,14 @@
       if (del) del.onclick = () => confirm(`Smazat hráče ${name}?`) && act('removePlayer', { sid: id }, 'Smazáno');
     });
   }
+
+  async function openGhost(teamId) {
+    const w = window.open('about:blank', '_blank');
+    const r = await act('ghost', { team: teamId || S.teams[0].id });
+    if (r.ok && w) w.location.href = '/play#ghost=' + r.sid + ':' + r.pin;
+    else if (w) w.close();
+  }
+  $('ghosthdr') && ($('ghosthdr').onclick = (e) => { e.preventDefault(); openGhost(); });
 
   // ---------- teams ----------
   function renderTeams() {
@@ -286,14 +333,15 @@
 
   function renderWarns() {
     const w = [];
-    if (S.storage === 'memory' && !/localhost|127\.0\.0\.1/.test(location.hostname)) w.push('Chybí databáze. Ve Vercelu: Storage → Upstash for Redis → Connect, pak Redeploy. Bez ní se investice ztrácejí.');
-    if (D.dealerDefault) w.push('Dealer je bez hesla (na testování). Před hodinou ho zamkněte: ve Vercelu nastavte DEALER_LOCK = 1 a DEALER_PASSWORD, pak Redeploy.');
     if (once('warns', w)) $('warns').innerHTML = w.map((x) => `<div class="warnbox">${esc(x)}</div>`).join('');
   }
 
+  let dumpN = 0;
   async function tick() {
-    const j = await get(H(), '?view=dealer');
+    const j = await get(H(), '?view=dealer' + (dumpN++ % 3 === 0 ? '&dump=1' : ''));
     if (!j.dealer) { localStorage.removeItem('mup.dealer'); location.reload(); return; }
+    if (j.dealer.dump) mergeBk(j.dealer.dump);
+    await guard(j);
     S = j; D = j.dealer;
     renderWarns(); renderCtrl(); renderBets(); renderRJ(); renderVals(); renderPlayers(); renderTeams(); renderTools();
   }

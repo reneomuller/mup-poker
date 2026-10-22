@@ -20,6 +20,7 @@ export function newMeta(teams, startV) {
     v: 1, teams, startV, block: 1, phase: 'lobby', presenting: null,
     timerEnd: null, timerTotal: 0, timerLabel: '', regOpen: true, screen: 'table',
     ledger: { S, P, H: {} }, history: [], reveal: null, settled: {}, seq: 0,
+    gid: Math.random().toString(36).slice(2, 10), rev: 1, removed: [],
   };
   m.history.push(snapshot(m, 'Start'));
   return m;
