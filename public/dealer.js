@@ -271,7 +271,9 @@
 
 
   // ---------- question board ----------
+  const BOARD_ON = false; // question board switched off for now
   function renderQBoard() {
+    if (!BOARD_ON) { $('qboard').classList.add('hidden'); return; }
     const qs = D.board || [];
     if (!once('qboard', [qs, D.qpinId, S.block, S.teams.map((t) => t.name)])) return;
     const cats = S.qcats || {};

@@ -240,8 +240,10 @@
 
   // ---------- question board ----------
   let boardTab = 'others', boardTeam = null, boardKey = null, askCat = 'market';
+  const BOARD_ON = false; // question board switched off for now (Block 2 uses "Swap the markets" instead)
   function renderBoard() {
     const el = $('board');
+    if (!BOARD_ON) { el.classList.add('hidden'); return; }
     if (!S.board || !me) { el.classList.add('hidden'); return; }
     el.classList.remove('hidden');
     // never rebuild while someone is typing a question or an answer
