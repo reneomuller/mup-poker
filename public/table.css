@@ -152,3 +152,14 @@ body {
 .cloud.s { max-width: 17cqw; } .cloud.s .ca { font-size: 1.3cqw; }
 .cloud.m { max-width: 22cqw; } .cloud.m .ca { font-size: 1.6cqw; }
 .cloud.l { max-width: 27cqw; } .cloud.l .ca { font-size: 1.95cqw; }
+
+/* pinned question from the board */
+.qpin { position: absolute; left: 50%; top: 47%; transform: translate(-50%, -50%); width: 54cqw; z-index: 60; background: #fbf6e9; color: #1d1b17;
+  border-radius: 1.4cqw; padding: 2cqw 2.4cqw; box-shadow: 0 1.5cqw 4cqw rgba(0,0,0,.55); transition: opacity .3s; }
+.qpin.hidden { display: none; }
+.qpin .qph { display: flex; align-items: center; gap: .8cqw; font-size: 1.15cqw; }
+.qpin .qph .dot { width: .9cqw; height: .9cqw; border-radius: 50%; display: inline-block; }
+.qpin .qpc { margin-left: auto; font-size: .9cqw; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #8a6a1f; }
+.qpin .qpv { font-weight: 800; font-size: 1.1cqw; }
+.qpin .qpt { font-family: 'Playfair Display', Georgia, serif; font-weight: 700; font-size: 2.5cqw; line-height: 1.22; margin-top: 1cqw; }
+.qpin .qpa { margin-top: 1.2cqw; font-size: 1.25cqw; line-height: 1.4; color: #3a3833; border-left: .3cqw solid #c9a24a; padding-left: 1cqw; }

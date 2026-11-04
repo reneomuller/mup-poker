@@ -28,6 +28,7 @@
       for (const [id, sl] of Object.entries(map || {})) if (!cur[id] || (sl.ts || 0) >= (cur[id].ts || 0)) cur[id] = sl;
     }
     if (d.content && Number(d.content.v || 0) >= Number(b.content?.v || 0)) b.content = d.content;
+    if (d.board) b.board = d.board;
     saveBk(b);
   }
   let restoring = false;
@@ -268,6 +269,34 @@
   }
   $('ghosthdr') && ($('ghosthdr').onclick = (e) => { e.preventDefault(); openGhost(); });
 
+
+  // ---------- question board ----------
+  function renderQBoard() {
+    const qs = D.board || [];
+    if (!once('qboard', [qs, D.qpinId, S.block, S.teams.map((t) => t.name)])) return;
+    const cats = S.qcats || {};
+    const pinned = qs.find((q) => q.id === D.qpinId);
+    const cur = qs.filter((q) => q.block === S.block);
+    $('qboard').innerHTML = `<h3>Otázky pro týmy (${cur.filter((q) => !q.hidden).length})</h3>
+      <p class="hint">Studenti se ptají z mobilu (max 3 otázky a 5 hlasů na blok), týmy odpovídají. Třída otázky vidí anonymně, vy vidíte autora. „Na plátno“ ukáže otázku velkou na stole.</p>
+      ${pinned ? `<div class="inline"><span>Na plátně: <b>${esc(team(pinned.team).name)}</b> · ${esc(pinned.text)}</span><button class="btn sm ghost" id="qunpin">Sundat z plátna</button></div>` : ''}
+      ${S.teams.map((t) => {
+        const list = cur.filter((q) => q.team === t.id);
+        return `<div class="lbl sec"><span class="dot" style="background:${t.color}"></span> ${esc(t.name)} · ${list.length}</div>
+          ${list.length ? list.map((q) => `<div class="prow2 qrow ${q.hidden ? 'hid' : ''}" data-q="${q.id}">
+            <div><span class="qc">${esc(cats[q.cat] || q.cat)}</span> ${esc(q.text)}
+              <span class="muted small"> — ${esc(q.by)}${q.ghost ? ' (ghost)' : ''} · ▲ ${q.votes}</span>
+              ${q.answer ? `<div class="small muted">↳ ${esc(q.answer.text)} · přesvědčilo ${q.yes}, nepřesvědčilo ${q.no}</div>` : ''}</div>
+            <span class="btns"><button class="btn sm" data-qpin>${q.id === D.qpinId ? 'Na plátně ✓' : 'Na plátno'}</button><button class="btn sm ghost" data-qhide>${q.hidden ? 'Vrátit' : 'Skrýt'}</button></span></div>`).join('') : '<p class="hint">Zatím žádné otázky.</p>'}`;
+      }).join('')}`;
+    if ($('qunpin')) $('qunpin').onclick = () => act('qpin', { qid: null });
+    $('qboard').querySelectorAll('.qrow').forEach((row) => {
+      const id = row.dataset.q, q = qs.find((x) => x.id === id);
+      row.querySelector('[data-qpin]').onclick = () => act('qpin', { qid: id === D.qpinId ? null : id });
+      row.querySelector('[data-qhide]').onclick = () => act('qhide', { qid: id, hidden: !q.hidden });
+    });
+  }
+
   // ---------- teams ----------
   let teamsDirty = false;
   function renderTeams() {
@@ -357,7 +386,7 @@
     if (j.dealer.dump) mergeBk(j.dealer.dump);
     await guard(j);
     S = j; D = j.dealer;
-    renderWarns(); renderCtrl(); renderBets(); renderRJ(); renderVals(); renderPlayers(); renderTeams(); renderTools();
+    renderWarns(); renderCtrl(); renderBets(); renderQBoard(); renderRJ(); renderVals(); renderPlayers(); renderTeams(); renderTools();
   }
 
   let started = false;

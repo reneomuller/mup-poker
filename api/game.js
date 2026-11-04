@@ -15,8 +15,10 @@ async function load(fresh) {
   let meta = await S.getJSON('meta');
   if (!meta) { meta = G.newMeta(); meta.auto = true; await S.setJSON('meta', meta); }
   else if (!meta.gid) { meta.gid = crypto.randomBytes(5).toString('hex'); meta.rev = meta.rev || 1; meta.removed = meta.removed || []; await S.setJSON('meta', meta); }
-  const [players, slips, content] = await Promise.all([S.hgetall('players'), S.hgetall('slip:' + meta.block), S.getJSON('content')]);
-  const data = { meta, players, slips, content: content || { v: '0', texts: {}, founders: null } };
+  const [players, slips, content, qs, qv, qr] = await Promise.all([
+    S.hgetall('players'), S.hgetall('slip:' + meta.block), S.getJSON('content'), S.hgetall('qs'), S.hgetall('qv'), S.hgetall('qr'),
+  ]);
+  const data = { meta, players, slips, content: content || { v: '0', texts: {}, founders: null }, qs, qv, qr };
   cache = { t: Date.now(), data };
   return data;
 }
@@ -45,8 +47,44 @@ async function readBody(req) {
   return s ? JSON.parse(s) : {};
 }
 
+// ---------- question board ----------
+// qs: question id -> { id, block, team, cat, text, by, ts, ghost?, hidden?, answer? { text, ts, by } }
+// qv: "qid|sid" -> 1 (upvote) · qr: "qid|sid" -> 'yes' | 'no' (reaction to the team's answer)
+const QCATS = { problem: 'Problém', market: 'Trh a čísla', competition: 'Konkurence', distribution: 'Distribuce' };
+const Q_MAX = 3, V_MAX = 5;
+
+function boardItems(bd, players, { dealer = false } = {}) {
+  const { qs = {}, qv = {}, qr = {} } = bd || {};
+  const votes = {}, yes = {}, no = {};
+  for (const k of Object.keys(qv)) { const [q, s] = k.split('|'); if (!players[s]?.ghost) votes[q] = (votes[q] || 0) + 1; }
+  for (const [k, v] of Object.entries(qr)) { const [q, s] = k.split('|'); if (players[s]?.ghost) continue; if (v === 'yes') yes[q] = (yes[q] || 0) + 1; else if (v === 'no') no[q] = (no[q] || 0) + 1; }
+  return Object.values(qs)
+    .filter((q) => q && (dealer || (!q.hidden && !q.ghost)))
+    .map((q) => ({
+      id: q.id, block: q.block, team: q.team, cat: q.cat, text: q.text, ts: q.ts, votes: votes[q.id] || 0,
+      answer: q.answer ? { text: q.answer.text, ts: q.answer.ts } : null, yes: yes[q.id] || 0, no: no[q.id] || 0,
+      ...(dealer ? { by: players[q.by]?.name || '?', hidden: !!q.hidden, ghost: !!q.ghost } : {}),
+    }))
+    .sort((a, b) => b.block - a.block || b.votes - a.votes || a.ts - b.ts);
+}
+
+function myBoard(meta, p, bd) {
+  const { qs = {}, qv = {}, qr = {} } = bd || {};
+  const mine = Object.values(qs).filter((q) => q?.by === p.id);
+  const voted = Object.keys(qv).filter((k) => k.endsWith('|' + p.id)).map((k) => k.split('|')[0]);
+  const reacts = {};
+  for (const [k, v] of Object.entries(qr)) if (k.endsWith('|' + p.id)) reacts[k.split('|')[0]] = v;
+  return {
+    asked: mine.filter((q) => q.block === meta.block && !q.hidden).length, qmax: Q_MAX,
+    votesUsed: voted.filter((id) => qs[id]?.block === meta.block).length, vmax: V_MAX,
+    mine: mine.map((q) => q.id), voted, reacts,
+    // a ghost sees its own (otherwise invisible) questions
+    extra: p.ghost ? boardItems({ qs: Object.fromEntries(mine.map((q) => [q.id, { ...q, ghost: false }])), qv, qr }, {}) : [],
+  };
+}
+
 // ---------- views ----------
-function publicState(meta, players, slips) {
+function publicState(meta, players, slips, bd) {
   const r = G.raised(meta);
   // money students have sent in this round, shown live on the table before the showdown (RJ stays hidden)
   const live = {};
@@ -72,6 +110,8 @@ function publicState(meta, players, slips) {
     betCount, playerCount: plist.length, players: plist, leaders, storage: S.storageMode, cfg: G.CFG,
     startV: meta.startV || Math.round(meta.ledger.P[meta.teams[0].id] * G.CFG.FOUNDER_SHARES), anyHoldings: Object.keys(meta.ledger.H).some((k) => G.hasHoldings(meta, k)),
     pins: meta.pins || [], gid: meta.gid, rev: meta.rev || 0, auto: !!meta.auto,
+    board: boardItems(bd, players), qcats: QCATS,
+    qpin: meta.qpin ? boardItems(bd, players).find((q) => q.id === meta.qpin) || null : null,
   };
 }
 
@@ -86,7 +126,7 @@ function recordPf(meta) {
   if (meta.pfHist.length > 250) meta.pfHist.splice(0, meta.pfHist.length - 250);
 }
 
-function meState(meta, p, slips) {
+function meState(meta, p, slips, bd) {
   const st = G.stakes(meta, p.id);
   const stakes = {};
   for (const [t, v] of Object.entries(st)) stakes[t] = r0(v);
@@ -95,6 +135,7 @@ function meState(meta, p, slips) {
     id: p.id, name: p.name, team: p.team, stakes, portfolio: r0(G.portfolio(meta, p.id)), invested: G.hasHoldings(meta, p.id),
     start: G.CFG.STUDENT_CAPITAL, series, rules: G.rules(meta, p.id), slip: slips[p.id] || null,
     msgs: ((meta.fb || {})[p.team] || []).slice().reverse(),
+    board: myBoard(meta, p, bd), ghost: !!p.ghost,
   };
 }
 
@@ -128,7 +169,7 @@ function callList(meta, players, slips) {
   };
 }
 
-function dealerState(meta, players, slips) {
+function dealerState(meta, players, slips, bd) {
   const rows = Object.values(players).filter((p) => !p.ghost).map((p) => ({
     id: p.id, name: p.name, team: p.team, hasPin: !!p.pin,
     portfolio: r0(G.portfolio(meta, p.id)), holdings: G.hasHoldings(meta, p.id), slip: slips[p.id] || null,
@@ -139,6 +180,7 @@ function dealerState(meta, players, slips) {
   return {
     rows, dealerDefault: DEALER_DEFAULT, settled: meta.settled,
     ghosts: Object.values(players).filter((p) => p.ghost).map((p) => ({ id: p.id, name: p.name, team: p.team })),
+    board: boardItems(bd, players, { dealer: true }), qpinId: meta.qpin || null,
     rj: { stakes, portfolio: r0(G.portfolio(meta, G.RJ)), rules: G.rules(meta, G.RJ), slip: slips[G.RJ] || null },
     calls: callList(meta, players, slips),
   };
@@ -167,7 +209,8 @@ async function makeDump() {
     const h = await S.hgetall('slip:' + i);
     if (Object.keys(h).length) slips[i] = h;
   }
-  return { meta, players, slips, content };
+  const board = { qs: await S.hgetall('qs'), qv: await S.hgetall('qv'), qr: await S.hgetall('qr') };
+  return { meta, players, slips, content, board };
 }
 
 function cleanEntries(x, meta) {
@@ -261,6 +304,55 @@ async function studentAction(b) {
 
   if (b.op === 'login') return ok({ sid: p.id });
 
+  if (['ask', 'vote', 'answer', 'react'].includes(b.op)) {
+    const { qs, qv } = await load(true);
+    if (b.op === 'ask') {
+      if (!meta.teams.some((t) => t.id === b.team)) return fail('Vyber tým, kterému se ptáš.');
+      if (b.team === p.team) return fail('Vlastnímu týmu se ptát nemůžeš.');
+      if (!QCATS[b.cat]) return fail('Vyber, čeho se otázka týká.');
+      const text = String(b.text || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+      if (text.length < 8) return fail('Napiš celou otázku.');
+      const asked = Object.values(qs).filter((q) => q.by === p.id && q.block === meta.block && !q.hidden).length;
+      if (asked >= Q_MAX) return fail(`V tomto bloku můžeš položit nejvýš ${Q_MAX} otázky.`);
+      const id = crypto.randomBytes(5).toString('hex');
+      await S.hset('qs', id, { id, block: meta.block, team: b.team, cat: b.cat, text, by: p.id, ts: Date.now(), ...(p.ghost ? { ghost: true } : {}) });
+      invalidate();
+      return ok({ id });
+    }
+    const q = qs[b.qid];
+    if (!q || q.hidden) return fail('Otázka už není k dispozici.');
+    if (b.op === 'vote') {
+      if (q.team === p.team) return fail('Pro otázky svému týmu nehlasuješ.');
+      if (q.by === p.id) return fail('Pro vlastní otázku nehlasuješ.');
+      if (q.block !== meta.block) return fail('Hlasovat jde jen pro otázky z tohoto bloku.');
+      const key = q.id + '|' + p.id;
+      if (qv[key]) { await S.hdel('qv', key); invalidate(); return ok({ voted: false }); }
+      const used = Object.keys(qv).filter((k) => k.endsWith('|' + p.id) && qs[k.split('|')[0]]?.block === meta.block).length;
+      if (used >= V_MAX) return fail(`Všech ${V_MAX} hlasů už máš rozdaných. Jeden odeber a dej ho jinam.`);
+      await S.hset('qv', key, 1);
+      invalidate();
+      return ok({ voted: true });
+    }
+    if (b.op === 'answer') {
+      if (q.team !== p.team) return fail('Odpovídá jen tým, kterému je otázka položená.');
+      if (p.ghost) return fail('Ghost neodpovídá za tým.');
+      const text = String(b.text || '').trim().slice(0, 800);
+      q.answer = text ? { text, ts: Date.now(), by: p.id } : null;
+      await S.hset('qs', q.id, q);
+      invalidate();
+      return ok();
+    }
+    if (b.op === 'react') {
+      if (!q.answer) return fail('Tým zatím neodpověděl.');
+      if (q.team === p.team) return fail('Na odpovědi svého týmu nereaguješ.');
+      if (p.ghost) return ok();
+      const key = q.id + '|' + p.id;
+      if (b.v === 'yes' || b.v === 'no') await S.hset('qr', key, b.v); else await S.hdel('qr', key);
+      invalidate();
+      return ok();
+    }
+  }
+
   if (b.op === 'notes') {
     // re-read right before writing so a notes autosave never undoes an investment sent a moment earlier
     const slip = (await S.hgetall('slip:' + meta.block))[p.id] || {};
@@ -321,6 +413,10 @@ async function restoreFrom(d) {
     }
   }
   if (d.content && Number(d.content.v || 0) > Number(content.v || 0)) await S.setJSON('content', d.content);
+  for (const h of ['qs', 'qv', 'qr']) {
+    const cur = await S.hgetall(h);
+    for (const [f, v] of Object.entries(d.board?.[h] || {})) if (!(f in cur) && v != null) await S.hset(h, f, v);
+  }
   invalidate();
   return ok({ restored });
 }
@@ -465,6 +561,21 @@ async function dealerAction(b) {
       await save();
       return ok();
     }
+    case 'qpin': {
+      meta.qpin = b.qid || null;
+      await save();
+      return ok();
+    }
+    case 'qhide': {
+      const { qs } = await load(true);
+      const q = qs[b.qid];
+      if (!q) return fail('Otázka nenalezena.');
+      q.hidden = !!b.hidden;
+      await S.hset('qs', q.id, q);
+      if (q.hidden && meta.qpin === q.id) { meta.qpin = null; await save(); }
+      invalidate();
+      return ok();
+    }
     case 'unpin': {
       meta.pins = b.all ? [] : (meta.pins || []).filter((p) => p.id !== b.id);
       await save();
@@ -561,20 +672,21 @@ export default async function handler(req, res) {
   try {
     const url = new URL(req.url, 'http://local');
     if (req.method === 'GET') {
-      const { meta, players, slips, content } = await load(false);
-      const out = publicState(meta, players, slips);
+      const { meta, players, slips, content, qs, qv, qr } = await load(false);
+      const bd = { qs, qv, qr };
+      const out = publicState(meta, players, slips, bd);
       out.content = content;
       const sid = req.headers['x-sid'], pin = req.headers['x-pin'];
       if (sid && pin) {
         const p = players[sid];
-        if (p && p.pin && p.pin === pinHash(p.id, pin)) out.me = meState(meta, p, slips);
+        if (p && p.pin && p.pin === pinHash(p.id, pin)) out.me = meState(meta, p, slips, bd);
         else out.meError = p ? 'pin' : 'unknown';
       }
       if (url.searchParams.get('view') === 'log' && dealerOk(req)) {
         return send(res, 200, { ok: true, storage: S.storageMode, pgEnv: S.pgEnvKey, log: await S.readLog(Number(url.searchParams.get('limit')) || 5000) });
       }
       if (url.searchParams.get('view') === 'dealer' && dealerOk(req)) {
-        out.dealer = dealerState(meta, players, slips);
+        out.dealer = dealerState(meta, players, slips, bd);
         if (url.searchParams.get('dump') === '1') out.dealer.dump = await makeDump();
         if (url.searchParams.get('all') === '1') {
           const all = {};
@@ -593,7 +705,7 @@ export default async function handler(req, res) {
     }
     if (req.method === 'POST') {
       const b = await readBody(req);
-      const studentOps = ['register', 'login', 'notes', 'submit', 'reasons', 'restore'];
+      const studentOps = ['register', 'login', 'notes', 'submit', 'reasons', 'restore', 'ask', 'vote', 'answer', 'react'];
       let r;
       const student = studentOps.includes(b.op);
       if (student) r = await studentAction(b);

@@ -307,6 +307,21 @@
     if (a >= 150000 || n > 70) return 'm';
     return 's';
   }
+
+  // a question pinned from the board, shown big on the table
+  let qpinKey = null;
+  function renderQPin(s) {
+    const el = $('qpin'), q = s.qpin || null;
+    const key = JSON.stringify([q, s.teams.map((t) => t.name)]);
+    if (key === qpinKey) return;
+    qpinKey = key;
+    if (!q) { el.classList.add('hidden'); return; }
+    const t = s.teams.find((x) => x.id === q.team) || { name: '', color: '#888' };
+    el.innerHTML = `<div class="qph"><span class="dot" style="background:${t.color}"></span><span>Otázka pro <b>${esc(t.name)}</b></span><span class="qpc">${esc((s.qcats || {})[q.cat] || '')}</span><span class="qpv">▲ ${q.votes}</span></div>
+      <div class="qpt">${esc(q.text)}</div>${q.answer ? `<div class="qpa">${esc(q.answer.text)}</div>` : ''}`;
+    el.classList.remove('hidden');
+  }
+
   function renderClouds(s) {
     const pins = s.pins || [], box = $('clouds');
     const ids = new Set(pins.map((p) => p.id));
@@ -349,6 +364,7 @@
       renderSeats(s, !first);
     }
     renderPot(s);
+    renderQPin(s);
     renderClouds(s);
   }
 

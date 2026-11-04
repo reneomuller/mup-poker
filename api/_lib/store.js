@@ -103,7 +103,7 @@ async function rHgetall(k) {
 const mirror = async (fn) => { if (!(redis && q)) return; try { await fn(); } catch (e) { console.error('postgres mirror failed', e?.message); } };
 
 // ---------- one-time copy Redis -> Postgres (and refill Redis from Postgres) per instance ----------
-const HASHES = ['players', 'slip:1', 'slip:2', 'slip:3', 'slip:4', 'slip:5'];
+const HASHES = ['players', 'slip:1', 'slip:2', 'slip:3', 'slip:4', 'slip:5', 'qs', 'qv', 'qr'];
 let synced = null;
 function sync() {
   if (!(redis && q)) return null;

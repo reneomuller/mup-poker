@@ -102,3 +102,32 @@ input[type=range] { width: 100%; margin: 12px 0 6px; accent-color: var(--gold); 
 .sparkx { padding-left: 34%; }
 .slipline .rwhy { margin-top: 6px; font-size: 14px; }
 .amt::placeholder { color: rgba(242,234,214,.45); }
+
+/* question board */
+#board h3 { margin-bottom: 4px; }
+.tchips, .cchips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.tchip, .cchip { border: 1px solid rgba(242,234,214,.18); background: rgba(0,0,0,.25); color: var(--cream); border-radius: 999px; padding: 7px 12px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.tchip.on, .cchip.on { background: rgba(201,162,74,.25); border-color: rgba(201,162,74,.7); }
+.tchip .dot { width: 9px; height: 9px; }
+.qask { display: grid; gap: 8px; margin-bottom: 6px; }
+.qask .btn { width: 100%; }
+.qerr { min-height: 18px; font-size: 13px; color: #ffb4ba; margin-bottom: 6px; }
+.q { padding: 12px; border-radius: 12px; background: rgba(0,0,0,.25); border: 1px solid rgba(242,234,214,.08); margin-bottom: 8px; }
+.q.mine { border-color: rgba(201,162,74,.45); }
+.qtop { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.qcat { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--gold-2, #e3c27a); }
+.qblk, .qmine, .qtop3 { font-size: 11px; padding: 2px 7px; border-radius: 999px; background: rgba(242,234,214,.1); color: var(--muted); }
+.qtop3 { background: rgba(201,162,74,.3); color: var(--cream); font-weight: 700; }
+.qvotes { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--muted); }
+.qt { font-size: 15px; line-height: 1.4; margin: 0 0 8px; }
+.qbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.qbar .saved { margin: 0 0 0 auto; }
+.vote { border: 1px solid rgba(242,234,214,.2); background: transparent; color: var(--cream); border-radius: 9px; padding: 6px 12px; font-weight: 800; font-size: 14px; }
+.vote.on { background: rgba(201,162,74,.35); border-color: rgba(201,162,74,.8); }
+.vote:disabled { opacity: .45; }
+.qa { margin-top: 10px; padding: 10px; border-radius: 10px; background: rgba(63,191,122,.08); border: 1px solid rgba(63,191,122,.25); }
+.qa p { margin: 4px 0 8px; font-size: 14px; line-height: 1.4; }
+.react { display: flex; gap: 6px; flex-wrap: wrap; }
+.react button { border: 1px solid rgba(242,234,214,.2); background: transparent; color: var(--cream); border-radius: 9px; padding: 6px 10px; font-size: 12px; font-weight: 600; }
+.react button.on { background: rgba(242,234,214,.18); }
+.qans { margin-bottom: 8px; }

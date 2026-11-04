@@ -237,6 +237,98 @@
     setSaved(r.ok ? 'Uloženo' : r.error);
   }
 
+
+  // ---------- question board ----------
+  let boardTab = 'others', boardTeam = null, boardKey = null, askCat = 'market';
+  function renderBoard() {
+    const el = $('board');
+    if (!S.board || !me) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    // never rebuild while someone is typing a question or an answer
+    const a = document.activeElement;
+    if (a && el.contains(a) && /TEXTAREA|INPUT/.test(a.tagName)) return;
+    const mb = me.board || { asked: 0, qmax: 3, votesUsed: 0, vmax: 5, mine: [], voted: [], reacts: {}, extra: [] };
+    const all = [...S.board, ...(mb.extra || [])];
+    const others = S.teams.filter((t) => t.id !== me.team);
+    if (!boardTeam || !others.some((t) => t.id === boardTeam)) boardTeam = others[0]?.id;
+    const key = JSON.stringify([boardTab, boardTeam, askCat, all, mb, S.block, S.teams.map((t) => t.name), MUP.cv()]);
+    if (key === boardKey) return;
+    boardKey = key;
+    const cats = S.qcats || {};
+    const ours = all.filter((q) => q.team === me.team);
+    const top3 = new Set(ours.filter((q) => q.block === S.block).slice(0, 3).map((q) => q.id));
+    const open = ours.filter((q) => !q.answer).length;
+    const leftQ = Math.max(0, mb.qmax - mb.asked), leftV = Math.max(0, mb.vmax - mb.votesUsed);
+    const top = (q, extra = '') => `<div class="qtop"><span class="qcat">${esc(cats[q.cat] || q.cat)}</span>${q.block !== S.block ? `<span class="qblk">Blok ${q.block}</span>` : ''}${extra}</div><p class="qt">${esc(q.text)}</p>`;
+    let body;
+    if (boardTab === 'others') {
+      const list = all.filter((q) => q.team === boardTeam);
+      body = `<div class="tchips">${others.map((t) => `<button class="tchip ${t.id === boardTeam ? 'on' : ''}" data-team="${t.id}"><span class="dot" style="background:${t.color}"></span>${esc(t.name)}</button>`).join('')}</div>
+        <div class="qask">
+          <div class="cchips">${Object.entries(cats).map(([k, v]) => `<button class="cchip ${k === askCat ? 'on' : ''}" data-cat="${k}">${esc(v)}</button>`).join('')}</div>
+          <textarea class="input" id="qtext" rows="2" maxlength="300" placeholder="Na co se chceš zeptat týmu ${esc(team(boardTeam).name)}?" ${leftQ ? '' : 'disabled'}></textarea>
+          <button class="btn" id="qgo" ${leftQ ? '' : 'disabled'}>${leftQ ? 'Položit otázku' : 'Otázky na tento blok máš vyčerpané'}</button>
+        </div>
+        <div class="msg qerr" id="qerr"></div>
+        ${list.length ? list.map((q) => {
+          const mine = mb.mine.includes(q.id), voted = mb.voted.includes(q.id), my = mb.reacts[q.id];
+          const canVote = !mine && q.block === S.block;
+          return `<div class="q ${mine ? 'mine' : ''}">${top(q, mine ? '<span class="qmine">tvoje</span>' : '')}
+            <div class="qbar"><button class="vote ${voted ? 'on' : ''}" data-vote="${q.id}" ${canVote ? '' : 'disabled'}>▲ ${q.votes}</button></div>
+            ${q.answer ? `<div class="qa"><div class="lbl">Odpověď týmu</div><p>${esc(q.answer.text)}</p>
+              <div class="react"><button class="${my === 'yes' ? 'on' : ''}" data-react="yes" data-q="${q.id}">Přesvědčilo · ${q.yes}</button><button class="${my === 'no' ? 'on' : ''}" data-react="no" data-q="${q.id}">Nepřesvědčilo · ${q.no}</button></div></div>` : ''}
+          </div>`;
+        }).join('') : `<p class="hint">Tomuhle týmu se zatím nikdo nezeptal. Buď první.</p>`}`;
+    } else {
+      body = `<p class="hint">Otázky pro váš tým, seřazené podle hlasů. Tři nejpodpořenější z tohoto bloku zodpovězte do dalšího bloku.</p>
+        ${ours.length ? ours.map((q) => `<div class="q">${top(q, (top3.has(q.id) ? '<span class="qtop3">TOP 3</span>' : '') + `<span class="qvotes">▲ ${q.votes}</span>`)}
+          <textarea class="input qans" data-ans="${q.id}" rows="2" maxlength="800" placeholder="Odpověď týmu…">${esc(q.answer?.text || '')}</textarea>
+          <div class="qbar"><button class="btn sm" data-save="${q.id}">Uložit odpověď</button>${q.answer ? `<span class="muted small">přesvědčilo ${q.yes} · nepřesvědčilo ${q.no}</span>` : ''}<span class="saved" data-saved="${q.id}"></span></div>
+        </div>`).join('') : '<p class="hint">Zatím se vašemu týmu nikdo nezeptal.</p>'}`;
+    }
+    el.innerHTML = `<h3>Otázky pro týmy</h3>
+      <p class="hint">V tomto bloku ti zbývá ${leftQ} z ${mb.qmax} otázek a ${leftV} z ${mb.vmax} hlasů. Nejpodpořenější otázky padnou na investiční komisi.</p>
+      <div class="tabs"><button data-bt="others" class="${boardTab === 'others' ? 'on' : ''}">Ostatní týmy</button><button data-bt="ours" class="${boardTab === 'ours' ? 'on' : ''}">Pro náš tým${open ? ` (${open})` : ''}</button></div>
+      ${body}`;
+    const again = () => { boardKey = null; setTimeout(tick, 150); };
+    const err = (t) => { const e = $('qerr'); if (e) e.textContent = t || ''; };
+    el.querySelectorAll('[data-bt]').forEach((b) => (b.onclick = () => { boardTab = b.dataset.bt; boardKey = null; renderBoard(); }));
+    el.querySelectorAll('[data-team]').forEach((b) => (b.onclick = () => { boardTeam = b.dataset.team; boardKey = null; renderBoard(); }));
+    el.querySelectorAll('[data-cat]').forEach((b) => (b.onclick = () => {
+      askCat = b.dataset.cat;
+      el.querySelectorAll('[data-cat]').forEach((x) => x.classList.toggle('on', x === b));
+    }));
+    if ($('qgo')) $('qgo').onclick = async () => {
+      const text = $('qtext').value.trim();
+      if (text.length < 8) return err('Napiš celou otázku.');
+      $('qgo').disabled = true;
+      const r = await post({ op: 'ask', sid, pin, team: boardTeam, cat: askCat, text });
+      if (!r.ok) { $('qgo').disabled = false; return err(r.error); }
+      $('qtext').value = '';
+      $('qtext').blur();
+      again();
+    };
+    el.querySelectorAll('[data-vote]').forEach((b) => (b.onclick = async () => {
+      b.disabled = true;
+      const r = await post({ op: 'vote', sid, pin, qid: b.dataset.vote });
+      if (!r.ok) { b.disabled = false; return err(r.error); }
+      again();
+    }));
+    el.querySelectorAll('[data-react]').forEach((b) => (b.onclick = async () => {
+      const cur = mb.reacts[b.dataset.q];
+      const r = await post({ op: 'react', sid, pin, qid: b.dataset.q, v: cur === b.dataset.react ? null : b.dataset.react });
+      if (!r.ok) return err(r.error);
+      again();
+    }));
+    el.querySelectorAll('[data-save]').forEach((b) => (b.onclick = async () => {
+      const id = b.dataset.save, ta = el.querySelector(`[data-ans="${id}"]`), sv = el.querySelector(`[data-saved="${id}"]`);
+      sv.textContent = 'Ukládám…';
+      const r = await post({ op: 'answer', sid, pin, qid: id, text: ta.value });
+      sv.textContent = r.ok ? 'Uloženo' : r.error;
+      if (r.ok) { ta.blur(); again(); }
+    }));
+  }
+
   // ----- allocation -----
   function draftKey() { return `mup.draft.${me.id}.${S.block}`; }
   function loadDraft() {
@@ -281,7 +373,7 @@
         <div class="lbl sec">${E('play.form.inLabel')}</div>
         ${others.map((t) => rowHTML('in', t, draft.in[t.id] || {})).join('')}
         <div class="sum" id="sum"></div>
-        <div class="actions"><button class="btn" id="go">${E('play.form.confirm')}</button><button class="btn ghost" id="hold">${E('play.form.hold')}</button></div>
+        <div class="actions"><button class="btn" id="go">${E('play.form.confirm')}</button>${R.exact ? '' : `<button class="btn ghost" id="hold">${E('play.form.hold')}</button>`}</div>
         <div class="err msg" id="ferr"></div></div>`;
     }
     $('main').innerHTML = html;
@@ -348,6 +440,7 @@
     const inT = sumOf(draft.in), outT = sumOf(draft.out);
     if (R.mode === 'initial' && inT !== R.capital) errs.unshift(`Zbývá rozdělit ${fmt(R.capital - inT)}.`);
     if (R.mode !== 'initial' && inT !== outT) errs.unshift(inT < outT ? `Zbývá vložit ${fmt(outT - inT)}.` : 'Vkládáš víc, než vybíráš.');
+    if (R.mode !== 'initial' && R.exact && outT !== R.cashoutMax) errs.unshift(`Vyber ještě ${fmt(R.cashoutMax - outT)}.`);
     return errs;
   }
 
@@ -363,8 +456,8 @@
       $('sum').innerHTML = `<span>Rozděleno</span><b>${esc(fmt(inT))} / ${esc(fmtM(R.capital))}</b>`;
       renderFan(R.capital - inT, tx('play.fan.left'), R.capital);
     } else {
-      $('sum').innerHTML = `<span>Vybráno ${esc(fmt(outT))}</span><b>vloženo ${esc(fmt(inT))}</b>`;
-      renderFan(outT - inT, outT ? 'Zbývá vložit' : 'Max. výběr', outT ? outT : R.cashoutMax, !outT);
+      $('sum').innerHTML = `<span>Vybráno ${esc(fmt(outT))}${R.exact ? ' z ' + esc(fmt(R.cashoutMax)) : ''}</span><b>vloženo ${esc(fmt(inT))}</b>`;
+      renderFan(outT - inT, outT ? 'Zbývá vložit' : R.exact ? 'Vyber' : 'Max. výběr', outT ? outT : R.cashoutMax, !outT);
     }
     $('sum').classList.toggle('good', !errs.length);
     $('go').disabled = errs.length > 0 || (R.mode !== 'initial' && outT === 0);
@@ -454,7 +547,7 @@
       else if (me.slip) rememberSlip(me.slip);
       $('login').classList.add('hidden');
       $('game').classList.remove('hidden');
-      renderHeader(); renderStatus(); renderMsgs(); renderNotes(); renderMain(); renderPortfolio();
+      renderHeader(); renderStatus(); renderMsgs(); renderNotes(); renderMain(); renderPortfolio(); renderBoard();
     } else if (sid && s.meError) {
       if (s.meError === 'unknown' && LS.get('mup.profile')?.sid === sid) {
         const r = await restore();

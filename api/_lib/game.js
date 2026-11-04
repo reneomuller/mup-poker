@@ -65,11 +65,12 @@ export function raised(m) {
 export function rules(m, inv) {
   const isRJ = inv === RJ;
   if (!hasHoldings(m, inv)) {
-    return { mode: 'initial', capital: isRJ ? CFG.RJ_CAPITAL : CFG.STUDENT_CAPITAL, cashoutMax: 0 };
+    return { mode: 'initial', capital: isRJ ? CFG.RJ_CAPITAL : CFG.STUDENT_CAPITAL, cashoutMax: 0, exact: false };
   }
   const pv = portfolio(m, inv);
   const cap = isRJ ? Math.floor((pv * CFG.RJ_CASHOUT_PCT) / 1000) * 1000 : CFG.STUDENT_CASHOUT;
-  return { mode: 'rebalance', capital: 0, cashoutMax: Math.min(cap, Math.floor(pv)) };
+  // students must take out exactly this much every block (RJ: up to it)
+  return { mode: 'rebalance', capital: 0, cashoutMax: Math.min(cap, Math.floor(pv)), exact: !isRJ };
 }
 
 const fmt = (n) => Math.round(n).toLocaleString('cs-CZ').replace(/ /g, ' ') + ' $';
@@ -108,7 +109,8 @@ export function validate(m, inv, ownTeam, raw) {
   if (r.mode === 'initial') {
     if (inTotal !== r.capital) errors.push(`Rozděl přesně ${fmt(r.capital)} (zatím ${fmt(inTotal)}).`);
   } else {
-    if (outTotal > r.cashoutMax) errors.push(`V tomto bloku můžeš vybrat nejvýš ${fmt(r.cashoutMax)}.`);
+    if (r.exact && outTotal !== r.cashoutMax) errors.push(`V tomto bloku vyber přesně ${fmt(r.cashoutMax)} (zatím ${fmt(outTotal)}).`);
+    else if (outTotal > r.cashoutMax) errors.push(`V tomto bloku můžeš vybrat nejvýš ${fmt(r.cashoutMax)}.`);
     if (inTotal !== outTotal) errors.push(`Vlož přesně tolik, kolik vybíráš (${fmt(outTotal)}).`);
   }
   return { ok: errors.length === 0, errors, out, in: inn, outTotal, inTotal, mode: r.mode };
