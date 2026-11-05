@@ -144,4 +144,15 @@ await main(async () => {
   ok(plain.features?.startupPage === false && Array.isArray(plain.teams) && plain.me, 'plain GET works with the flag off');
   await c.dealer('features', { set: { startupPage: true } });
   ok((await sv(S[0], X)).ok, 'flag back on → view works again');
+
+  section('guard: wrong PINs on the startup / recap views count (review)');
+  { // these views check the PIN themselves; without the gate they were a PIN oracle around the guard lockout
+    const bf = await c.post({ op: 'register', name: 'Brute Force', team: T[0], pin: '4321' });
+    for (let i = 0; i < 8; i++) await c.get('?view=' + (i % 2 ? 'recap' : 'startup&team=' + X), { 'x-sid': bf.sid, 'x-pin': String(5000 + i) });
+    const right = await c.get('?view=startup&team=' + X, { 'x-sid': bf.sid, 'x-pin': '4321' });
+    ok(bf.ok && right._status === 401 && /Moc pokusů/.test(right.error || ''), `after 8 wrong PINs even the right one is refused (${right._status} ${right.error})`);
+    const g = await c.get('', { 'x-sid': bf.sid, 'x-pin': '4321' });
+    ok(!g.me && g.meError === 'locked', `…and the player is locked for the plain GET too (${g.meError})`);
+    ok((await c.dealer('removePlayer', { sid: bf.sid })).ok, 'clean-up: the test player is removed again');
+  }
 });
