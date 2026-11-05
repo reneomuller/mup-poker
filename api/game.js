@@ -265,6 +265,8 @@ function dealerState(meta, players, slips, bd, tx = {}, qa = {}) {
     quizSets: meta.quizSets, quiz: Q.dealerQuiz(meta, players, qa), points: meta.points,
     awards: meta.awards, rounds: meta.rounds, roundTerms: Object.fromEntries(Object.entries(tx).filter(([k]) => k.startsWith('rt:'))),
     rjFund: G.rjFund(meta), tranches: meta.tranches, exit: meta.exit, v2ArchivedAt: meta.v2ArchivedAt || null,
+    // v3 §4: per-team wall counters for the Nástěnky unread badges (dealer.js reads D.wallRev)
+    ...(F.on(meta, 'wall') ? { wallRev: Object.fromEntries(meta.teams.map((t) => [t.id, W.rev(meta, t.id, tx)])) } : {}),
   };
 }
 
