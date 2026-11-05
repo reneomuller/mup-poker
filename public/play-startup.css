@@ -103,7 +103,7 @@ body.sd-lock { overflow: hidden; }
 .sd-iv { padding: 9px 0; border-top: 1px solid var(--s-border); }
 .sd-iv:first-child { border-top: 0; }
 .sd-iv-h { display: flex; align-items: center; gap: 10px; }
-.sd-iv-n { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.sd-iv-n { flex: 1; min-width: 0; display: grid; justify-items: start; gap: 1px; }
 .sd-iv-n b { font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sd-iv-n .p-tt { font-size: 12px; color: var(--s-muted); }
 .sd-iv-a { flex: none; font-size: 13.5px; font-weight: 700; white-space: nowrap; }
