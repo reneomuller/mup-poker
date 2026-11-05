@@ -67,7 +67,8 @@ body {
 .qrbox .qrimg svg { width: 100%; height: auto; display: block; }
 .qrbox .qrl { font-size: 1.45rem; font-weight: 700; color: var(--gold-2); margin-top: .5rem; line-height: 1.15; }
 .brand { position: absolute; left: 50%; bottom: 1.3rem; transform: translateX(-50%); font-size: 1.45rem; letter-spacing: .32em; text-transform: uppercase; color: rgba(242,234,214,.42); white-space: nowrap; z-index: 2; }
-.credits { position: absolute; right: 1rem; bottom: .6rem; font-size: 1.1rem; color: rgba(242,234,214,.3); z-index: 2; }
+.credits { position: absolute; left: 50%; bottom: .2rem; transform: translateX(-50%); font-size: 1.1rem; color: rgba(242,234,214,.32); z-index: 2; white-space: nowrap; }
+.stage.lobby .brand { bottom: 1.9rem; }
 .credits.off { display: none; }
 
 /* ---------- seats ---------- */
@@ -197,15 +198,16 @@ body {
 .pot .lab b { font-family: var(--serif); font-size: 2.4rem; color: var(--gold-2); font-variant-numeric: tabular-nums; }
 
 /* ---------- join ---------- */
-.join { position: absolute; left: 50%; top: 63%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 1.8rem; z-index: 6;
-  background: linear-gradient(180deg, rgba(8,28,20,.94), rgba(5,18,13,.94)); border: .14rem solid rgba(201,162,74,.6); border-radius: 1.4rem; padding: 1.3rem 1.8rem; box-shadow: 0 1.4rem 3rem rgba(0,0,0,.55);
+.join { position: absolute; left: 50%; top: 62.5%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 1.4rem; z-index: 12; max-width: 33rem;
+  background: linear-gradient(180deg, rgba(8,28,20,.96), rgba(5,18,13,.96)); border: .14rem solid rgba(201,162,74,.6); border-radius: 1.3rem; padding: 1.1rem 1.3rem; box-shadow: 0 1.4rem 3rem rgba(0,0,0,.55);
   animation: rise .6s cubic-bezier(.2,.8,.2,1) both; }
-.join .qr { width: 12rem; height: 12rem; background: #fff; border-radius: .6rem; padding: .5rem; flex: none; }
+.join .qr { width: 11rem; height: 11rem; background: #fff; border-radius: .6rem; padding: .45rem; flex: none; }
 .join .qr svg { width: 100%; height: 100%; display: block; }
-.join .jt { max-width: 25rem; }
-.join .t1 { font-family: var(--serif); font-size: 2.8rem; font-weight: 900; line-height: 1.1; }
-.join .t2 { font-size: 1.9rem; color: var(--gold-2); margin-top: .5rem; font-weight: 700; word-break: break-all; }
-.join .t3 { font-size: 1.5rem; color: var(--muted); margin-top: .6rem; line-height: 1.3; }
+.join .jt { min-width: 0; }
+.join .t1 { font-family: var(--serif); font-size: 2.3rem; font-weight: 900; line-height: 1.1; text-wrap: balance; }
+.join .t2 { font-size: 1.6rem; color: var(--gold-2); margin-top: .4rem; font-weight: 700; overflow-wrap: anywhere; line-height: 1.2; }
+.join .t3 { font-size: 1.45rem; color: var(--muted); margin-top: .4rem; line-height: 1.3; }
+.stage.lobby .spot { opacity: .35; transition: opacity .6s; }
 @keyframes rise { from { opacity: 0; transform: translate(-50%, -40%); } }
 
 /* ---------- flying chips ---------- */

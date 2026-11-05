@@ -618,7 +618,7 @@
     const inv = $('inv');
     const box = $('bspeople');
     const avail = box.clientHeight / rem();
-    const nInv = points ? 5 : Math.max(3, Math.min(10, Math.floor((avail - 4) / 4.4)));
+    const nInv = points ? (avail > 50 ? 5 : 4) : Math.max(3, Math.min(10, Math.floor((avail - 4) / 4.4)));
     const L = (s.leaders || []).slice(0, nInv);
     if (!L.length) { setHTML(inv, `<li class="empty muted">${esc(tx('table.board.noInvestors'))}</li>`); inv._rows = null; inv.style.height = ''; }
     else {

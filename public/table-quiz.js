@@ -96,7 +96,7 @@
     const n = rows.length;
     ol.innerHTML = rows.map((r, i) => {
       const t = team(s, r.team);
-      return `<li style="--d:${(n - 1 - i) * 110 + 150}ms" class="${i < 3 ? 'top' + (i + 1) : ''}"><span class="qz-pos">${i + 1}</span><span class="qz-nm">${esc(r.name)}</span><span class="qz-tm"><span class="dot" style="background:${t.color}"></span>${esc(t.name)}</span><span class="qz-pts">${pts(r.quizPoints)}</span><span class="qz-tot">${esc(tx('table.quiz.total'))} ${pts(r.total)}</span></li>`;
+      return `<li style="--d:${(n - 1 - i) * 110 + 150}ms" class="${i < 3 ? 'top' + (i + 1) : ''}"><span class="qz-pos">${i + 1}</span><span class="qz-nm">${esc(r.name)}</span><span class="qz-tm"><span class="dot" style="background:${t.color}"></span><span class="qz-tmn">${esc(t.name)}</span></span><span class="qz-pts">${pts(r.quizPoints)}</span><span class="qz-tot">${esc(tx('table.quiz.total'))} ${pts(r.total)}</span></li>`;
     }).join('');
   }
 

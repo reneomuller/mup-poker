@@ -38,7 +38,7 @@
   function finalHTML(s, x, list) {
     const rows = (x.ranking || []).map((r, i) => {
       const t = team(s, r.team);
-      return `<li style="--d:${(9 - i) * 90 + 200}ms" class="${i === 0 ? 'first' : ''}"><span class="ex-pos">${i + 1}</span><span class="ex-nm">${esc(r.name)}</span><span class="ex-tm"><span class="dot" style="background:${t.color}"></span>${esc(t.name)}</span><span class="ex-val">${esc(fmtM(r.value))}</span><span class="ex-ret ${r.returnPct >= 0 ? 'up' : 'down'}">${pct(r.returnPct)}</span></li>`;
+      return `<li style="--d:${(9 - i) * 90 + 200}ms" class="${i === 0 ? 'first' : ''}"><span class="ex-pos">${i + 1}</span><span class="ex-nm">${esc(r.name)}</span><span class="ex-tm"><span class="dot" style="background:${t.color}"></span><span class="ex-tmn">${esc(t.name)}</span></span><span class="ex-val">${esc(fmtM(r.value))}</span><span class="ex-ret ${r.returnPct >= 0 ? 'up' : 'down'}">${pct(r.returnPct)}</span></li>`;
     }).join('') || `<li class="ex-empty">${esc(tx('table.exit.noRanking'))}</li>`;
     const outs = list.slice().sort((a, b) => b.V - a.V).map((o) => {
       const t = team(s, o.team);
