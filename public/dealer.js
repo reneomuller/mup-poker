@@ -86,6 +86,7 @@
     ['wall', 'Nástěnky týmů', 'Každý tým má soukromou nástěnku s\u00a0otázkami a úkoly od vás i od svých členů.'],
     ['startupPage', 'Detail startupu', 'Klepnutím na startup v\u00a0mobilu se otevře detail: graf ocenění, čísla, karta a proč do něj spolužáci investovali.'],
     ['wallplus', 'Nástěnky+', 'Reakce, připnutí, označená odpověď, termín a řešitel úkolu, šablony a filtry na nástěnkách.'],
+    ['regie', 'Režie', 'Plán hodiny s\u00a0dalším krokem, kdo chybí a kdo je připojený, připomínky týmům, klávesové zkratky a historie akcí.'], // v4 regie
   ];
   const featKnown = () => !!(S && S.features && typeof S.features === 'object');
   const F = (k) => !!(S && S.features && S.features[k]);
@@ -195,7 +196,7 @@
   $('dpw').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('dgo').click(); });
 
   // ---------- tabs ----------
-  const TABS = ['hra', 'investice', 'rj', 'oceneni', 'startupy', 'walls', 'kviz', 'body', 'hraci', 'funkce', 'data', 'texty'];
+  const TABS = ['hra', 'regie', 'investice', 'rj', 'oceneni', 'startupy', 'walls', 'kviz', 'body', 'hraci', 'funkce', 'data', 'texty'];
   let tab = TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'hra';
   function setTab(k) {
     if (!TABS.includes(k)) return;
@@ -1766,6 +1767,7 @@
     funkce: [renderFeatures],
     data: [renderArchives, renderTables, renderExports, renderDanger],
     texty: [],
+    regie: [() => window.MUPRegie && window.MUPRegie.render()], // v4 regie (public/dealer-regie.js)
   };
   function renderPanel() {
     for (const fn of PANELS[tab] || []) {
@@ -1790,6 +1792,7 @@
     if (S.phase === 'pitch' && S.presenting) markPitched(S.presenting);
     renderTop();
     renderPanel();
+    if (window.MUPRegie) window.MUPRegie.tick(); // v4 regie
     if (['hraci', 'body', 'data'].includes(tab) && dumpN % 3 === 1) loadData();
   }
 
@@ -1809,5 +1812,6 @@
     setInterval(tickClock, 250);
   }
 
+  window.MUPD = { get S() { return S; }, get D() { return D; }, get tab() { return tab; }, H, F, act, toast, setTab, team, nextStep, nextPitchTeam, startPitch, openBetting, closeBetting, doShowdown, doRjReveal, doNext, doFinal, quiz, pitchedList }; // v4 regie
   tryLogin(pw || '').then((ok) => { if (!ok) $('dlogin').classList.remove('hidden'); });
 })();

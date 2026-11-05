@@ -13,6 +13,7 @@ export const FEATURE_DEFAULTS = {
   quizplus: true, // v4: quiz explanations, ×2 questions, images, podium, lobby counter, results export
   wallplus: true, // v4: reactions, pins, accepted answers, task due/assignee, templates on the team walls
   recap: true, // v4: end-of-game recap on the phone + class report (GET ?view=recap / ?view=report)
+  regie: true, // v4 regie: run-of-show, class health, presence, nudges, shortcuts on /dealer
 };
 export const OFF = 'Tato funkce je vypnutá.';
 export const REASON_LABELS = { milestone: 'Splněný milník', traction: 'Trakce', team: 'Tým', risk: 'Riziko', market: 'Trh', other: 'Jiné' };
@@ -34,7 +35,7 @@ export const QUIZ_IDLE = { runId: null, setId: null, idx: -1, state: 'idle', sta
 
 // Fields that belong to the course rather than to one game round: undo keeps them, and restoring an
 // old-shaped dump (without them) keeps the server's current ones.
-export const KEEP_ON_UNDO = ['features', 'quizSets', 'quiz', 'quizLog', 'points', 'awards', 'cards', 'milestoneDefs', 'v2ArchivedAt', 'wallTpl'];
+export const KEEP_ON_UNDO = ['features', 'quizSets', 'quiz', 'quizLog', 'points', 'awards', 'cards', 'milestoneDefs', 'v2ArchivedAt', 'wallTpl', 'regie'];
 export const V2_FIELDS = [...KEEP_ON_UNDO, 'drivers', 'rounds', 'market', 'tranches', 'rjPrincipal', 'lots', 'exit'];
 
 export const seedSets = () => [{ id: 'blok2', title: 'Blok 2 – slovník', questions: structuredClone(QUIZ_SEED) }];

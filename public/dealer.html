@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="/stand.css">
 <link rel="stylesheet" href="/wall.css">
 <link rel="stylesheet" href="/dealer.css">
+<link rel="stylesheet" href="/dealer-regie.css">
 <script src="/vendor/qrcode.js" defer></script>
 </head>
 <body class="s-app adm">
@@ -44,6 +45,7 @@
     <nav class="tabs" id="tabs" aria-label="Sekce">
       <div class="brand"><div class="s-label">RainbowJet × MUP</div><div class="bt">Investiční stůl</div><div class="s-gradbar"></div></div>
       <button data-atab="hra">Hra<span class="tb" data-badge="hra"></span></button>
+      <button data-atab="regie" hidden>Režie<span class="tb" data-badge="regie"></span></button>
       <button data-atab="investice">Investice<span class="tb" data-badge="investice"></span></button>
       <button data-atab="rj">RJ<span class="tb" data-badge="rj"></span></button>
       <button data-atab="oceneni">Ocenění<span class="tb" data-badge="oceneni"></span></button>
@@ -69,6 +71,8 @@
         </div>
       </div>
     </section>
+
+    <section class="panel" data-panel="regie" hidden><div id="rgpanel"></div></section>
 
     <section class="panel" data-panel="investice" hidden>
       <div class="cols c-main">
@@ -176,5 +180,6 @@
 <script src="/dealer.js"></script>
 <script src="/quiz-auto.js" defer></script>
 <script src="/dealer-quizplus.js" defer></script>
+<script src="/dealer-regie.js" defer></script>
 </body>
 </html>
