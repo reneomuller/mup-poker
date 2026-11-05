@@ -20,7 +20,7 @@
 </head>
 <body>
 <div class="demo-bar" role="toolbar" aria-label="Režim dema">
-  <b>Nástěnka</b>
+  <b>Nástěnka</b><a href="?plus=0" style="font-size:12px;color:inherit">v3</a>
   <button type="button" data-mode="student">Student</button>
   <button type="button" data-mode="dealer">MUP – tým</button>
   <button type="button" data-mode="all">MUP – všechny týmy</button>
@@ -36,7 +36,9 @@
 (function () {
   'use strict';
   // non-breaking space after single-letter prepositions/conjunctions
-  function nb(s) { return s.replace(/(?<=^|[\s(„\u00a0])([vkszouaiVKSZOUAI]) /g, '$1\u00a0'); }
+  function nb(s) { return s.replace(/(?<=^|[\s(„ ])([vkszouaiVKSZOUAI]) /g, '$1 '); }
+  var qs = new URLSearchParams(location.search);
+  var PLUS = qs.get('plus') !== '0';
   var TEAMS = [
     { id: 'zp', name: 'Zdravotní pomůcky', color: '#3FCF8E' },
     { id: 'billi', name: 'Billi', color: '#3586D1' },
@@ -49,27 +51,40 @@
   var MUP = { role: 'dealer', name: 'MUP' };
   var RJ = { role: 'dealer', name: 'RainbowJet' };
   var st = function (id, name) { return { role: 'student', id: id, name: name }; };
+  var MEMBERS = {
+    billi: [st('s1', 'Jana Nováková'), st('s2', 'Petr Svoboda'), st('s3', 'Tereza Malá')],
+    seeto: [st('s7', 'Adam Král'), st('s8', 'Lucie Dvořáková')],
+    zp: [st('s9', 'Ondřej Beneš'), st('s11', 'Eva Černá')],
+    zpr: [st('s12', 'Marek Pokorný')], asset: [st('s10', 'Klára Horáková')], vestity: [st('s13', 'Filip Veselý')],
+  };
   var now = Date.now(), min = 60000;
   var n = 0;
   function rid() { return Math.random().toString(36).slice(2, 8); }
   function S(team, kind, text, by, ago, extra) {
-    var s = { id: 'x' + (++n) + rid(), team: team, kind: kind, text: nb(text), by: by, ts: now - ago * min, done: false, replies: [] };
+    var s = { id: 'x' + (++n) + rid(), team: team, kind: kind, text: nb(text), by: by, ts: now - ago * min, done: false, replies: [], rx: {} };
     for (var k in extra || {}) s[k] = extra[k];
     return s;
   }
-  function R(text, by, ago) { return { id: 'r' + rid(), text: nb(text), by: by, ts: now - ago * min }; }
-  var G = 'g' + rid();
+  function R(text, by, ago, rx) { return { id: 'r' + rid(), text: nb(text), by: by, ts: now - ago * min, rx: rx || {} }; }
+  function hm(ms) { var d = new Date(ms); return d.getHours() + ':' + ('0' + d.getMinutes()).slice(-2); }
+  var G = 'g' + rid(), GQ = 'g' + rid();
   var DB = [];
   TEAMS.forEach(function (t, i) {
-    DB.push(S(t.id, 'task', 'Do pátku nahrajte na Moodle pitch deck (max. 10 slidů) a jednu větu o tom, k čemu jste dospěli v rozhovorech se zákazníky.', MUP, 50 + i, { group: G }));
+    DB.push(S(t.id, 'task', 'Do pátku nahrajte na Moodle pitch deck (max. 10 slidů) a jednu větu o tom, k čemu jste dospěli v rozhovorech se zákazníky.', MUP, 50 + i, { group: G, due: { kind: 'block', block: 2 }, assign: { all: true }, done: i % 3 === 0 }));
+    DB.push(S(t.id, 'q', 'Jaký je váš nejrizikovější předpoklad? Napište ho jednou větou.', MUP, 44 + i, { group: GQ }));
   });
+  DB.forEach(function (s) { if (s.group === GQ && (s.team === 'billi' || s.team === 'zp' || s.team === 'seeto')) s.replies.push(R('Že lidé budou platit předplatné.', st('sx', 'Student'), 30)); });
+  var acc = R('Ano. Násobek je přítok do vašeho týmu děleno průměrným přítokem, takže ×2. Omezené je to na 0,1 až 10.', MUP, 25, { up: ['s2', 's3'], heart: ['s1'] });
   DB.push(
-    S('billi', 'q', 'Jak přesně funguje poptávkové ocenění? Když do nás v bloku 1 půjde dvakrát víc peněz než průměr, zdvojnásobí se cena akcie?', ME, 32, { replies: [
-      R('Ano. Násobek je přítok do vašeho týmu děleno průměrným přítokem, takže ×2. Omezené je to na 0,1 až 10.', MUP, 25),
-      R('Díky! Takže se vyplatí pitch vylepšit ještě před showdownem.', st('s2', 'Petr Svoboda'), 20),
+    S('billi', 'task', 'Dnes v 10:30 jdeme s pitchem na projektor – připravte si 60 vteřin.', MUP, 60, { pinned: true, rx: { fire: ['s2', 's3'], up: ['s1'] } }),
+    S('billi', 'q', 'Jak přesně funguje poptávkové ocenění? Když do nás v bloku 1 půjde dvakrát víc peněz než průměr, zdvojnásobí se cena akcie?', ME, 32, { accepted: acc.id, rx: { think: ['s2'] }, replies: [
+      acc,
+      R('Díky! Takže se vyplatí pitch vylepšit ještě před showdownem.', st('s2', 'Petr Svoboda'), 20, { lol: ['s1'] }),
+      R('A platí to i pro rebalancování v bloku 3?', st('s3', 'Tereza Malá'), 3),
     ] }),
     S('billi', 'task', 'Připravit 3 otázky pro mentora z RainbowJet – hlavně k cenotvorbě a k tomu, jak oslovit první B2B zákazníky.', st('s3', 'Tereza Malá'), 40, { done: true, doneBy: st('s3', 'Tereza Malá'), replies: [R('Hotovo, jsou ve sdíleném dokumentu.', st('s3', 'Tereza Malá'), 12)] }),
-    S('billi', 'task', 'Aktualizovat kartu týmu: nové logo a krátký popis v jedné větě.', ME, 18),
+    S('billi', 'task', 'Aktualizovat kartu týmu: nové logo a krátký popis v jedné větě.', ME, 18, { due: { kind: 'time', at: hm(now - 10 * min), ts: now - 10 * min }, assign: { id: 's2', name: 'Petr Svoboda' } }),
+    S('billi', 'task', 'Sepsat tři hypotézy o zákaznících a poslat je MUP.', st('s2', 'Petr Svoboda'), 11, { due: { kind: 'time', at: hm(now + 40 * min), ts: now + 40 * min }, assign: { id: 's1', name: 'Jana Nováková' } }),
     S('billi', 'q', 'Proč nám v bloku 2 klesla valuace, když jsme nic neprodali?', st('s2', 'Petr Svoboda'), 9, { replies: [R('Investoři přesunuli peníze jinam – čistý přítok byl záporný, takže násobek vyšel pod 1. Podívejte se na záložku Investoři u svého týmu.', RJ, 5)] }),
     S('billi', 'q', 'Dlouhý text pro test: Máme za sebou tři rozhovory s účetními firmami a dva s malými e-shopy. Všichni říkají, že by fakturaci z mobilu chtěli, ale nikdo za ni nechce platit víc než 99 Kč měsíčně. Má smysl jít do freemium modelu, nebo raději udělat jednorázovou licenci? A jak to vysvětlit investorům, aby to nepůsobilo, že nemáme jasný byznys model? Uvažujeme i o partnerství s bankou, která by nás mohla nabízet svým klientům v rámci podnikatelského účtu.', ME, 4),
     S('billi', 'task', 'Natočit 30s video o produktu na projekci <img src=x onerror=alert(1)> & „uvozovky“', RJ, 2),
@@ -78,40 +93,86 @@
     S('zp', 'q', 'Kdy se zveřejní výsledky RJ smart money?', st('s9', 'Ondřej Beneš'), 7, { replies: [R('Po showdownu, v odhalení RJ.', MUP, 6)] }),
     S('asset', 'q', 'Je možné změnit jméno týmu?', st('s10', 'Klára Horáková'), 3)
   );
-  DB.forEach(function (s, i) { if (s.group && s.team === 'zp') { s.done = true; s.doneBy = st('s9', 'Ondřej Beneš'); } });
+  var TPL = [
+    { id: 't1', kind: 'task', text: 'Nahrajte pitch deck na Moodle (max. 10 slidů).', due: { kind: 'block' }, ts: now - 900 * min },
+    { id: 't2', kind: 'q', text: 'Co jste se dnes dozvěděli od zákazníků? Jedna věta.', ts: now - 800 * min },
+  ];
 
-  var mode = 'student', viewer = ME;
+  var mode = 'student';
   var failEl = document.getElementById('fail');
   function wait(v) {
     return new Promise(function (res, rej) {
-      setTimeout(function () { failEl.checked ? rej(new Error('Server neodpovídá. Zkus to za chvíli.')) : res(v); }, 250 + Math.random() * 300);
+      setTimeout(function () { failEl.checked ? rej(new Error('Server neodpovídá. Zkus to za chvíli.')) : res(v); }, 150 + Math.random() * 200);
     });
   }
+  function who() { return mode === 'student' ? ME.id : 'dealer'; }
   function isMine(by) { return mode === 'student' && by && by.id === ME.id; }
+  function rxOut(rx) {
+    var o = {};
+    for (var c in rx || {}) if (rx[c].length) o[c] = { n: rx[c].length, mine: rx[c].indexOf(who()) >= 0 };
+    return o;
+  }
   function out(s) {
-    return { id: s.id, kind: s.kind, text: s.text, by: s.by, ts: s.ts, group: s.group, mine: isMine(s.by), done: !!s.done, doneBy: s.doneBy,
-      replies: s.replies.map(function (r) { return { id: r.id, text: r.text, by: r.by, ts: r.ts, mine: isMine(r.by) }; }) };
+    var mine = isMine(s.by), dealer = mode !== 'student';
+    var o = { id: s.id, kind: s.kind, text: s.text, by: s.by, ts: s.ts, group: s.group, mine: mine, done: !!s.done, doneBy: s.doneBy,
+      replies: s.replies.map(function (r) { var x = { id: r.id, text: r.text, by: r.by, ts: r.ts, mine: isMine(r.by) }; if (PLUS) { x.reactions = rxOut(r.rx); if (s.accepted === r.id) x.accepted = true; } return x; }) };
+    if (PLUS) {
+      o.pinned = !!s.pinned; o.reactions = rxOut(s.rx);
+      if (s.kind === 'q') o.accepted = s.accepted || null;
+      if (s.due) { o.due = s.due; o.overdue = !s.done && s.due.kind === 'time' && s.due.ts < Date.now(); }
+      if (s.assign) { o.assign = s.assign; o.assignedToMe = mode === 'student' && s.assign.id === ME.id; }
+      o.canPin = dealer || mine; o.canAccept = s.kind === 'q' && (dealer || mine); o.canEdit = s.kind === 'task' && (dealer || mine);
+    }
+    return o;
   }
   function wallOf(team) {
     return DB.filter(function (s) { return s.team === team; })
-      .sort(function (a, b) { var da = a.kind === 'task' && a.done ? 1 : 0, db = b.kind === 'task' && b.done ? 1 : 0; return da - db || b.ts - a.ts; })
+      .sort(function (a, b) { var da = a.kind === 'task' && a.done ? 1 : 0, db = b.kind === 'task' && b.done ? 1 : 0; return (!!b.pinned - !!a.pinned) || da - db || b.ts - a.ts; })
       .map(out);
+  }
+  function groups() {
+    var g = {}, order = [];
+    DB.forEach(function (s) {
+      if (!s.group) return;
+      if (!g[s.group]) { g[s.group] = { group: s.group, kind: s.kind, text: s.text, ts: s.ts, teams: [] }; order.push(s.group); }
+      g[s.group].teams.push({ team: s.team, id: s.id, done: !!s.done, replies: s.replies.length, accepted: !!s.accepted });
+    });
+    return order.map(function (k) { var x = g[k]; x.total = x.teams.length; x.done = x.teams.filter(function (t) { return t.done; }).length; x.answered = x.teams.filter(function (t) { return t.replies > 0; }).length; return x; });
   }
   function teamFor(o) { return mode === 'student' ? 'billi' : o.team; }
   function check(text) { if (!text || !String(text).trim()) throw new Error('Text je prázdný.'); if (String(text).length > 500) throw new Error('Text je moc dlouhý.'); }
-  function get(team, id) { var s = DB.filter(function (x) { return x.team === team && x.id === id; })[0]; if (!s) throw new Error('Lísteček už neexistuje.'); return s; }
+  function get(team, id) { var s = DB.filter(function (x) { return x.team === team && x.id === id; })[0]; if (!s) throw new Error('Lísteček nenalezen.'); return s; }
+  function members(team) { return (MEMBERS[team] || []).map(function (m) { return { id: m.id, name: m.name }; }); }
+  function dueOf(o) {
+    if (o.due === 'block') return { kind: 'block', block: 2 };
+    if (o.due && /^\d{1,2}:\d{2}$/.test(o.due)) return { kind: 'time', at: o.due, ts: o.dueTs || Date.now() };
+    return null;
+  }
+  function assignOf(team, a) {
+    if (a === 'all') return { all: true };
+    var m = (MEMBERS[team] || []).filter(function (x) { return x.id === a; })[0];
+    return m ? { id: m.id, name: m.name } : null;
+  }
+  function add(team, o, by, group) {
+    var s = S(team, o.kind, o.text, by, 0, group ? { group: group } : {});
+    if (o.kind === 'task') { var d = dueOf(o); if (d) s.due = d; var a = assignOf(team, o.assign); if (a) s.assign = a; }
+    DB.push(s); return s;
+  }
   var api = {
     list: function (team) {
-      if (mode === 'student') return wait(wallOf('billi'));
-      if (team === 'all') { var w = {}; TEAMS.forEach(function (t) { w[t.id] = wallOf(t.id); }); return wait({ walls: w }); }
-      return wait(wallOf(team));
+      if (mode === 'student') return wait(PLUS ? { stickers: wallOf('billi'), members: members('billi') } : wallOf('billi'));
+      if (team === 'all') {
+        var w = {}, m = {}; TEAMS.forEach(function (t) { w[t.id] = wallOf(t.id); m[t.id] = members(t.id); });
+        return wait(PLUS ? { walls: w, members: m, templates: TPL.slice(), groups: groups() } : { walls: w });
+      }
+      return wait(PLUS ? { stickers: wallOf(team), members: members(team), templates: TPL.slice() } : wallOf(team));
     },
     post: function (o) {
       return wait(null).then(function () {
         check(o.text);
         var by = mode === 'student' ? ME : MUP;
-        if (o.all) { var g = 'g' + rid(); TEAMS.forEach(function (t) { DB.push(S(t.id, o.kind, o.text, by, 0, { group: g })); }); }
-        else DB.push(S(teamFor(o), o.kind, o.text, by, 0));
+        if (o.all) { var g = 'g' + rid(); TEAMS.forEach(function (t) { add(t.id, o, by, g); }); }
+        else add(teamFor(o), o, by);
         return { ok: true };
       });
     },
@@ -124,23 +185,82 @@
     del: function (o) {
       return wait(null).then(function () {
         var s = get(teamFor(o), o.id);
-        if (o.reply) s.replies = s.replies.filter(function (r) { return r.id !== o.reply; });
+        if (o.reply) { s.replies = s.replies.filter(function (r) { return r.id !== o.reply; }); if (s.accepted === o.reply) s.accepted = null; }
         else DB = DB.filter(function (x) { return x !== s; });
         return { ok: true };
       });
     },
   };
+  if (PLUS) api.op = function (o) {
+    return wait(null).then(function () {
+      var dealer = mode !== 'student';
+      if (o.op === 'wallPost') {
+        check(o.text);
+        var by = dealer ? MUP : ME;
+        if (o.all && dealer) { var g = 'g' + rid(); var first; TEAMS.forEach(function (t) { var s = add(t.id, o, by, g); first = first || s; }); return { ok: true, id: first.id }; }
+        return { ok: true, id: add(teamFor(o), o, by).id };
+      }
+      if (o.op === 'wallTplSave') {
+        if (!dealer) throw new Error('Šablony má jen MUP.');
+        if (TPL.length >= 30) throw new Error('Šablon je moc (nejvýš 30). Nejdřív nějakou smaž.');
+        check(o.text);
+        TPL.unshift({ id: 't' + rid(), kind: o.kind, text: o.text, due: o.due === 'block' ? { kind: 'block' } : o.due ? { kind: 'time', at: o.due } : undefined, ts: Date.now() });
+        return { ok: true, templates: TPL.slice() };
+      }
+      if (o.op === 'wallTplDelete') {
+        if (!dealer) throw new Error('Šablony má jen MUP.');
+        TPL = TPL.filter(function (t) { return t.id !== o.tpl; });
+        return { ok: true, templates: TPL.slice() };
+      }
+      var s = get(teamFor(o), o.id), mine = isMine(s.by);
+      if (o.op === 'wallReact') {
+        var tgt = o.reply ? s.replies.filter(function (r) { return r.id === o.reply; })[0] : s;
+        if (!tgt) throw new Error('Odpověď nenalezena.');
+        var list = (tgt.rx[o.emoji] = tgt.rx[o.emoji] || []), i = list.indexOf(who());
+        if (o.on && i < 0) list.push(who()); else if (!o.on && i >= 0) list.splice(i, 1);
+        return { ok: true };
+      }
+      if (o.op === 'wallPin') { if (!dealer && !mine) throw new Error('Připnout může jen autor lístečku nebo MUP.'); s.pinned = !!o.on; return { ok: true }; }
+      if (o.op === 'wallAccept') {
+        if (s.kind !== 'q') throw new Error('Odpověď jde označit jen u otázky.');
+        if (!dealer && !mine) throw new Error('Odpověď může označit jen ten, kdo se ptal, nebo MUP.');
+        s.accepted = o.reply || null; return { ok: true };
+      }
+      if (o.op === 'wallTask') {
+        if (s.kind !== 'task') throw new Error('Termín a řešitele má jen úkol.');
+        if (!dealer && !mine) throw new Error('Upravit může jen autor úkolu nebo MUP.');
+        if ('due' in o) s.due = dueOf(o);
+        if ('assign' in o) s.assign = assignOf(s.team, o.assign);
+        return { ok: true };
+      }
+      throw new Error('Neznámá akce.');
+    });
+  };
   // simulate a teammate posting while the wall is open
-  setTimeout(function () { DB.push(S('billi', 'q', 'Kdo z nás půjde ve čtvrtek prezentovat?', st('s2', 'Petr Svoboda'), 0)); }, 9000);
+  setTimeout(function () { DB.push(S('billi', 'q', 'Kdo z nás půjde ve čtvrtek prezentovat?', st('s2', 'Petr Svoboda'), 0)); }, +(qs.get('later') || 9000));
+
+  // demo only: pretend this device has seen everything except the newest reply and one sticker
+  function seedSeen(m) {
+    var role = m === 'student' ? 'student' : 'dealer';
+    TEAMS.forEach(function (t) {
+      var map = {};
+      DB.forEach(function (s) {
+        if (s.team !== t.id) return;
+        if (/^Proč nám/.test(s.text)) return; // unseen sticker
+        map[s.id] = /^Jak přesně/.test(s.text) ? s.replies.length - 1 : s.replies.length;
+      });
+      try { localStorage.setItem('mw.seen.' + role + '.' + t.id, JSON.stringify(map)); } catch (e) {}
+    });
+  }
 
   var sel = document.getElementById('team');
   TEAMS.forEach(function (t) { var o = document.createElement('option'); o.value = t.id; o.textContent = t.name; sel.appendChild(o); });
   sel.value = 'billi';
   var w = null;
-  var qs = new URLSearchParams(location.search);
   function start(m) {
     mode = m;
     if (w) w.destroy();
+    if (PLUS) seedSeen(m);
     document.querySelectorAll('[data-mode]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-mode') === m)); });
     sel.hidden = m !== 'dealer';
     document.getElementById('h').textContent = m === 'all' ? 'Nástěnky – všechny týmy' : 'Nástěnka týmu ' + (m === 'student' ? 'Billi' : TEAMS.filter(function (t) { return t.id === sel.value; })[0].name);
@@ -151,6 +271,7 @@
       api: api,
       canSendAll: m !== 'student',
       pollMs: +(qs.get('poll') || 4000),
+      plus: PLUS,
     });
     window.demoWall = w;
   }

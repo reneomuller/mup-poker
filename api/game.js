@@ -293,7 +293,7 @@ async function backup(meta) {
 async function makeDump() {
   const { meta, players, content } = await load(true);
   const d = await A.buildDump(meta, players, content);
-  d.walls = await W.dumpWalls(meta); // v3 §4: team sticker walls
+  // v3 §4 team sticker walls: A.buildDump includes them (v4: so archives keep them too)
   return d;
 }
 
@@ -518,7 +518,7 @@ async function studentAction(b) {
     return ok();
   }
   // v3 §4: wall ops on the student's own team (after the PIN check above)
-  if (W.OPS.includes(b.op)) { const r = await W.op(b, meta, { role: 'student', p }, serial); invalidate(); return r; }
+  if (W.OPS.includes(b.op)) { const r = await W.op(b, meta, { role: 'student', p }, serial, players); invalidate(); return r; }
   return fail('Neznámá akce.');
 }
 
@@ -763,8 +763,9 @@ async function dealerAction(b) {
 
     case 'auth': return ok();
     // v3 §4: dealer wall ops on any team (wallPost also with all: true)
-    case 'wallPost': case 'wallReply': case 'wallDone': case 'wallDelete': {
-      const r = await W.op(b, meta, { role: 'dealer' });
+    case 'wallPost': case 'wallReply': case 'wallDone': case 'wallDelete':
+    case 'wallReact': case 'wallPin': case 'wallAccept': case 'wallTask': case 'wallTplSave': case 'wallTplDelete': { // v4 wallplus
+      const r = await W.op(b, meta, { role: 'dealer' }, undefined, players);
       invalidate();
       return r;
     }
@@ -1028,6 +1029,7 @@ async function dealerAction(b) {
       await archive('Před novou hrou');
       const fresh = freshMeta(meta.teams, meta.startV);
       for (const k of ['features', 'quizSets', 'milestoneDefs', 'cards']) fresh[k] = meta[k];
+      if (meta.wallTpl) fresh.wallTpl = meta.wallTpl; // v4 wallplus: templates are course-level, like quiz sets
       fresh.rev = (meta.rev || 0) + 1;
       await Promise.all(Object.keys(await S.hgetall('tx')).filter((k) => k.startsWith('rt:')).map((k) => S.hdel('tx', k)));
       for (let i = 1; i <= G.CFG.MAX_BLOCK; i++) await S.del('slip:' + i);
@@ -1089,7 +1091,7 @@ export default async function handler(req, res) {
           viewer = { role: 'student', p };
         } else if (dealerOk(req)) viewer = { role: 'dealer' };
         else return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
-        const r = await W.view(meta, viewer, url.searchParams.get('team'));
+        const r = await W.view(meta, viewer, url.searchParams.get('team'), players);
         return send(res, r.status, r.body);
       }
       if (view === 'startup') { const r = SV.view(req, url, { meta, players, slips, pinHash }); return send(res, r.status, r.body); } // v4 startup detail sheet
