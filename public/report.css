@@ -60,7 +60,7 @@ a { color: var(--r-accent); }
 @media screen and (min-width: 900px) { .r-tiles { grid-template-columns: repeat(4, 1fr); } }
 .r-tile { border: 1px solid var(--r-line); border-radius: 12px; padding: 10px 12px; background: var(--r-zebra); min-width: 0; }
 .r-tile .r-l { font-family: var(--r-mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--r-faint); }
-.r-tile .r-v { font-size: 22px; font-weight: 800; line-height: 1.15; margin-top: 2px; overflow-wrap: anywhere; }
+.r-tile .r-v { font-size: 22px; font-weight: 800; line-height: 1.15; margin-top: 2px; overflow-wrap: anywhere; white-space: normal; } /* review: .r-num's nowrap pushed „Nejlepší investor“ (a name) out of its tile and widened the page on phones */
 .r-tile .r-v small { font-size: 12px; font-weight: 500; color: var(--r-muted); }
 .r-types { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .r-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--r-line-2); border-radius: 999px; padding: 3px 10px; font-size: 13px; }
