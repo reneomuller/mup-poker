@@ -6,6 +6,8 @@ import * as F from './_lib/features.js';
 import * as Q from './_lib/quiz.js';
 import * as E from './_lib/economy.js';
 import * as A from './_lib/archive.js';
+import * as W from './_lib/wall.js';
+import * as D from './_lib/demand.js';
 
 // Dealer is open (no password) unless DEALER_LOCK=1 and DEALER_PASSWORD are set in Vercel.
 const DEALER_PW = process.env.DEALER_LOCK === '1' ? process.env.DEALER_PASSWORD || 'mup-dealer' : '';
@@ -129,8 +131,9 @@ function myBoard(meta, p, bd) {
 }
 
 // ---------- views ----------
-function publicState(meta, players, slips, bd, tx = {}, qa = {}) {
+function publicState(meta, players, slips, bd, tx = {}, qa = {}, proj = D.project(meta, slips, players)) {
   const r = G.raised(meta);
+  const now = D.teamNow(meta, proj);
   // money students have sent in this round, shown live on the table before the showdown (RJ stays hidden)
   const live = {};
   if (['betting', 'closed'].includes(meta.phase) && !meta.settled[meta.block + 'c']) {
@@ -142,14 +145,14 @@ function publicState(meta, players, slips, bd, tx = {}, qa = {}) {
   }
   const capOn = F.on(meta, 'captable');
   const teams = meta.teams.map((t) => ({
-    ...t, V: r0(G.valuation(meta, t.id)), cls: r0(r[t.id].cls), rj: r0(r[t.id].rj), live: r0(live[t.id] || 0),
+    ...t, V: r0(G.valuation(meta, t.id)), cls: r0(r[t.id].cls), rj: r0(r[t.id].rj), live: r0(live[t.id] || 0), ...now[t.id],
     ...(capOn ? { cap: F.capOf(meta, t.id, players) } : {}),
   }));
   const plist = Object.values(players).filter((p) => !p.ghost).map((p) => ({ id: p.id, name: p.name, team: p.team }));
   const betCount = Object.entries(slips).filter(([k, s]) => k !== G.RJ && players[k] && !players[k].ghost && s?.submitted).length;
   const leaders = plist
-    .filter((p) => G.hasHoldings(meta, p.id))
-    .map((p) => ({ name: p.name, team: p.team, value: r0(G.portfolio(meta, p.id)) }))
+    .filter((p) => G.hasHoldings(proj.pm, p.id))
+    .map((p) => ({ name: p.name, team: p.team, value: r0(G.portfolio(proj.pm, p.id)) }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 5)
     .map((x) => ({ ...x, returnPct: F.returnPct(x.value) }));
@@ -165,6 +168,7 @@ function publicState(meta, players, slips, bd, tx = {}, qa = {}) {
   if (F.on(meta, 'track')) { v2.awards = F.publicAwards(meta, players); v2.contrarian = F.contrarian(meta, players); }
   if (F.on(meta, 'exit') && meta.exit) v2.exit = E.publicExit(meta, players);
   if (F.on(meta, 'points')) v2.points = F.publicPoints(meta, players);
+  v2.demand = D.publicDemand(meta);
   return {
     ...v2,
     now: Date.now(), teams, block: meta.block, maxBlock: G.CFG.MAX_BLOCK, phase: meta.phase,
@@ -181,16 +185,21 @@ function publicState(meta, players, slips, bd, tx = {}, qa = {}) {
 // Every student's portfolio value at each showdown and revaluation (for the stonks chart).
 const recordPf = F.recordPf;
 
-function meState(meta, p, slips, bd, players = {}, qa = {}) {
+function meState(meta, p, slips, bd, players = {}, qa = {}, proj = D.project(meta, slips, players)) {
   const st = G.stakes(meta, p.id);
-  const stakes = {};
+  const stakes = {}, stakesNow = {};
   for (const [t, v] of Object.entries(st)) stakes[t] = r0(v);
+  for (const [t, v] of Object.entries(G.stakes(proj.pm, p.id))) stakesNow[t] = r0(v);
+  const portfolioNow = r0(G.portfolio(proj.pm, p.id));
+  const others = Object.values(players).filter((x) => !x.ghost && x.id !== p.id && G.hasHoldings(proj.pm, x.id));
+  const rankNow = G.hasHoldings(proj.pm, p.id) ? 1 + others.filter((x) => G.portfolio(proj.pm, x.id) > portfolioNow + 0.5).length : null;
   const series = (meta.pfHist || []).filter((h) => h.v[p.id] !== undefined).map((h) => [h.ts, h.v[p.id]]);
   return {
     id: p.id, name: p.name, team: p.team, stakes, portfolio: r0(G.portfolio(meta, p.id)), invested: G.hasHoldings(meta, p.id),
     start: G.CFG.STUDENT_CAPITAL, series, rules: G.rules(meta, p.id), slip: slips[p.id] || null,
     msgs: ((meta.fb || {})[p.team] || []).slice().reverse(),
     board: myBoard(meta, p, bd), ghost: !!p.ghost,
+    portfolioNow, stakesNow, rankNow, myTeam: D.myTeam(meta, p, players, proj, D.teamNow(meta, proj)),
     ...meV2(meta, p, players, qa),
   };
 }
@@ -280,7 +289,9 @@ async function backup(meta) {
 // (new instance, redeploy); the dealer page keeps this copy and pushes it back with op 'restore'.
 async function makeDump() {
   const { meta, players, content } = await load(true);
-  return A.buildDump(meta, players, content);
+  const d = await A.buildDump(meta, players, content);
+  d.walls = await W.dumpWalls(meta); // v3 §4: team sticker walls
+  return d;
 }
 
 function cleanEntries(x, meta) {
@@ -497,6 +508,8 @@ async function studentAction(b) {
     invalidate();
     return ok();
   }
+  // v3 §4: wall ops on the student's own team (after the PIN check above)
+  if (W.OPS.includes(b.op)) { const r = await W.op(b, meta, { role: 'student', p }, serial); invalidate(); return r; }
   return fail('Neznámá akce.');
 }
 
@@ -543,6 +556,9 @@ async function restoreFrom(d) {
       if (!c || (Number(v.updatedAt || v.ts) || 0) > (Number(c.updatedAt || c.ts) || 0)) await S.hset('tx', f, v);
     }
   }
+  // v3 §4: walls (old dumps without `walls` restore nothing here)
+  const wallTeams = [...new Set([...(d.meta.teams || []), ...meta.teams].map((t) => t?.id).filter(Boolean))];
+  await W.restoreWalls(d.walls, wallTeams);
   invalidate();
   return ok({ restored });
 }
@@ -737,6 +753,12 @@ async function dealerAction(b) {
     }
 
     case 'auth': return ok();
+    // v3 §4: dealer wall ops on any team (wallPost also with all: true)
+    case 'wallPost': case 'wallReply': case 'wallDone': case 'wallDelete': {
+      const r = await W.op(b, meta, { role: 'dealer' });
+      invalidate();
+      return r;
+    }
 
     case 'ghost': {
       // a test account that sees the students' view but never counts anywhere
@@ -776,20 +798,21 @@ async function dealerAction(b) {
       if (meta.settled[blk + 'c']) return fail('Showdown už proběhl.');
       if (!['betting', 'closed'].includes(meta.phase)) return fail('Nejdřív otevři a zavři investování.');
       await backup(structuredClone(meta));
-      const delta = {}, skipped = [];
-      let n = 0;
-      const low = G.lowTeams(meta);
-      for (const [sid, s] of Object.entries(slips)) {
-        const p = players[sid];
-        if (sid === G.RJ || !p || p.ghost || !s?.submitted) continue;
-        const v = G.validate(meta, sid, p.team, s);
-        if (!v.ok) { skipped.push({ name: p.name, error: v.errors[0] }); continue; }
-        const d = G.apply(meta, sid, v, low);
-        for (const [t, x] of Object.entries(d)) delta[t] = (delta[t] || 0) + x;
-        n++;
-      }
+      const ct = D.classTrades(meta, slips, players);
+      const skipped = ct.skipped.map(({ name, error }) => ({ name, error }));
+      const dOn = D.demandOn(meta);
+      const { delta, before, dem, n } = D.settleClass(meta, ct.trades, dOn);
       for (const t in delta) delta[t] = r0(delta[t]);
       F.addDrivers(meta, 'class', delta, `Třída v bloku ${blk}`);
+      meta.flows = meta.flows || {};
+      meta.flows[blk] = D.flowsOf(ct.trades);
+      if (dOn) {
+        meta.demand = meta.demand || {};
+        meta.demand[blk] = dem;
+        const dd = {}, notes = {};
+        for (const t of meta.teams) { dd[t.id] = r0(G.valuation(meta, t.id) - before[t.id]); notes[t.id] = `Poptávka v bloku ${blk} (${D.fmtMult(dem.mult[t.id])})`; }
+        F.addDrivers(meta, 'demand', dd, notes);
+      }
       meta.settled[blk + 'c'] = true;
       meta.phase = 'showdown';
       setTimer(meta, 0);
@@ -825,6 +848,7 @@ async function dealerAction(b) {
         if (i) addMsg(meta, t.id, { kind: 'smart', amt: i.amt, text: i.why });
         if (o) addMsg(meta, t.id, { kind: 'smart', amt: -o.amt, text: o.why });
       }
+      if (meta.flows?.[blk]) meta.flows[blk][G.RJ] = { in: v.in, out: v.out };
       meta.settled[blk + 'r'] = true;
       meta.phase = 'rj';
       meta.reveal = { seq: ++meta.seq, block: blk, kind: 'rj', delta: d };
@@ -993,6 +1017,7 @@ async function dealerAction(b) {
       fresh.rev = (meta.rev || 0) + 1;
       await Promise.all(Object.keys(await S.hgetall('tx')).filter((k) => k.startsWith('rt:')).map((k) => S.hdel('tx', k)));
       for (let i = 1; i <= G.CFG.MAX_BLOCK; i++) await S.del('slip:' + i);
+      await W.clearWalls(meta);
       await S.del('backups');
       if (!b.keepPlayers) await S.del('players');
       await S.setJSON('meta', fresh);
@@ -1028,15 +1053,32 @@ export default async function handler(req, res) {
           return archive ? send(res, 200, { ok: true, archive }) : send(res, 404, { ok: false, error: 'Archiv nenalezen.' });
         }
         const fullTx = Object.keys(tx).length || F.on(meta, 'cards') ? tx : await S.hgetall('tx');
-        return send(res, 200, await A.dataView(meta, players, fullTx));
+        const dv = await A.dataView(meta, players, fullTx);
+        dv.walls = await W.dataWalls(meta);
+        return send(res, 200, dv);
       }
-      const out = publicState(meta, players, slips, bd, tx, qa);
+      if (view === 'wall') {
+        // v3 §4: a student sees only their own team's wall (x-sid / x-pin); without a sid it is the dealer view
+        const wsid = req.headers['x-sid'];
+        let viewer;
+        if (wsid) {
+          const p = players[wsid];
+          if (!p || !p.pin || p.pin !== pinHash(p.id, String(req.headers['x-pin'] || ''))) return send(res, 401, { ok: false, error: 'Přihlas se znovu.', relogin: true });
+          viewer = { role: 'student', p };
+        } else if (dealerOk(req)) viewer = { role: 'dealer' };
+        else return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
+        const r = await W.view(meta, viewer, url.searchParams.get('team'));
+        return send(res, r.status, r.body);
+      }
+      const proj = D.project(meta, slips, players);
+      const out = publicState(meta, players, slips, bd, tx, qa, proj);
       out.content = content;
       const sid = req.headers['x-sid'], pin = req.headers['x-pin'];
       if (sid && pin) {
         const p = players[sid];
-        if (p && p.pin && p.pin === pinHash(p.id, pin)) out.me = meState(meta, p, slips, bd, players, qa);
+        if (p && p.pin && p.pin === pinHash(p.id, pin)) out.me = meState(meta, p, slips, bd, players, qa, proj);
         else out.meError = p ? 'pin' : 'unknown';
+        if (out.me && F.on(meta, 'wall')) out.me.wallRev = W.rev(meta, p.team); // v3 §4: badge, read from meta only
       }
       if (url.searchParams.get('view') === 'log' && dealerOk(req)) {
         return send(res, 200, { ok: true, storage: S.storageMode, pgEnv: S.pgEnvKey, log: await S.readLog(Number(url.searchParams.get('limit')) || 5000) });
@@ -1065,7 +1107,7 @@ export default async function handler(req, res) {
       let r;
       // card / roundTerms exist for both: with a sid it is a student editing their own team
       // restore with a `dump` is the dealer's backup push (before v2 it was routed to the phones' restore and never ran)
-      const student = (studentOps.includes(b.op) && !(b.op === 'restore' && b.dump)) || (['card', 'roundTerms'].includes(b.op) && !!b.sid);
+      const student = (studentOps.includes(b.op) && !(b.op === 'restore' && b.dump)) || (['card', 'roundTerms', ...W.OPS].includes(b.op) && !!b.sid);
       if (student) r = await studentAction(b);
       else {
         if (!dealerOk(req)) return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });

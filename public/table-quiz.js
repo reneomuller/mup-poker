@@ -9,6 +9,7 @@
     'table.quiz.q': 'Otázka {n} / {total}',
     'table.quiz.answers': 'Odpovědi',
     'table.quiz.fastest': 'Nejrychlejší správná odpověď',
+    'table.quiz.streak': 'Nejdelší série',
     'table.quiz.noneCorrect': 'Správně neodpověděl nikdo.',
     'table.quiz.board': 'Průběžné pořadí',
     'table.quiz.final': 'Konečné pořadí',
@@ -139,10 +140,13 @@
     const fast = el.querySelector('.qz-fast');
     if (mode === 'reveal') {
       const f = q.fastest;
+      // Kahoot-style streak (optional server field quiz.topStreak)
+      const st = q.topStreak, tt = st && team(s, st.team);
+      const sh = st && st.name && Number(st.streak) >= 2 ? ` <span class="qz-st">🔥 ${esc(tx('table.quiz.streak'))}: <b>${esc(st.name)}</b>${tt.name ? ` (${esc(tt.name)})` : ''} – ${Number(st.streak)}</span>` : '';
       if (f) {
         const t = team(s, f.team);
-        setHTML(fast, `<span class="qz-fk">⚡ ${esc(tx('table.quiz.fastest'))}</span> <b>${esc(f.name)}</b> <span class="qz-ft"><span class="dot" style="background:${t.color}"></span>${esc(t.name)}</span> <span class="qz-fs">${secs(f.ms)}</span>`);
-      } else setHTML(fast, `<span class="qz-fk">${esc(tx('table.quiz.noneCorrect'))}</span>`);
+        setHTML(fast, `<span class="qz-fk">⚡ ${esc(tx('table.quiz.fastest'))}</span> <b>${esc(f.name)}</b> <span class="qz-ft"><span class="dot" style="background:${t.color}"></span>${esc(t.name)}</span> <span class="qz-fs">${secs(f.ms)}</span>` + sh);
+      } else setHTML(fast, `<span class="qz-fk">${esc(tx('table.quiz.noneCorrect'))}</span>` + sh);
     } else setHTML(fast, '');
     toggle(el.querySelector('.qz-ring'), 'gone', mode !== 'question');
     if (mode === 'question' && !raf) raf = requestAnimationFrame(ringLoop);

@@ -12,7 +12,7 @@
     'play.nav.invest': 'Investovat',
     'play.nav.portfolio': 'Portfolio',
     'play.nav.startups': 'Startupy',
-    'play.nav.profile': 'Profil',
+    'play.nav.profile': 'Tým',
     'play.chip.lobby': 'Čekáme na start',
     'play.chip.pitch': 'Pitch',
     'play.chip.betting': 'Investování',
@@ -87,6 +87,32 @@
   const day = (ts) => { const d = new Date(ts); return `${d.getDate()}.${NB}${d.getMonth() + 1}.`; };
   const initials = (name) => String(name || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0] || '').join('').toUpperCase();
   const dot = (c) => `<span class="s-dot" style="background:${esc(c)}"></span>`;
+  // v3 live numbers: projected (…Now) fields while class trades are pending, v2 fields as a fallback
+  const Vn = (t) => (t && (t.Vnow ?? t.V)) || 0;
+  const PF = () => me.portfolioNow ?? me.portfolio;
+  const INV = () => !!(me.invested || Object.values(me.stakesNow || {}).some((v) => v > 0));
+  const SK = (id) => ((me.stakesNow || me.stakes || {})[id] || 0);
+  const pendingLive = () => (S.phase === 'betting' || S.phase === 'closed') && S.teams.some((t) => t.Vnow != null && t.Vnow !== t.V);
+  // tweened numbers: render with tw(), runTweens() animates from the last shown value after each render
+  const twLast = {};
+  const twF = { M: (v) => fmtM(v), F: (v) => fmt(v) };
+  const tw = (key, v, f = 'M') => `<span class="s-num p-tw" data-tw="${esc(key)}" data-v="${Math.round(v)}" data-f="${f}">${esc(twF[f](v))}</span>`;
+  function runTweens() {
+    document.querySelectorAll('[data-tw]').forEach((el) => {
+      const key = el.dataset.tw, to = +el.dataset.v, f = twF[el.dataset.f] || twF.M, from = twLast[key];
+      twLast[key] = to;
+      if (from == null || from === to || PK.reduced() || el.offsetParent === null) { if (!el._tw || from !== to) { el._tw = null; el.textContent = f(to); } return; }
+      const t0 = performance.now(), dur = 700, run = el._tw = {};
+      el.classList.remove('p-tw-up', 'p-tw-down'); void el.offsetWidth; el.classList.add(to > from ? 'p-tw-up' : 'p-tw-down');
+      const step = (now) => {
+        if (el._tw !== run) return;
+        const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+        el.textContent = f(from + (to - from) * e);
+        if (k < 1) requestAnimationFrame(step); else el._tw = null;
+      };
+      requestAnimationFrame(step);
+    });
+  }
   const teamTag = (id) => { const t = team(id); return `<span class="p-tt">${dot(t.color)}${esc(t.name)}</span>`; };
 
   // ---------- network status ----------
@@ -202,13 +228,13 @@
     try { sessionStorage.setItem('mup.view', v); } catch {}
     applyView();
     window.scrollTo(0, scrollPos[v] || 0);
-    if (me) { markSeen(); renderDock(); }
+    if (me) { markSeen(); renderDock(); syncWall(); runTweens(); }
   }
   function applyView() {
     document.querySelectorAll('[data-view]').forEach((s) => s.classList.toggle('on', s.dataset.view === view));
     document.querySelectorAll('[data-nav]').forEach((b) => { const on = b.dataset.nav === view; b.classList.toggle('s-on', on); b.setAttribute('aria-current', on ? 'page' : 'false'); });
   }
-  function resetViews() { ['hero', 'msgs', 'main', 'exitbox', 'portfolio', 'captable', 'startups', 'profile'].forEach((id) => { $(id).innerHTML = ''; }); $('dock').innerHTML = ''; dockBuilt = false; }
+  function resetViews() { ['hero', 'msgs', 'main', 'exitbox', 'portfolio', 'captable', 'startups', 'teamv', 'profile'].forEach((id) => { $(id).innerHTML = ''; }); $('dock').innerHTML = ''; dockBuilt = false; }
   document.querySelectorAll('[data-nav]').forEach((b) => (b.onclick = () => { haptic.tap(); go(b.dataset.nav); }));
 
   // "new" dots on tabs: each tab has a signature; when it changes while you're elsewhere, a dot shows
@@ -217,9 +243,9 @@
     const m = me.msgs || [];
     return {
       invest: [m[0]?.ts || 0, S.phase === 'betting' && !me.slip?.submitted ? 'bet' + S.block : ''].join('|'),
-      portfolio: [Math.round((me.portfolio || 0) / 1000), feat('captable') ? me.myTeamCap?.founders : ''].join('|'),
+      portfolio: [Math.round((PF() || 0) / 1000), feat('captable') ? me.myTeamCap?.founders : ''].join('|'),
       startups: JSON.stringify([feat('cards') ? S.cards : 0, feat('drivers') ? Object.values(S.drivers || {}).map((d) => d[0]?.ts || 0) : 0, feat('market') ? (S.market?.flipped || []).length : 0, feat('rounds') ? S.rounds : 0]),
-      profile: [feat('points') ? me.points?.total : '', feat('track') ? (me.track?.awards || []).length : ''].join('|'),
+      profile: [feat('points') ? me.points?.total : '', feat('track') ? (me.track?.awards || []).length : '', wallOn() ? me.wallRev || 0 : ''].join('|'),
     };
   }
   function markSeen() { if (sigs[view] !== undefined) seen[view] = sigs[view]; renderDots(); }
@@ -240,14 +266,15 @@
     ava.style.setProperty('--tc', t.color);
     morph($('who'), `${esc(me.name)}${me.ghost ? ' <span class="s-badge s-warn">Ghost</span>' : ''}`);
     morph($('myteam'), `${dot(t.color)}<span>${esc(t.name)}</span>`);
-    const v = me.portfolio || (me.invested ? 0 : me.rules.capital || 0);
+    const v = PF() || (INV() ? 0 : me.rules.capital || 0);
     const pf = $('pfv');
     if (pfShown !== null && pfShown !== v) { pf.classList.remove('p-bump'); void pf.offsetWidth; pf.classList.add('p-bump'); }
     pfShown = v;
-    pf.textContent = fmtM(v);
-    const up = me.invested && me.portfolio >= me.start;
-    pf.classList.toggle('s-up', !!(me.invested && up && me.portfolio > me.start));
-    pf.classList.toggle('s-down', !!(me.invested && !up));
+    pf.dataset.tw = 'hdrpf'; pf.dataset.v = Math.round(v); pf.dataset.f = 'M';
+    if (twLast.hdrpf == null) pf.textContent = fmtM(v);
+    const up = INV() && PF() >= me.start;
+    pf.classList.toggle('s-up', !!(INV() && up && PF() > me.start));
+    pf.classList.toggle('s-down', !!(INV() && !up));
   }
 
   function phaseTexts() {
@@ -693,7 +720,7 @@
   // ---------- portfolio + stonks ----------
   function sparkHTML() {
     const raw = me.series.map(([ts, v]) => ({ ts, v }));
-    raw.push({ ts: MUP.now(), v: me.portfolio });
+    raw.push({ ts: MUP.now(), v: PF() });
     const days = [];
     for (const p of raw) {
       const key = new Date(p.ts).toDateString(), last = days[days.length - 1];
@@ -707,7 +734,7 @@
     if (hi - lo < 40000) { const m = (hi + lo) / 2; lo = m - 20000; hi = m + 20000; }
     const x = (i) => padL + (i * (W - padL - pad)) / (pts0.length - 1);
     const y = (v) => padT + (1 - (v - lo) / (hi - lo)) * (Hh - padT - pad);
-    const up = me.portfolio >= me.start, col = up ? '#3FCF8E' : '#FF5C6C';
+    const up = PF() >= me.start, col = up ? '#3FCF8E' : '#FF5C6C';
     const line = pts0.map((p, i) => `${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
     const base = y(me.start).toFixed(1);
     const lx = x(pts0.length - 1).toFixed(1), ly = y(pts0[pts0.length - 1].v).toFixed(1);
@@ -723,31 +750,31 @@
   function renderPortfolio() {
     const others = S.teams.filter((t) => t.id !== me.team);
     let head;
-    if (me.invested) {
-      const pl = me.portfolio - me.start, p = (pl / me.start) * 100, up = pl >= 0;
+    if (INV()) {
+      const pl = PF() - me.start, p = (pl / me.start) * 100, up = pl >= 0;
       const [svg, labels] = sparkHTML();
       head = `<div class="s-card p-card p-pfcard"><div class="p-pfpanel ${up ? 'up' : 'down'}">${svg}
           <img class="p-man" src="/img/${up ? 'stonks' : 'not-stonks'}-cut.webp" alt="${up ? 'stonks' : 'not stonks'}" width="130" height="168">
-          <div class="p-pfnums"><div class="s-label">${E('play.pf.title')}</div><div class="p-pfbig s-num">${esc(fmt(me.portfolio))}</div>
+          <div class="p-pfnums"><div class="s-label">${E('play.pf.title')}</div><div class="p-pfbig s-num">${tw('pfbig', PF(), 'F')}</div>
           <div class="p-pl ${up ? 's-up' : 's-down'}">${up ? '+' : '−'}${esc(fmt(Math.abs(pl)))} · ${esc(spct(p))}</div></div></div>${labels}</div>`;
     } else {
       head = `<div class="s-card p-card p-empty"><div class="s-label">${E('play.pf.title')}</div><h3 class="s-h3">${E('play.pf.empty')}</h3><p class="p-hint">Až investuješ, uvidíš tady, jak se tvým startupům daří.</p></div>`;
     }
-    const total = me.portfolio || 1;
+    const total = PF() || 1;
     const rows = others.map((t) => {
-      const v = me.stakes[t.id] || 0;
-      const own = t.V ? (v / t.V) * 100 : 0;
+      const v = SK(t.id);
+      const own = Vn(t) ? (v / Vn(t)) * 100 : 0;
       return `<div class="p-hold ${v ? '' : 'none'}" data-key="h${t.id}" style="--tc:${esc(t.color)}">
-        <div class="p-hold-h">${dot(t.color)}<b>${esc(t.name)}</b><span class="p-hold-v s-num">${v ? esc(fmt(v)) : '—'}</span></div>
+        <div class="p-hold-h">${dot(t.color)}<b>${esc(t.name)}</b><span class="p-hold-v s-num">${v ? tw('hv' + t.id, v, 'F') : '—'}</span></div>
         <div class="p-hold-bar"><i style="width:${v ? Math.max(2, (v / total) * 100) : 0}%"></i></div>
-        <div class="p-hold-s s-faint">ocenění ${esc(fmtM(t.V))}${v ? ` · vlastníš ${esc(pct(own, 2))}` : ''}</div></div>`;
+        <div class="p-hold-s s-faint">ocenění ${tw('hV' + t.id, Vn(t))}${multChip(t)}${v ? ` · vlastníš ${esc(pct(own, 2))}` : ''}</div></div>`;
     }).join('');
     const tr = feat('track') && me.track;
     const trackHTML = tr ? `<div class="p-stats">
         <div class="s-stat p-stat"><span class="s-label">Návratnost</span><span class="s-v ${tr.returnPct >= 0 ? 's-up' : 's-down'}">${esc(spct(tr.returnPct))}</span></div>
-        <div class="s-stat p-stat"><span class="s-label">Pořadí</span><span class="s-v">${tr.rank ? esc(tr.rank + '.') : '–'}<small> z ${esc(tr.of || S.playerCount)}</small></span></div>
+        <div class="s-stat p-stat"><span class="s-label">Pořadí</span><span class="s-v">${(me.rankNow ?? tr.rank) ? esc((me.rankNow ?? tr.rank) + '.') : '–'}<small> z ${esc(tr.of || S.playerCount)}</small></span></div>
       </div>` : '';
-    morph($('portfolio'), head + trackHTML + `<div class="s-card p-card"><div class="p-card-h"><h3 class="s-h3">Podíly ve startupech</h3><span class="s-label">${others.filter((t) => me.stakes[t.id] > 0).length} z ${others.length}</span></div>${rows}</div>`);
+    morph($('portfolio'), head + trackHTML + `<div class="s-card p-card"><div class="p-card-h"><h3 class="s-h3">Podíly ve startupech</h3><span class="s-label">${others.filter((t) => SK(t.id) > 0).length} z ${others.length}</span></div>${rows}</div>`);
   }
 
   // ----- cap table of my own team -----
@@ -801,22 +828,142 @@
       const c = cards?.[t.id] || {};
       const r = feat('rounds') ? S.rounds?.[t.id] : null;
       const dr = feat('drivers') ? (S.drivers?.[t.id] || []).slice(0, 3) : [];
-      const mine = me.stakes[t.id] || 0;
+      const mine = SK(t.id);
       const ms = cards ? defs.map((d) => `<span class="p-ms ${c.milestones?.[d.key] ? 'done' : ''}" data-key="ms${esc(d.key)}">${c.milestones?.[d.key] ? '✓' : '○'} ${esc(d.label)}</span>`).join('') : '';
       const locked = tr.filter((x) => x.team === t.id && x.status === 'locked');
       const capF = feat('captable') && t.cap ? t.cap.founders : null;
       return `<article class="s-card p-card p-su ${t.id === me.team ? 'mine' : ''}" data-key="su${t.id}" style="--tc:${esc(t.color)}">
         <div class="p-su-h"><span class="p-su-ic">${esc(initials(t.name))}</span><div class="p-su-n"><b>${esc(t.name)}</b>${t.id === me.team ? '<span class="s-badge">Tvůj tým</span>' : ''}</div>
-          <div class="p-su-v"><span class="s-num">${esc(fmtM(t.V))}</span>${r && r.kind && r.kind !== 'flat' ? `<span class="s-badge ${r.kind === 'up' ? 's-ok' : r.kind === 'down' ? 's-bad' : ''}">${esc(ROUND[r.kind] || '')}${r.pct ? ' ' + esc(spct(r.pct)) : ''}</span>` : '<span class="s-label">ocenění</span>'}</div></div>
+          <div class="p-su-v">${tw('suV' + t.id, Vn(t))}${multChip(t, true)}${r && r.kind && r.kind !== 'flat' ? `<span class="s-badge ${r.kind === 'up' ? 's-ok' : r.kind === 'down' ? 's-bad' : ''}">${esc(ROUND[r.kind] || '')}${r.pct ? ' ' + esc(spct(r.pct)) : ''}</span>` : '<span class="s-label">ocenění</span>'}</div></div>
         ${c.oneLiner ? `<p class="p-su-one">${esc(c.oneLiner)}</p>` : cards ? '<p class="p-su-one s-faint">Tým zatím nenapsal one-liner.</p>' : ''}
         ${c.sub ? `<p class="p-su-sub">${esc(c.sub)}</p>` : ''}
         ${ms ? `<div class="p-mss">${ms}</div>` : ''}
-        ${mine || capF != null ? `<div class="p-su-meta">${mine ? `<span>Tvůj podíl <b class="s-num">${esc(fmtM(mine))}</b></span>` : ''}${capF != null ? `<span>Zakladatelé <b class="s-num">${esc(pct(capF))}</b></span>` : ''}</div>` : ''}
+        ${mine || capF != null ? `<div class="p-su-meta">${mine ? `<span>Tvůj podíl <b>${tw('suS' + t.id, mine)}</b></span>` : ''}${capF != null ? `<span>Zakladatelé <b class="s-num">${esc(pct(capF))}</b></span>` : ''}</div>` : ''}
         ${locked.length ? `<div class="p-trs">${locked.map((x) => `<span class="p-tr" data-key="tr${esc(x.id)}"><b>${esc(fmtM(x.amt))}</b> čeká na: ${esc(x.cond)}</span>`).join('')}</div>` : ''}
         ${dr.length ? `<div class="p-drs"><span class="s-label">Co hýbalo oceněním</span>${dr.map((d, i) => `<div class="p-dr" data-key="dr${d.ts}${i}"><span class="p-dr-k">${esc(DRIVER[d.kind] || d.kind)}</span><span class="p-dr-n">${esc(d.note || '')}</span><b class="s-num ${d.delta > 0 ? 's-up' : d.delta < 0 ? 's-down' : ''}">${esc(smoney(d.delta))}</b></div>`).join('')}</div>` : ''}
       </article>`;
     }).join('');
     morph($('startups'), market + list);
+  }
+
+  // ---------- Tým: live team header, valuation chart, investors, team wall ----------
+  function multChip(t, block) {
+    const m = t.mult;
+    if (m == null || m === 1 || !pendingLive()) return '';
+    return `${block ? '' : ' '}<span class="p-mx ${m > 1 ? 's-up' : 's-down'}">${m > 1 ? '▲' : '▼'}${NB}×${esc(num(m, 2))}</span>`;
+  }
+  function valChart(hist) {
+    const pts = hist.filter((h) => h && h.V != null);
+    if (pts.length < 2) return '';
+    const W = 320, H = 96, pl = 4, pr = 8, pt = 10, pb = 8;
+    const vals = pts.map((h) => h.V);
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    if (hi - lo < 1) { lo -= 1; hi += 1; }
+    const x = (i) => pl + (i * (W - pl - pr)) / (pts.length - 1);
+    const y = (v) => pt + (1 - (v - lo) / (hi - lo)) * (H - pt - pb);
+    const up = vals[vals.length - 1] >= vals[0], col = up ? '#3FCF8E' : '#FF5C6C';
+    const line = pts.map((h, i) => `${x(i).toFixed(1)},${y(h.V).toFixed(1)}`).join(' ');
+    const last = pts.length - 1;
+    return `<svg class="p-vch" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Vývoj ocenění">
+      <defs><linearGradient id="vg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".32"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+      <polygon points="${x(0)},${H} ${line} ${x(last)},${H}" fill="url(#vg)"/>
+      <polyline points="${line}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+    </svg><div class="p-vchx"><span>${esc(pts[0].label || '')}</span><span>${esc(pts[last].label || '')}</span></div>`;
+  }
+  const whyOpen = new Set();
+  function whyHTML(key, label, text) {
+    if (!text) return '';
+    const long = text.length > 90, open = whyOpen.has(key);
+    return `<div class="p-iv-w" ${long ? `data-why="${esc(key)}" role="button" tabindex="0" aria-expanded="${open}"` : ''}><p class="p-iv-why ${long && !open ? 'clamp' : ''}">${label ? `<span class="s-label">${esc(label)}</span> ` : ''}„${esc(text)}“</p>${long ? `<span class="p-iv-more">${open ? 'méně' : 'celé zdůvodnění'}</span>` : ''}</div>`;
+  }
+  function investorWord(n) { return n === 1 ? 'investor' : n >= 2 && n <= 4 ? 'investoři' : 'investorů'; }
+  function renderTeam() {
+    const el = $('teamv');
+    const m = me.myTeam || null;
+    const t = team(me.team);
+    const ranked = S.teams.slice().sort((a, b) => Vn(b) - Vn(a));
+    const Vnow = m?.Vnow ?? Vn(t);
+    const rank = m?.rank ?? t.rank ?? ranked.findIndex((x) => x.id === t.id) + 1;
+    const of = m?.of ?? S.teams.length;
+    const chg = m?.chg ?? t.chg;
+    const founders = m?.founders ?? me.myTeamCap?.founders ?? t.cap?.founders;
+    const invN = m?.investorsNow ?? me.myTeamCap?.investors ?? t.cap?.investors;
+    const mx = m?.mult ?? t.mult;
+    const live = pendingLive();
+    const mxs = live ? mx : (m?.flows || []).filter((f) => f.settled && f.mult != null).sort((a, b) => b.block - a.block)[0]?.mult;
+    const chgP = chg != null ? chg * 100 : null;
+    let h = `<div class="s-card p-card p-tm" style="--tc:${esc(t.color)}">
+      <div class="p-tm-h"><span class="p-su-ic">${esc(initials(t.name))}</span><div class="p-tm-n"><div class="s-label">Tvůj tým</div><h2 class="s-h2">${esc(m?.name || t.name)}</h2></div>
+        ${rank ? `<span class="p-tm-rank"><b class="s-num">#${esc(rank)}</b><small> z${NB}${esc(of)}</small></span>` : ''}</div>
+      <div class="p-tm-v"><span class="p-tm-big">${tw('tmV', Vnow)}</span>${chgP != null && Math.abs(chgP) >= 0.05 ? `<span class="p-tm-chg ${chgP > 0 ? 's-up' : 's-down'}">${chgP > 0 ? '▲' : '▼'}${NB}${esc(pct(Math.abs(chgP), Math.abs(chgP) < 10 ? 1 : 0))}</span>` : ''}</div>
+      <div class="p-tm-sub">${live ? '<span class="p-lv"><i></i>živě</span><span>ocenění po tomto bloku, jak to teď vypadá</span>' : '<span>ocenění</span>'}</div>
+      <div class="p-stats p-stats-3">
+        <div class="s-stat p-stat"><span class="s-label">Zakladatelé</span><span class="s-v">${founders != null ? esc(pct(founders)) : '–'}</span></div>
+        <div class="s-stat p-stat"><span class="s-label">Investoři</span><span class="s-v">${invN != null ? esc(num(invN)) : '–'}</span></div>
+        <div class="s-stat p-stat"><span class="s-label">${live ? 'Poptávka teď' : 'Poptávka'}</span><span class="s-v ${mxs > 1 ? 's-up' : mxs < 1 ? 's-down' : ''}">${mxs != null ? '×' + esc(num(mxs, 2)) : '–'}</span></div>
+      </div>
+      ${m?.history ? valChart(m.history) : ''}
+    </div>`;
+    const flows = (m?.flows || []).slice().sort((a, b) => b.block - a.block);
+    if (m && flows.length) {
+      h += `<div class="s-card p-card p-invs"><div class="p-card-h"><h3 class="s-h3">Investoři</h3><span class="s-label">${invN != null ? `${esc(num(invN))} ${investorWord(invN)}` : ''}</span></div>
+        ${flows.map((f) => {
+          const inv = f.investors || [];
+          return `<div class="p-fl ${f.settled ? '' : 'now'}" data-key="fl${esc(f.block)}">
+            <div class="p-fl-h"><b>Blok ${esc(f.block)}</b>${f.settled ? '<span class="s-label">uzavřeno</span>' : '<span class="p-lv"><i></i>plní se živě</span>'}
+              <span class="p-fl-sum s-num">${f.totalIn ? `<span class="s-up">+${esc(fmtM(f.totalIn))}</span>` : ''}${f.totalOut ? ` <span class="s-down">−${esc(fmtM(f.totalOut))}</span>` : ''}${f.mult != null && f.mult !== 1 ? ` <span class="p-mx ${f.mult > 1 ? 's-up' : 's-down'}">×${esc(num(f.mult, 2))}</span>` : ''}</span></div>
+            ${inv.length ? inv.map((v) => {
+              const k = `${f.block}:${v.id}`, rj = v.id === 'rj';
+              return `<div class="p-iv" data-key="iv${esc(k)}">
+                <div class="p-iv-h"><span class="p-iv-ava" style="--tc:${esc(rj ? '#6754DF' : team(v.team).color)}">${esc(initials(v.name))}</span>
+                  <div class="p-iv-n"><b>${esc(v.name)}</b>${rj ? '<span class="s-badge">Smart money</span>' : v.team ? teamTag(v.team) : ''}</div>
+                  <span class="p-iv-amt s-num">${v.in ? `<span class="s-up">+${esc(fmtM(v.in))}</span>` : ''}${v.out ? `<span class="s-down">−${esc(fmtM(v.out))}</span>` : ''}</span></div>
+                ${whyHTML(k + ':i', v.whyIn && v.whyOut ? 'Nákup' : '', v.whyIn)}${whyHTML(k + ':o', v.whyIn && v.whyOut ? 'Prodej' : 'Prodej', v.whyOut)}
+              </div>`;
+            }).join('') : `<p class="p-hint">${f.settled ? 'V tomhle bloku do vás nikdo neinvestoval.' : 'Zatím nikdo neodeslal. Seznam se plní živě, jak spolužáci odesílají.'}</p>`}
+          </div>`;
+        }).join('')}
+      </div>`;
+    }
+    morph(el, h);
+  }
+  $('teamv').addEventListener('click', (e) => {
+    const w = e.target.closest('[data-why]');
+    if (!w) return;
+    const k = w.dataset.why;
+    if (whyOpen.has(k)) whyOpen.delete(k); else whyOpen.add(k);
+    haptic.tap(); renderTeam();
+  });
+
+  // ----- team sticker wall (component from /wall.js, §6) -----
+  const wallOn = () => !!(S && (!S.features || S.features.wall !== false) && me && window.MupWall);
+  async function wallOp(body) {
+    const r = await send({ ...body, sid, pin });
+    if (!r.ok) throw Object.assign(new Error(r.error || 'Něco se pokazilo.'), { ok: false, error: r.error });
+    return r;
+  }
+  const wallApi = {
+    async list() {
+      const r = DEMO && window.PlayDemo?.wallList ? await window.PlayDemo.wallList() : await get(auth(), '?view=wall');
+      if (!r || r.ok === false) throw Object.assign(new Error(r?.error || 'Nástěnku se nepodařilo načíst.'), { ok: false, error: r?.error });
+      return r.stickers || [];
+    },
+    post: (b) => (DEMO && window.PlayDemo?.wallOp ? window.PlayDemo.wallOp('post', b) : wallOp({ op: 'wallPost', kind: b.kind, text: b.text })),
+    reply: (b) => (DEMO && window.PlayDemo?.wallOp ? window.PlayDemo.wallOp('reply', b) : wallOp({ op: 'wallReply', id: b.id, text: b.text })),
+    done: (b) => (DEMO && window.PlayDemo?.wallOp ? window.PlayDemo.wallOp('done', b) : wallOp({ op: 'wallDone', id: b.id, done: !!b.done })),
+    del: (b) => (DEMO && window.PlayDemo?.wallOp ? window.PlayDemo.wallOp('del', b) : wallOp({ op: 'wallDelete', id: b.id, ...(b.reply ? { reply: b.reply } : {}) })),
+  };
+  let wallW = null, wallKey = null;
+  function syncWall() {
+    const on = wallOn();
+    $('wallcard').classList.toggle('hidden', !on);
+    const want = on && view === 'profile' ? `${me.id}|${me.team}` : null;
+    if (want === wallKey) return;
+    if (wallW) { try { wallW.destroy(); } catch {} wallW = null; $('wallbox').innerHTML = ''; }
+    wallKey = want;
+    if (want) {
+      try { wallW = window.MupWall.mount($('wallbox'), { role: 'student', team: me.team, api: wallApi, pollMs: 4000 }); } catch (e) { console.warn(e); wallW = null; }
+    }
   }
 
   // ---------- profile ----------
@@ -831,12 +978,12 @@
       <div class="p-me-h"><span class="p-ava p-ava-lg" style="--tc:${esc(t.color)}">${esc(initials(me.name))}</span><div><h2 class="s-h2">${esc(me.name)}</h2><div class="p-team">${dot(t.color)}<span>${esc(t.name)}</span>${me.ghost ? ' <span class="s-badge s-warn">Ghost</span>' : ''}</div></div></div>
       ${tr ? `<div class="p-stats p-stats-3">
         <div class="s-stat p-stat"><span class="s-label">Návratnost</span><span class="s-v ${tr.returnPct >= 0 ? 's-up' : 's-down'}">${esc(spct(tr.returnPct))}</span></div>
-        <div class="s-stat p-stat"><span class="s-label">Pořadí</span><span class="s-v">${tr.rank ? esc(tr.rank + '.') : '–'}<small> z ${esc(tr.of || '–')}</small></span></div>
+        <div class="s-stat p-stat"><span class="s-label">Pořadí</span><span class="s-v">${(me.rankNow ?? tr.rank) ? esc((me.rankNow ?? tr.rank) + '.') : '–'}<small> z ${esc(tr.of || '–')}</small></span></div>
         <div class="s-stat p-stat"><span class="s-label">Nejlepší tah</span><span class="s-v p-best">${tr.bestCall ? `${esc(mult(tr.bestCall.multiple))}` : '–'}</span>${tr.bestCall ? `<span class="p-best-t">${teamTag(tr.bestCall.team)}</span>` : ''}</div>
       </div>` : me.invested ? `<div class="p-stats p-stats-3">
-        <div class="s-stat p-stat"><span class="s-label">Portfolio</span><span class="s-v">${esc(fmtM(me.portfolio))}</span></div>
-        <div class="s-stat p-stat"><span class="s-label">Výnos</span><span class="s-v ${me.portfolio >= me.start ? 's-up' : 's-down'}">${esc(spct(((me.portfolio - me.start) / me.start) * 100))}</span></div>
-        <div class="s-stat p-stat"><span class="s-label">Startupy</span><span class="s-v">${Object.values(me.stakes).filter((v) => v > 0).length}</span></div>
+        <div class="s-stat p-stat"><span class="s-label">Portfolio</span><span class="s-v">${tw('prpf', PF())}</span></div>
+        <div class="s-stat p-stat"><span class="s-label">Výnos</span><span class="s-v ${PF() >= me.start ? 's-up' : 's-down'}">${esc(spct(((PF() - me.start) / me.start) * 100))}</span></div>
+        <div class="s-stat p-stat"><span class="s-label">Startupy</span><span class="s-v">${Object.values(me.stakesNow || me.stakes).filter((v) => v > 0).length}</span></div>
       </div>` : ''}
     </div>`;
     if (P) {
@@ -1030,12 +1177,14 @@
     const left = q.endsAt ? q.endsAt - MUP.now() : 0;
     const head = `<div class="qz-top"><span class="s-label">Kvíz${q.setTitle ? ' · ' + esc(q.setTitle) : ''}</span><span class="s-label">${q.idx >= 0 ? `Otázka ${q.idx + 1} z ${q.total}` : ''}</span></div>`;
     let body = '';
+    const streak = mq.streak ?? 0, bonus = mq.myBonus ?? 0;
     if (mode === 'question') {
       const n = (q.a || []).length;
       const locked = myChoice !== null && myChoice !== undefined;
       const late = !locked && left <= -1500;
       const st = local?.st || (locked ? 'sent' : '');
       body = `${head}
+        ${streak >= 2 ? `<div class="qz-stk"><span class="qz-fl" aria-hidden="true">🔥</span>Série${NB}${esc(streak)} · další správná +${esc(num(Math.min(250, 50 * streak)))}</div>` : ''}
         <div class="qz-q"><div class="qz-ring" id="qzring"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" class="bg"/><circle cx="22" cy="22" r="19" class="fg" id="qzfg"/></svg><b id="qzsec" class="s-num"></b></div><p>${esc(q.q || '')}</p></div>
         <div class="qz-tiles n${n} ${locked ? 'locked' : ''} ${late ? 'late' : ''}">${(q.a || []).map((a, i) => `<button type="button" class="qz-tile ${myChoice === i ? 'pick' : ''}" data-quiz="${i}" style="--qc:${QCOL[i]}" ${locked || late ? 'data-off="1"' : ''}><b>${LET[i]}</b><span>${esc(a)}</span>${myChoice === i ? `<em class="qz-sent">${st === 'sending' ? 'Odesílám…' : '✓ ' + E('play.quiz.sent')}</em>` : ''}</button>`).join('')}</div>
         <div class="qz-foot"><span>${locked ? `<b class="qz-ok">✓ ${E('play.quiz.sent')}</b> · ${E('play.quiz.wait')}` : late ? 'Čas vypršel.' : local?.st === 'err' ? `<b class="s-down">${esc(local.msg || 'Nepodařilo se odeslat, zkus to znovu.')}</b>` : 'Vyber jednu odpověď. Změnit ji už nepůjde.'}</span><span class="qz-cnt s-faint">${q.answered != null ? `odpovědělo ${esc(q.answered)}` : ''}</span></div>`;
@@ -1043,7 +1192,7 @@
       const right = mq.myCorrect === true, none = myChoice === null || myChoice === undefined;
       body = `${head}
         <div class="qz-res ${right ? 'ok' : 'bad'}"><div class="qz-res-ic">${right ? '✓' : none ? '–' : '✕'}</div><h2>${right ? 'Správně!' : none ? 'Bez odpovědi' : 'Tentokrát ne'}</h2>
-          <div class="qz-res-p s-num">${right ? '+' + esc(pts(mq.myPoints || 0)) : '0 bodů'}</div></div>
+          <div class="qz-res-p s-num">${right ? '+' + esc(bonus > 0 ? num(mq.myPoints || 0) : pts(mq.myPoints || 0)) : '0 bodů'}${right && bonus > 0 ? `<span class="qz-bonus"> · série${NB}${esc(streak)} 🔥 +${esc(num(bonus))}</span>` : ''}</div></div>
         <p class="qz-qs">${esc(q.q || '')}</p>
         <div class="qz-list">${(q.a || []).map((a, i) => `<div class="qz-li ${i === q.correct ? 'right' : ''} ${i === myChoice ? 'mine' : ''}" style="--qc:${QCOL[i]}"><b>${LET[i]}</b><span>${esc(a)}</span><em class="s-num">${q.counts ? esc(q.counts[i] || 0) : ''}</em>${i === q.correct ? '<i>✓</i>' : i === myChoice ? '<i>✕</i>' : ''}</div>`).join('')}</div>
         <div class="qz-foot"><span>${q.fastest ? `Nejrychlejší: <b>${esc(q.fastest.name)}</b> · ${esc(num(q.fastest.ms / 1000, 1))}${NB}s` : ''}</span><span class="qz-cnt">V kvízu máš <b class="s-num">${esc(pts(mq.runPoints || 0))}</b></span></div>`;
@@ -1139,7 +1288,8 @@
     if (firstRender) { applyView(); firstRender = false; }
     document.body.classList.toggle('p-bet', S.phase === 'betting');
     renderHeader(); renderStatus(); renderExit(); renderHero(); renderMsgs(); renderNotes(); renderMain(); renderDock();
-    renderPortfolio(); renderCap(); renderStartups(); renderProfile(); renderBoard(); renderQuiz(); renderDots(); renderReveal();
+    renderPortfolio(); renderCap(); renderStartups(); renderTeam(); renderProfile(); renderBoard(); renderQuiz(); renderDots(); renderReveal();
+    syncWall(); runTweens();
   }
 
   async function tick() {

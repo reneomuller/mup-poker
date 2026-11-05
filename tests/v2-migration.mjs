@@ -204,6 +204,7 @@ await main(async () => {
 
   // ---------- 3. the class continues: showdown, RJ, next block ----------
   section('showdown on migrated data');
+  await c.dealer('features', { set: { demand: false } }); // v2 fixed-price money below; v3-demand covers demand on
   const sd = await c.dealer('showdown');
   ok(sd.ok && sd.n === 19, `showdown ok, 19 slips applied (n=${sd.n}, ${sd.error || ''})`);
   st = await c.get();
@@ -244,7 +245,7 @@ await main(async () => {
   ok((arch3.archives || []).some((a) => a.label === 'Před blokem 2' && a.auto === true && a.block === 1), 'auto archive "Před blokem 2"');
   const mb2 = await c.me(S[3]);
   ok(!mb2.me?.slip || !mb2.me.slip.submitted, 'phone in block 2 has no block-1 slip');
-  ok(!/Zaujalo mě 3|Nevěřím 3|Silný tým – /.test(mb2._raw), 'phone never sees block-1 notes or reasons in block 2');
+  ok(!/Zaujalo mě 3|Nevěřím 3|Silný tým – /.test(JSON.stringify({ ...mb2, me: { ...mb2.me, myTeam: undefined } })), 'phone never sees block-1 notes or reasons in block 2 (outside the v3 Tým flows)');
   // old-style restore: a phone with its local copy (same gid, older ts) changes nothing
   const old3 = oldDump.slips[1][S[3].sid];
   const rr = await c.post({ op: 'restore', sid: S[3].sid, pin: S[3].pin, name: S[3].name, team: S[3].team, gid: oldPub.gid, slips: { 1: old3 } });
