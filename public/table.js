@@ -835,6 +835,7 @@
     if (first) { build(s); lastSeq = s.reveal?.seq || 0; }
     const sk = s.teams.map((t) => t.id).join();
     if (sk !== seatKey) { seatKey = sk; buildSeats(s); }
+    if (S && s.phase !== S.phase && s.phase === 'betting') window.MupSound?.cue('marketOpen'); // v4 sound
     S = s;
     $('warn')?.remove();
     renderBanner(s); renderJoin(s); renderGlass(s); renderBoardScreen(s);
@@ -843,6 +844,7 @@
       busy = true;
       renderSeats(s, false);
       const k = s.reveal.kind;
+      if (k === 'class') window.MupSound?.cue('showdown'); // v4 sound
       if (k === 'class') revealClass(s);
       else if (k === 'rj') revealRJ(s);
       else if (k === 'market') revealMarket(s);

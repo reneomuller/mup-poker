@@ -106,6 +106,7 @@
     const live = !!(q && on(s, 'quiz') && !['idle', 'done'].includes(q.state));
     toggle(el, 'hidden', !live);
     document.body.classList.toggle('quizon', live);
+    if (!live && cur) { if (q?.state === 'done') window.MupSound?.cue('podium'); else window.MupSound?.stopAll(); } // v4 sound
     if (!live) { cur = null; if (raf) cancelAnimationFrame(raf); raf = 0; return; }
     if (!built) build();
     cur = q;
@@ -115,6 +116,8 @@
     if (k !== key) {
       key = k;
       el.dataset.state = mode;
+      window.MupSound?.cue(mode === 'board' && q.total && q.idx >= q.total - 1 ? 'podium' : mode, { endsAt: q.endsAt, serverNow: MUP.now(), crowd: !!q.fastest }); // v4 sound
+      if (mode === 'reveal' && Number(q.topStreak?.streak) >= 3) window.MupSound?.cue('streak', { delay: 2.2 }); // v4 sound
       // restart the entry animations
       const main = el.querySelector('.qz-main');
       main.classList.remove('enter'); void main.offsetWidth; main.classList.add('enter');

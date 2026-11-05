@@ -82,6 +82,7 @@
     ['tranches', 'Tranše RJ', 'RainbowJet slíbí peníze, které uvolní až po splnění podmínky.'],
     ['exit', 'Exit', 'Finále: akvizice, IPO nebo odpis a konečné pořadí investorů.'],
     ['demand', 'Cena podle poptávky', 'Jako na burze: po showdownu se cena startupu změní podle toho, kolik peněz přilákal oproti ostatním.'],
+    ['sound', 'Zvuk na plátně', 'Znělky kvízu, zvonek při otevření trhu a vířivý buben u\u00a0showdownu. Hraje jen projektor (tlačítko 🔊 v\u00a0rohu), mobily jsou vždy potichu.'],
     ['wall', 'Nástěnky týmů', 'Každý tým má soukromou nástěnku s\u00a0otázkami a úkoly od vás i od svých členů.'],
   ];
   const featKnown = () => !!(S && S.features && typeof S.features === 'object');
