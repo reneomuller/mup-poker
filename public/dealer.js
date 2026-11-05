@@ -219,7 +219,7 @@
   const offCard = (k, what) => `<div class="off"><div><b>${esc(featName(k))} je vypnutý.</b> ${esc(what || '')}</div>${featKnown() ? `<button class="s-btn s-sm" data-enable="${k}">Zapnout</button>` : '<span class="s-badge">server zatím nepodporuje</span>'}</div>`;
 
   // ---------- game flow ----------
-  let pitchMin = store.get('mup.pmin') || '3', betMin = store.get('mup.bmin') || '8', pteamSel = null;
+  let pitchMin = store.get('mup.pmin') || '3', pteamSel = null;
   let tMin = '2', tLab = '';
   const pkey = () => `mup.pitched.${S.gid}.${S.block}`;
   const pitchedList = () => { try { return JSON.parse(store.get(pkey()) || '[]'); } catch { return []; } };
@@ -233,7 +233,8 @@
     return null;
   }
   function startPitch(id) { markPitched(id); return act('phase', { phase: 'pitch', team: id, minutes: num(pitchMin), label: 'Pitch' }); }
-  const openBetting = () => act('phase', { phase: 'betting', minutes: num(betMin), label: 'Investování' });
+  // No countdown: investing runs until the dealer closes it (minutes 0 also clears a pitch timer still running).
+  const openBetting = () => act('phase', { phase: 'betting', minutes: 0 });
   const closeBetting = () => act('phase', { phase: 'closed' });
   async function doShowdown() {
     const n = S.betCount, m = S.playerCount;
@@ -368,9 +369,8 @@
            <button class="s-btn s-sm ${pc(1)}" id="bpitch">${E('dealer.btn.pitch')}</button>
            <button class="s-btn s-sm s-ghost" id="bqa">${E('dealer.btn.qa')}</button>
            <button class="s-btn s-sm s-ghost" id="bstop">${E('dealer.btn.stop')}</button>`)}
-        ${step(2, 'Otevřít investování', sc ? 'V tomto bloku už proběhl showdown.' : 'Studenti posílají investice z mobilů. Časovač je jen orientační.',
-          `<span class="unit"><input class="s-input sm num" id="bmin" value="${esc(betMin)}" inputmode="decimal" aria-label="Minuty investování"> min</span>
-           <button class="s-btn s-sm ${pc(2)}" id="bbet" ${sc ? 'disabled' : ''}>${E('dealer.btn.open')}</button>`)}
+        ${step(2, 'Otevřít investování', sc ? 'V tomto bloku už proběhl showdown.' : 'Studenti posílají investice z\u00a0mobilů. Investování běží, dokud ho sami nezavřete.',
+          `<button class="s-btn s-sm ${pc(2)}" id="bbet" ${sc ? 'disabled' : ''}>${E('dealer.btn.open')}</button>`)}
         ${step(3, 'Zavřít investování', `Investovalo <b>${s.betCount}</b> z ${s.playerCount}.`,
           `<button class="s-btn s-sm ${pc(3)}" id="bclose" ${sc || ph !== 'betting' ? 'disabled' : ''}>${E('dealer.btn.close')}</button>`)}
         ${step(4, 'Showdown třídy', 'Peníze třídy dopadnou na stůl a pohnou oceněním.',
@@ -383,7 +383,6 @@
       </div>`;
     $('pteam').onchange = (e) => { pteamSel = e.target.value; };
     $('pmin').oninput = (e) => { pitchMin = e.target.value; store.set('mup.pmin', pitchMin); };
-    $('bmin').oninput = (e) => { betMin = e.target.value; store.set('mup.bmin', betMin); };
     all(el, '[data-pt]').forEach((b) => (b.onclick = () => { pteamSel = b.dataset.pt; $('pteam').value = pteamSel; all(el, '[data-pt]').forEach((x) => x.classList.toggle('sel', x === b)); }));
     if ($('preset')) $('preset').onclick = () => { store.del(pkey()); redraw('ctrl'); renderTop(); renderFlow(); };
     $('bpitch').onclick = () => startPitch($('pteam').value);

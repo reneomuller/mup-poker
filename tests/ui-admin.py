@@ -48,6 +48,13 @@ def main():
                 ids = ['blobby', 'bpitch', 'bbet', 'bclose', 'bshow', 'brj', 'bnext', 'bfinal']
                 present = [i for i in ids if page.locator('#' + i).count()]
                 warn(len(present) == len(ids), f'phase controls present in Hra tab: {present} (missing {[i for i in ids if i not in present]})')
+                # investing has no countdown: the dealer opens and closes it; opening also clears a pitch timer still running
+                dealer('timer', minutes=3, label='Pitch')
+                page.wait_for_timeout(1200)
+                ok(page.locator('#bmin').count() == 0, 'no minutes field for investing')
+                page.click('#bbet')
+                ok(bool(wait_until(lambda: get()['phase'] == 'betting' and not get().get('timerEnd'), 5)), '„Otevřít investování“ opens investing with no timer (pitch timer cleared)')
+                dealer('phase', phase='lobby')
                 # feature switches
                 click_tab(page, 'funkce')
                 page.wait_for_selector('[data-feature="market"]', timeout=5000)
