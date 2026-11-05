@@ -3,31 +3,64 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b2a1e">
+<meta name="theme-color" content="#0B1030">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Investiční stůl · hráč</title>
-<link rel="stylesheet" href="/fonts/fonts.css">
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/fonts/stand-fonts.css">
+<link rel="stylesheet" href="/stand.css">
 <link rel="stylesheet" href="/play.css">
 </head>
-<body>
-<main id="app">
-  <section id="login" class="hidden"></section>
-  <section id="game" class="hidden">
-    <header class="top">
-      <div><div class="who" id="who"></div><div class="pill" id="myteam"></div></div>
-      <div class="pf"><div class="lbl">Portfolio</div><div class="pfv serif" id="pfv">—</div></div>
-    </header>
-    <div class="card status" id="status"></div>
-    <div class="card hidden" id="msgs"></div>
-    <div id="main"></div>
-    <div class="card" id="notes"></div>
-    <div class="card hidden" id="board"></div>
-    <div class="card" id="portfolio"></div>
-    <p class="foot muted">Odhlásit se: <a href="#" id="logout">změnit hráče</a></p>
-  </section>
-</main>
-<div class="fan hidden" id="fan"><div class="fanlab" id="fanlab"></div><div class="bills" id="bills"></div></div>
+<body class="s-app p-app">
+<div class="p-net hidden" id="net" role="alert"><span class="p-net-dot"></span><span id="nettxt">Bez spojení – zkouším to znovu…</span><button type="button" id="netretry">Zkusit hned</button></div>
+
+<div class="p-boot" id="boot" aria-hidden="true">
+  <div class="p-skel-top"><span class="sk sk-ava"></span><span class="sk sk-l"></span><span class="sk sk-r"></span></div>
+  <div class="p-skel-body"><span class="sk sk-card"></span><span class="sk sk-card sk-short"></span><span class="sk sk-card"></span></div>
+</div>
+
+<section id="login" class="p-login hidden"></section>
+
+<section id="game" class="hidden">
+  <header class="p-top" id="top">
+    <div class="p-top-row">
+      <div class="p-ava" id="ava"></div>
+      <div class="p-id"><div class="p-name" id="who"></div><div class="p-team" id="myteam"></div></div>
+      <div class="p-pf"><div class="s-label">Portfolio</div><div class="p-pfv s-num" id="pfv">—</div></div>
+    </div>
+    <div class="p-phase" id="status"></div>
+    <i class="p-tbar" id="tbar"></i>
+  </header>
+
+  <div class="p-views" id="views">
+    <section class="p-view" data-view="invest">
+      <div id="exitbox"></div>
+      <div id="hero"></div>
+      <div id="main"></div>
+      <div id="msgs"></div>
+      <div class="s-card p-card hidden" id="notes"></div>
+      <div class="s-card p-card hidden" id="board"></div>
+    </section>
+    <section class="p-view" data-view="portfolio"><div id="portfolio"></div><div id="captable"></div></section>
+    <section class="p-view" data-view="startups"><div id="startups"></div></section>
+    <section class="p-view" data-view="profile"><div id="profile"></div></section>
+  </div>
+
+  <div class="p-dock hidden" id="dock"></div>
+
+  <nav class="s-tabbar p-tabbar" id="nav" aria-label="Navigace">
+    <button type="button" data-nav="invest"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17l5-5 4 4 7-8"/><path d="M15 8h5v5"/></svg><span>Investovat</span><i class="p-dotnew"></i></button>
+    <button type="button" data-nav="portfolio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg><span>Portfolio</span><i class="p-dotnew"></i></button>
+    <button type="button" data-nav="startups"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg><span>Startupy</span><i class="p-dotnew"></i></button>
+    <button type="button" data-nav="profile"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c1.2-3.8 4-5.5 7.5-5.5s6.3 1.7 7.5 5.5"/></svg><span>Profil</span><i class="p-dotnew"></i></button>
+  </nav>
+</section>
+
+<div class="p-quiz hidden" id="quiz" role="dialog" aria-modal="true" aria-label="Kvíz"></div>
+
 <script src="/common.js"></script>
+<script src="/play-kit.js"></script>
 <script src="/play.js"></script>
 </body>
 </html>
