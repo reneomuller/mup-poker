@@ -294,6 +294,8 @@
     tickClock();
   }
   function tickClock() {
+    const cn = $('tbConn');
+    if (cn) cn.hidden = Date.now() - lastOk < 9000;
     if (!S) return;
     const left = timeLeft(S);
     const el = $('tbTimer');
@@ -1521,10 +1523,12 @@
     });
   }
 
-  let dumpN = 0;
+  let dumpN = 0, lastOk = Date.now();
   async function tick() {
     const j = await get(H(), '?view=dealer' + (dumpN++ % 3 === 0 ? '&dump=1' : ''));
-    if (!j.dealer) { store.del('mup.dealer'); location.reload(); return; }
+    // public state without the dealer part = wrong password; a server error just skips this tick
+    if (!j.dealer) { if (Array.isArray(j.teams)) { store.del('mup.dealer'); location.reload(); } return; }
+    lastOk = Date.now();
     if (j.dealer.dump) mergeBk(j.dealer.dump);
     await guard(j);
     S = j; D = j.dealer;
