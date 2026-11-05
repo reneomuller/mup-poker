@@ -237,7 +237,7 @@
   }
 
   function driverNote(x) {
-    if (x.kind === 'demand') { const m = /×\s?([\d,.]+)/.exec(x.note || ''); return m ? `Poptávka ×${m[1]}` : x.note || 'Poptávka'; }
+    if (x.kind === 'demand') { const m = /×\s?([\d,.]+)/.exec(x.note || ''); return m ? `×${m[1]}` : x.note || ''; } // the row label already says „Poptávka“
     return x.note || '';
   }
 
