@@ -145,7 +145,7 @@
     };
     const rest = rows.map((r, i) => {
       const t = team(s, r.team);
-      return `<li style="--d:${i * 70}ms" class="${i < 3 ? 'top' + (i + 1) : ''}"><span class="qzp-rp">${i + 1}</span><span class="qzp-rn">${esc(r.name)}</span><span class="qzp-rt"><span class="dot" style="background:${t.color}"></span>${esc(t.name)}</span><span class="qzp-rv">${pts(r.quizPoints)}</span></li>`;
+      return `<li style="--d:${i * 70}ms" class="${i < 3 ? 'top' + (i + 1) : ''}"><span class="qzp-rp">${i + 1}</span><span class="qzp-rn">${esc(r.name)}</span><span class="qzp-rt"><span class="dot" style="background:${t.color}"></span><span class="qzp-rtn">${esc(t.name)}</span></span><span class="qzp-rv">${pts(r.quizPoints)}</span></li>`;
     }).join('');
     p.innerHTML = `<div class="qzp-head"><div class="qzp-kick">${esc(q.setTitle || '')}</div><h2>${esc(tx('table.qp.final'))}</h2></div>
       ${rows.length ? `<div class="qzp-body"><div class="qzp-stage">${col(rows[1], 2)}${col(rows[0], 1)}${col(rows[2], 3)}<div class="qzp-drum"><span></span><span></span><span></span><em>${esc(tx('table.qp.drum'))}</em></div></div>

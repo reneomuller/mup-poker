@@ -121,6 +121,7 @@
 .qzp-rp { font-family: 'Archivo Expanded', 'Archivo', sans-serif; font-weight: 800; font-size: 2rem; color: #9FB4FF; }
 .qzp-rn { font-weight: 700; font-size: 2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qzp-rt { display: flex; align-items: center; gap: .5rem; min-width: 0; font-size: 1.5rem; color: #B8BED6; white-space: nowrap; overflow: hidden; }
+.qzp-rtn { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .qzp-rv { font-family: 'Archivo Expanded', 'Archivo', sans-serif; font-weight: 800; font-size: 2.1rem; text-align: right; font-variant-numeric: tabular-nums; }
 .qzp-none { flex: 1; display: grid; place-items: center; font-size: 2.4rem; color: #B8BED6; }
 @media (prefers-reduced-motion: reduce) {
