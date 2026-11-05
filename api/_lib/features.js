@@ -9,6 +9,7 @@ export const FEATURE_DEFAULTS = {
   rounds: false, market: false, tranches: false, exit: false,
   wall: true,
   demand: true,
+  recap: true, // v4: end-of-game recap on the phone + class report (GET ?view=recap / ?view=report)
 };
 export const OFF = 'Tato funkce je vypnutá.';
 export const REASON_LABELS = { milestone: 'Splněný milník', traction: 'Trakce', team: 'Tým', risk: 'Riziko', market: 'Trh', other: 'Jiné' };
