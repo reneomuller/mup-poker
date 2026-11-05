@@ -46,19 +46,16 @@
   /* ---- Portfolio: chart next to the stakes ---- */
   #portfolio { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
   #portfolio > * { grid-column: 2; margin-top: 0; }
-  #portfolio > .p-pfcard { grid-column: 1; grid-row: 1 / span 6; position: sticky; top: 100px; }
+  #portfolio > .p-pfcard { grid-column: 1; grid-row: 1 / span 2; position: sticky; top: 100px; }
   #portfolio > .p-empty { grid-column: 1 / -1; }
   #portfolio > .s-card + .s-card { margin-top: 0; }
 
-  /* ---- Tým: header + chart next to Investoři; a wide wall ---- */
-  [data-view="team"] > div:first-child { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
-  [data-view="team"] > div:first-child > * { margin-top: 0; }
-  [data-view="team"] > div:first-child > :nth-child(n + 3) { grid-column: 2; }
-  [data-view="team"] > div:first-child > :first-child, [data-view="team"] > div:first-child > :nth-child(2) { grid-column: 1; }
-  [data-view="team"] [class*="wall"] { grid-column: 1 / -1; }
-
-  /* ---- Profil ---- */
-  [data-view="profile"] > #profile { width: 100%; max-width: 760px; justify-self: center; }
+  /* ---- Tým (the profile view): header + chart next to Investoři; a wide wall ---- */
+  #teamv { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+  #teamv > * { grid-column: 1; margin-top: 0; }
+  #teamv > .p-invs { grid-column: 2; grid-row: 1; }
+  #teamv:not(:has(.p-invs)) { grid-template-columns: minmax(0, 1fr); }
+  #wallcard { width: 100%; }
 
   /* ---- quiz: tiles become a comfortable 2×2 ---- */
   .qz-in { max-width: 860px; padding-left: 0; padding-right: 0; }
