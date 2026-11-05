@@ -850,10 +850,12 @@
   }
 
   // ---------- Tým: live team header, valuation chart, investors, team wall ----------
+  // the share price move this block in %, i.e. what the investors' money did (demand multiple − 1): „▲ 63 %“
+  const movePct = (m) => { const p = Math.abs((m - 1) * 100); return pct(p, p < 10 ? 1 : 0); };
   function multChip(t, block) {
     const m = t.mult;
     if (m == null || m === 1 || !pendingLive()) return '';
-    return `${block ? '' : ' '}<span class="p-mx ${m > 1 ? 's-up' : 's-down'}">${m > 1 ? '▲' : '▼'}${NB}×${esc(num(m, 2))}</span>`;
+    return `${block ? '' : ' '}<span class="p-mx ${m > 1 ? 's-up' : 's-down'}">${m > 1 ? '▲' : '▼'}${NB}${esc(movePct(m))}</span>`;
   }
   function valChart(hist) {
     const pts = hist.filter((h) => h && h.V != null);
@@ -888,22 +890,23 @@
     const Vnow = m?.Vnow ?? Vn(t);
     const rank = m?.rank ?? t.rank ?? ranked.findIndex((x) => x.id === t.id) + 1;
     const of = m?.of ?? S.teams.length;
-    const chg = m?.chg ?? t.chg;
     const founders = m?.founders ?? me.myTeamCap?.founders ?? t.cap?.founders;
     const invN = m?.investorsNow ?? me.myTeamCap?.investors ?? t.cap?.investors;
     const mx = m?.mult ?? t.mult;
     const live = pendingLive();
     const mxs = live ? mx : (m?.flows || []).filter((f) => f.settled && f.mult != null).sort((a, b) => b.block - a.block)[0]?.mult;
-    const chgP = chg != null ? chg * 100 : null;
+    const mvP = mxs != null && Math.abs(mxs - 1) > 0.0005 ? (mxs - 1) * 100 : null; // share price move, not the valuation incl. new money
+    const fl0 = (m?.flows || []).slice().sort((a, b) => b.block - a.block)[0];
+    const net = fl0 ? (fl0.totalIn || 0) - (fl0.totalOut || 0) : null;
     let h = `<div class="s-card p-card p-tm" style="--tc:${esc(t.color)}">
       <div class="p-tm-h"><span class="p-su-ic">${esc(initials(t.name))}</span><div class="p-tm-n"><div class="s-label">Tvůj tým</div><h2 class="s-h2">${esc(m?.name || t.name)}</h2></div>
         ${rank ? `<span class="p-tm-rank"><b class="s-num">#${esc(rank)}</b><small> z${NB}${esc(of)}</small></span>` : ''}</div>
-      <div class="p-tm-v"><span class="p-tm-big">${tw('tmV', Vnow)}</span>${chgP != null && Math.abs(chgP) >= 0.05 ? `<span class="p-tm-chg ${chgP > 0 ? 's-up' : 's-down'}">${chgP > 0 ? '▲' : '▼'}${NB}${esc(pct(Math.abs(chgP), Math.abs(chgP) < 10 ? 1 : 0))}</span>` : ''}</div>
+      <div class="p-tm-v"><span class="p-tm-big">${tw('tmV', Vnow)}</span>${mvP != null ? `<span class="p-tm-chg ${mvP > 0 ? 's-up' : 's-down'}" title="Změna ceny podílu v${NB}bloku">${mvP > 0 ? '▲' : '▼'}${NB}${esc(movePct(mxs))}</span>` : ''}</div>
       <div class="p-tm-sub">${live ? '<span class="p-lv"><i></i>živě</span><span>ocenění po tomto bloku, jak to teď vypadá</span>' : '<span>ocenění</span>'}</div>
       <div class="p-stats p-stats-3">
         <div class="s-stat p-stat"><span class="s-label">Zakladatelé</span><span class="s-v">${founders != null ? esc(pct(founders)) : '–'}</span></div>
         <div class="s-stat p-stat"><span class="s-label">Investoři</span><span class="s-v">${invN != null ? esc(num(invN)) : '–'}</span></div>
-        <div class="s-stat p-stat"><span class="s-label">${live ? 'Poptávka teď' : 'Poptávka'}</span><span class="s-v ${mxs > 1 ? 's-up' : mxs < 1 ? 's-down' : ''}">${mxs != null ? '×' + esc(num(mxs, 2)) : '–'}</span></div>
+        <div class="s-stat p-stat"><span class="s-label">${live ? 'Peníze teď' : 'Peníze v\u00a0bloku'}</span><span class="s-v ${net > 0 ? 's-up' : net < 0 ? 's-down' : ''}">${net ? (net > 0 ? '+' : '−') + esc(fmtM(Math.abs(net))) : '–'}</span></div>
       </div>
       ${m?.history ? valChart(m.history) : ''}
     </div>`;
@@ -914,7 +917,7 @@
           const inv = f.investors || [];
           return `<div class="p-fl ${f.settled ? '' : 'now'}" data-key="fl${esc(f.block)}">
             <div class="p-fl-h"><b>Blok ${esc(f.block)}</b>${f.settled ? '<span class="s-label">uzavřeno</span>' : '<span class="p-lv"><i></i>plní se živě</span>'}
-              <span class="p-fl-sum s-num">${f.totalIn ? `<span class="s-up">+${esc(fmtM(f.totalIn))}</span>` : ''}${f.totalOut ? ` <span class="s-down">−${esc(fmtM(f.totalOut))}</span>` : ''}${f.mult != null && f.mult !== 1 ? ` <span class="p-mx ${f.mult > 1 ? 's-up' : 's-down'}">×${esc(num(f.mult, 2))}</span>` : ''}</span></div>
+              <span class="p-fl-sum s-num">${f.totalIn ? `<span class="s-up">+${esc(fmtM(f.totalIn))}</span>` : ''}${f.totalOut ? ` <span class="s-down">−${esc(fmtM(f.totalOut))}</span>` : ''}${f.mult != null && Math.abs(f.mult - 1) > 0.0005 ? ` <span class="p-mx ${f.mult > 1 ? 's-up' : 's-down'}" title="Změna ceny podílu v${NB}bloku">${f.mult > 1 ? '▲' : '▼'}${NB}${esc(movePct(f.mult))}</span>` : ''}</span></div>
             ${inv.length ? inv.map((v) => {
               const k = `${f.block}:${v.id}`, rj = v.id === 'rj';
               return `<div class="p-iv" data-key="iv${esc(k)}">

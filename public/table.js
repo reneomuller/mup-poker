@@ -21,7 +21,7 @@
     'table.driver.market': 'Trh',
     'table.driver.exit': 'Exit',
     'table.driver.demand': 'Poptávka',
-    'table.mult.title': 'násobek bloku',
+    'table.mult.title': 'změna ceny podílu v bloku',
     'table.award.kick': 'Ocenění',
     'table.award.sharpest': 'Nejlepší investor',
     'table.award.analyst': 'Nejlepší analytik',
@@ -118,6 +118,11 @@
       if (m) return Number(m[1].replace(',', '.'));
     }
     return multMem[blk]?.[tid] ?? null;
+  }
+  // the share price move of a block in % terms (what the investors' money did), null when nothing moved
+  function moveOf(s, tid, blk = s.block) {
+    const m = blockMult(s, tid, blk);
+    return m != null && Math.abs(m - 1) > 0.0005 ? m - 1 : null;
   }
   const team = (s, id) => (s.teams || []).find((t) => t.id === id) || { id, name: '', color: '#888' };
   const on = (s, k) => !!(s.features && s.features[k]);
@@ -254,7 +259,7 @@
         tween(e.val, vnow(t), fmtM, 700);
         celebrate(e, hasM && m < 1);
         renderVR(s, t, e, true);
-        badge(t.id, hasM ? mult2(m) + (x ? ' · ' + sign(x) : '') : sign(x), (hasM ? m < 1 : x < 0) ? 'neg' : '');
+        badge(t.id, hasM ? chgTxt(m - 1) + (x ? ' · ' + sign(x) : '') : sign(x), (hasM ? m < 1 : x < 0) ? 'neg' : '');
         await sleep(380);
       }
       $('pile').innerHTML = ''; potShown = 0;
@@ -275,14 +280,12 @@
     setText(rk, r ? '#' + r : '');
     toggle(rk, 'hidden', !r);
     toggle(rk, 'first', r === 1);
-    const c = chgOf(t), showC = Math.abs(c) >= 0.0005;
-    toggle(cg, 'hidden', !showC);
-    if (showC) { setText(cg, chgTxt(c)); toggle(cg, 'down', c < 0); }
+    // the badge is the share price move this block in % (what the investors' money did), live while investing
     const settled = !pending(s) && ['showdown', 'rj'].includes(s.phase);
-    const m = settled || showMult ? blockMult(s, t.id, s.reveal?.kind === 'class' ? s.reveal.block || s.block : s.block) : null;
-    const showM = m != null && Math.abs(m - 1) > 0.004;
-    toggle(mx, 'hidden', !showM);
-    if (showM) { setText(mx, mult2(m)); toggle(mx, 'down', m < 1); mx.title = tx('table.mult.title'); }
+    const mv = pending(s) || settled || showMult ? moveOf(s, t.id, s.reveal?.kind === 'class' ? s.reveal.block || s.block : s.block) : null;
+    toggle(cg, 'hidden', mv == null);
+    if (mv != null) { setText(cg, chgTxt(mv)); toggle(cg, 'down', mv < 0); cg.title = tx('table.mult.title'); }
+    toggle(mx, 'hidden', true);
   }
 
   function rjFace(x) {
@@ -685,10 +688,13 @@
     const settled = ['showdown', 'rj'].includes(s.phase);
     keyedList($('rank'), items, 5.6, ({ t }, i) => {
       const p = prev?.[t.id];
-      const ch = v3 ? chgOf(t) * 100 : p ? ((t.V - p) / p) * 100 : 0;
-      const chs = (v3 || p) && Math.abs(ch) >= 0.05 ? `<small class="${ch >= 0 ? 'up' : 'down'}">${ch >= 0 ? '▲' : '▼'} ${pct(Math.abs(ch), false)}</small>` : `<small class="muted">${esc(tx('table.board.same'))}</small>`;
-      const m = pending(s) ? (t.mult ?? null) : settled ? blockMult(s, t.id) : null;
-      const ms = m != null && Math.abs(m - 1) > 0.004 ? `<small class="mx ${m < 1 ? 'down' : ''}">${esc(mult2(m))}</small>` : '';
+      let ch;
+      if (s.features?.demand !== false) {
+        const mv = moveOf(s, t.id, pending(s) || settled ? s.block : s.block - 1);
+        ch = mv != null ? mv * 100 : 0;
+      } else ch = v3 ? chgOf(t) * 100 : p ? ((t.V - p) / p) * 100 : 0;
+      const chs = Math.abs(ch) >= 0.05 ? `<small class="${ch >= 0 ? 'up' : 'down'}">${ch >= 0 ? '▲' : '▼'} ${pct(Math.abs(ch), false)}</small>` : `<small class="muted">${esc(tx('table.board.same'))}</small>`;
+      const ms = '';
       return `<span class="pos">${i + 1}</span><span class="tn"><span class="dot" style="background:${t.color}"></span><span class="nmx">${esc(t.name)}</span></span><span class="tv"><b>${esc(fmtM(vnow(t)))}</b><span class="tvs">${ms}${chs}</span></span>`;
     });
   }
