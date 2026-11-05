@@ -76,6 +76,38 @@
         s.phase = 'final';
       }
     }
+    // v3: fake the server's Vnow / mult / rank / chg (docs/V3-SPEC.md §1–2) on top of a real v2 GET
+    if (D.has('v3')) {
+      const pend = s.phase === 'betting' || s.phase === 'closed';
+      const L = s.teams.map((t) => t.live || 0);
+      const avgNet = L.reduce((a, b) => a + b, 0) / (L.length || 1), avgIn = L.reduce((a, b) => a + Math.max(0, b), 0) / (L.length || 1);
+      const F = {};
+      for (const [b, m] of Object.entries(V3.mult)) if (+b < s.block || (+b === s.block && !pend)) for (const id in m) F[id] = (F[id] || 1) * m[id];
+      const vs = (V3.start[s.block] = V3.start[s.block] || {});
+      s.drivers = { ...(s.drivers || {}) };
+      s.teams.forEach((t) => {
+        t.V = Math.round(t.V * (F[t.id] || 1));
+        const m = pend && avgIn ? Math.min(10, Math.max(0.1, 1 + ((t.live || 0) - avgNet) / avgIn)) : 1;
+        if (pend) (V3.mult[s.block] = V3.mult[s.block] || {})[t.id] = m;
+        t.mult = Math.round(m * 100) / 100;
+        t.Vnow = pend ? Math.round((t.V + (t.live || 0)) * m) : t.V;
+        if (vs[t.id] == null) vs[t.id] = pend ? t.V : t.V;
+        t.chg = vs[t.id] ? t.Vnow / vs[t.id] - 1 : 0;
+      });
+      [...s.teams].sort((a, b) => b.Vnow - a.Vnow).forEach((t, i) => { t.rank = i + 1; });
+      s.demand = {};
+      for (const [b, m] of Object.entries(V3.mult)) {
+        if (+b === s.block && pend) continue;
+        s.demand[b] = { mult: m };
+        for (const t of s.teams) {
+          const x = m[t.id] || 1;
+          const note = 'Poptávka v bloku ' + b + ' (×' + x.toLocaleString('cs-CZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ')';
+          s.drivers[t.id] = [...(s.drivers[t.id] || []), { ts: Date.now() - 1000 * +b, block: +b, team: t.id, kind: 'demand', delta: Math.round(t.V - t.V / x), note }];
+        }
+      }
+      if (D.has('longnames')) s.teams.forEach((t, i) => { if (i % 2 === 0) t.name = t.name + ' – Zdravotní pomůcky pro seniory'; });
+    }
     return s;
   };
+  const V3 = { mult: {}, start: {} };
 })();
