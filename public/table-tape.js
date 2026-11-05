@@ -116,7 +116,8 @@
         const at = Math.max(W, visEnd);
         const it = addItem(s, r, at);
         it.el.classList.add('fresh');
-        for (const o of items) if (o !== it && o.x >= at) { o.x += it.w + gap(); place(o); }
+        // queued items sit exactly at `at` up to float drift from the frame loop: compare with a tolerance
+        for (const o of items) if (o !== it && o.x >= at - 2) { o.x += it.w + gap(); place(o); }
         flash(r);
       }
     }
