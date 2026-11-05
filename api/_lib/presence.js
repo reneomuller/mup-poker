@@ -14,6 +14,7 @@ import * as S from './store.js';
 import * as F from './features.js';
 import * as W from './wall.js';
 import * as E from './economy.js';
+import * as GU from './guard.js';
 
 const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -28,11 +29,15 @@ const ok = (extra) => ({ status: 200, body: { ok: true, ...extra } });
 const SID = /^[\w-]{4,24}$/;
 
 // ---------- heartbeat ----------
-export async function hb(b, pinHash) {
+export async function hb(b, pinHash, req) {
   const sid = String(b.sid || '');
   if (!SID.test(sid) || !/^\d{4}$/.test(String(b.pin || ''))) return fail('Přihlas se znovu.');
   const p = await S.hget('players', sid);
-  if (!p || !p.pin || p.pin !== pinHash(sid, String(b.pin))) return fail('Přihlas se znovu.', 401);
+  if (!p || !p.pin) return fail('Přihlas se znovu.', 401);
+  // v4 guard: a wrong PIN counts here like on every other route, and a locked player is refused, so the
+  // heartbeat is no PIN oracle around the lockout (only a failed or locked beat reads meta, for the flag)
+  if (p.pin !== pinHash(sid, String(b.pin))) return fail((await GU.failed(await S.getJSON('meta'), req, p)) ? GU.TOO_MANY : 'Přihlas se znovu.', 401);
+  if (Number(p.lock) > Date.now() && GU.locked(await S.getJSON('meta'), p)) return fail(GU.TOO_MANY, 401);
   if (p.ghost) return ok({ ghost: true }); // a ghost never counts anywhere
   const ts = Date.now();
   if (redis) await redis.set(KEY(sid), String(ts), { ex: TTL() });

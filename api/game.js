@@ -1168,7 +1168,7 @@ export default async function handler(req, res) {
     }
     if (req.method === 'POST') {
       const b = await readBody(req);
-      if (b.op === 'hb') { const r = await PR.hb(b, pinHash); return send(res, r.status, r.body); } // v4 regie: presence heartbeat, never logged
+      if (b.op === 'hb') { const r = await PR.hb(b, pinHash, req); return send(res, r.status, r.body); } // v4 regie: presence heartbeat, never logged
       const studentOps = ['register', 'login', 'tokenLogin', 'notes', 'submit', 'reasons', 'restore', 'ask', 'vote', 'answer', 'react', 'quizAnswer', 'quizReady'];
       let r;
       // card / roundTerms exist for both: with a sid it is a student editing their own team
