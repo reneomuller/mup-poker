@@ -64,6 +64,15 @@ await main(async () => {
   const bad = await hb(S[2], '0000');
   ok(!bad.ok && bad._status === 401, `hb with a wrong PIN is refused (${bad._status})`);
   ok(!(await c.post({ op: 'hb', sid: 'nope-nope', pin: '1234' })).ok, 'hb for an unknown sid is refused');
+  { // v4 review: wrong PINs on hb count like on every other route, so the heartbeat is no PIN oracle around the guard lockout
+    const bf = await c.post({ op: 'register', name: 'Brute Force', team: T[0], pin: '4321' });
+    for (let i = 0; i < 8; i++) await c.post({ op: 'hb', sid: bf.sid, pin: String(5000 + i) });
+    const right = await c.post({ op: 'hb', sid: bf.sid, pin: '4321' });
+    ok(bf.ok && !right.ok && right._status === 401, `after 8 wrong hb PINs even the right one is refused (${right._status} ${right.error})`);
+    const g = await c.get('', { 'x-sid': bf.sid, 'x-pin': '4321' });
+    ok(!g.me && g.meError === 'locked', `…and the player is locked for the GET too (${g.meError})`);
+    ok((await c.dealer('removePlayer', { sid: bf.sid })).ok, 'clean-up: the test player is removed again');
+  }
   const hg = await hb(G);
   ok(hg.ok && hg.ghost === true, 'a ghost hb is answered but not recorded');
   p = await pres();

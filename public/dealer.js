@@ -89,6 +89,8 @@
     ['wallplus', 'Nástěnky+', 'Reakce, připnutí, označená odpověď, termín a řešitel úkolu, šablony a filtry na nástěnkách.'],
     ['regie', 'Režie', 'Plán hodiny s\u00a0dalším krokem, kdo chybí a kdo je připojený, připomínky týmům, klávesové zkratky a historie akcí.'], // v4 regie
     ['tape', 'Burza na plátně', 'Při investování běží dole na plátně páska obchodů (jména jako iniciály), u\u00a0showdownu „Burza uzavřena“ s\u00a0násobky a v\u00a0pořadí malé grafy ocenění.'],
+    ['recap', 'Rekapitulace', 'Na konci hry si každý projde své karty s\u00a0výsledky (i\u00a0obrázek ke sdílení) a\u00a0vy máte třídní report k\u00a0tisku a\u00a0do CSV.'], // v4 recap (review: the flag had no switch)
+    ['guard', 'Ochrana PINu a\u00a0signálu', 'Po opakovaně špatném PINu se účet na pár minut zamkne (odemkne ho QR přihlášení); mobil bez signálu ukáže pruh a\u00a0odeslání sám zopakuje.'], // v4 guard (review: the flag had no switch)
   ];
   const featKnown = () => !!(S && S.features && typeof S.features === 'object');
   const F = (k) => !!(S && S.features && S.features[k]);
@@ -243,7 +245,7 @@
   const closeBetting = () => act('phase', { phase: 'closed' });
   async function doShowdown() {
     const n = S.betCount, m = S.playerCount;
-    if (!confirm(`Spustit showdown? Započítá se ${n} ${pl(n, 'investor', 'investoři', 'investorů')} z ${m}. Kdo neinvestoval, v tomto bloku nic nevloží.`)) return;
+    if (!confirm(`Spustit showdown? ${pl(n, 'Započítá', 'Započítají', 'Započítá')} se ${n} ${pl(n, 'investor', 'investoři', 'investorů')} z\u00a0${m}. Kdo neinvestoval, v tomto bloku nic nevloží.`)) return;
     const r = await act('showdown', {}, 'Showdown proběhl');
     if (r.ok && r.skipped?.length) alert('Neplatné investice (nezapočítány):\n' + r.skipped.map((x) => `${x.name}: ${x.error}`).join('\n'));
   }

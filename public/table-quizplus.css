@@ -95,6 +95,8 @@
 .qzp-pod.s1 .p1 .qzp-who { transition-delay: .55s; }
 .qzp-pod.s1 .p1 .qzp-nm { font-size: 3.2rem; color: #FFE08A; }
 .qzp-pod.s10 .qzp-nm { font-size: 2.2rem; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+/* review: with the top-10 list beside it the columns are narrow – the winner's name shrinks so a surname like „Svobodová“ is not cut to „Svobo…“ */
+.qzp-pod.s10 .p1 .qzp-nm { font-size: 2.5rem; overflow-wrap: break-word; }
 .qzp-pod.s10 .qzp-pts { font-size: 2.2rem; } .qzp-pod.s10 .qzp-medal { font-size: 3.6rem; }
 .qzp-pod.s1 .p1 .qzp-medal { animation: qzp-medal 1.2s 1.1s cubic-bezier(.2,.9,.25,1.3) both; }
 @keyframes qzp-medal { 0% { transform: scale(1); } 40% { transform: scale(1.5) rotate(-10deg); } 100% { transform: scale(1.15); } }
@@ -119,6 +121,7 @@
 .qzp-rp { font-family: 'Archivo Expanded', 'Archivo', sans-serif; font-weight: 800; font-size: 2rem; color: #9FB4FF; }
 .qzp-rn { font-weight: 700; font-size: 2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qzp-rt { display: flex; align-items: center; gap: .5rem; min-width: 0; font-size: 1.5rem; color: #B8BED6; white-space: nowrap; overflow: hidden; }
+.qzp-rtn { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .qzp-rv { font-family: 'Archivo Expanded', 'Archivo', sans-serif; font-weight: 800; font-size: 2.1rem; text-align: right; font-variant-numeric: tabular-nums; }
 .qzp-none { flex: 1; display: grid; place-items: center; font-size: 2.4rem; color: #B8BED6; }
 @media (prefers-reduced-motion: reduce) {

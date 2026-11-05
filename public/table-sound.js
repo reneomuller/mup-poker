@@ -11,6 +11,8 @@
       opacity: .5; cursor: pointer; transition: opacity .2s; white-space: nowrap; }
     .snd-btn:hover, .snd-btn:focus-visible { opacity: 1; }
     .snd-btn.off { opacity: .7; }
+    .snd-btn.idle { opacity: 0; }
+    body.tapeon .snd-btn { bottom: calc(var(--tape-h, 0px) + 8px); }
     .snd-btn[hidden] { display: none; }`;
   document.head.appendChild(st);
   const btn = document.createElement('button');
@@ -38,6 +40,13 @@
   const gesture = (e) => { if (e.target !== btn && S.enabled && S.allowed && !S.unlocked) S.unlock(); };
   addEventListener('pointerdown', gesture, true);
   addEventListener('keydown', gesture, true);
+  // the corner button sits over the market tape's label / the quiz footer: it fades out 4 s after the last mouse move
+  let idleT = 0;
+  const wake = () => { btn.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => btn.classList.add('idle'), 4000); };
+  addEventListener('pointermove', wake, true);
+  addEventListener('pointerdown', wake, true);
+  addEventListener('keydown', wake, true);
+  wake();
   S.onchange = paint;
   // runs before the quiz screen (script order), so the flag is set before any cue of the same tick
   T.screens.push((s) => { S.setAllowed(T.on(s, 'sound')); paint(); });

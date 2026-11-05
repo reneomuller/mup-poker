@@ -123,8 +123,12 @@
     const now = rows.find((r) => r.s === 'now') || null;
     if (now && now.st.k === 'quiz' && !ticks.includes(now.st.id)) { l.ticks = [...ticks, now.st.id]; saveLocal(l); }
     let sug = now && ['pitch', 'quiz'].includes(now.st.k) ? now : rows.find((r) => r.i > last && r.s === 'todo') || null;
+    // review: a live quiz wins over the other „now“ step (a quiz during open investing, or in a block the plan has
+    // no quiz step for) – else „Další krok ▶“ / N offered „Zavřít investování“ in the middle of the quiz
+    const qlive = quizLive() ? rows.find((r) => r.s === 'now' && r.st.k === 'quiz') || { st: { id: 'qlive' + M().S.block, k: 'quiz', b: M().S.block }, i: -1, s: 'now' } : null;
+    if (qlive) { sug = qlive; if (qlive.i >= 0 && !ticks.includes(qlive.st.id)) { l.ticks = [...ticks, qlive.st.id]; saveLocal(l); } } // ticked like a quiz that is „now“
     if (!sug && now) sug = now;
-    const cur = now || sug;
+    const cur = qlive || now || sug;
     // when did the current step start? (first time this session saw it as current; kept in localStorage)
     if (cur && !l.started[cur.st.id]) { l.started[cur.st.id] = Date.now(); saveLocal(l); }
     const startedAt = cur ? l.started[cur.st.id] : null;
@@ -210,7 +214,7 @@
     const viaSel = wallOn ? `<label class="rg-via">Připomínka jako <select id="rgvia" class="s-input sm"><option value="wall" ${via === 'wall' ? 'selected' : ''}>úkol na nástěnce</option><option value="msg" ${via === 'msg' ? 'selected' : ''}>zpráva týmu</option></select></label>` : '<span class="s-faint">Připomínka přijde jako zpráva týmu.</span>';
     const settled = !!M().D.settled[S.block + 'c'];
     const missBody = !HL.players.length ? '<p class="s-faint">Zatím se nikdo nepřihlásil.</p>'
-      : settled ? `<p class="s-faint">Showdown bloku ${S.block} už proběhl${miss.length ? ` – neinvestovalo ${HL.notSubmitted.length} ${pl(HL.notSubmitted.length, 'student', 'studenti', 'studentů')}` : ''}. Připomínky se pošlou v\u00a0dalším bloku.</p>`
+      : settled ? `<p class="s-faint">Showdown bloku ${S.block} už proběhl${miss.length ? ` – ${pl(HL.notSubmitted.length, 'neinvestoval', 'neinvestovali', 'neinvestovalo')} ${HL.notSubmitted.length} ${pl(HL.notSubmitted.length, 'student', 'studenti', 'studentů')}` : ''}. Připomínky se pošlou v\u00a0dalším bloku.</p>`
       : !miss.length ? '<p class="s-up">Všichni v tomto bloku investovali.</p>'
         : `${live ? '' : '<p class="s-faint">Investování teď neběží – seznam je pro blok ' + S.block + '.</p>'}
           <div class="rg-nudgebar">${viaSel}<button type="button" class="s-btn s-sm" data-nudge="*">Připomenout všem</button></div>
@@ -418,7 +422,7 @@
     const el = $('rgpanel');
     if (!el || M().tab !== 'regie') return;
     if (!on()) {
-      const html = `<div class="s-card"><div class="off"><div><b>Režie je vypnutá.</b> Plán hodiny, zdraví třídy a připomínky se zapínají v Funkcích.</div><button class="s-btn s-sm" data-enable="regie">Zapnout</button></div></div>`;
+      const html = `<div class="s-card"><div class="off"><div><b>Režie je vypnutá.</b> Plán hodiny, zdraví třídy a připomínky se zapínají v\u00a0Funkcích.</div><button class="s-btn s-sm" data-enable="regie">Zapnout</button></div></div>`;
       if (el.innerHTML !== html) el.innerHTML = html;
       panelSig = '';
       return;
@@ -499,6 +503,8 @@
     if (!on() || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
     const t = e.target;
     if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
+    // another dialog is open (a wall sticker, the login QR): its keys are its own, no game step / timer behind it
+    if ([...document.querySelectorAll('[aria-modal="true"]')].some((d) => !d.closest('#rghelp, #rgdrawer') && d.getClientRects().length)) return;
     if (e.key === 'Escape') { if ($('rghelp') && !$('rghelp').hidden) help(false); else if (drawerOpen) closeDrawer(); return; }
     const k = e.key.toLowerCase();
     if (e.key === '?') { e.preventDefault(); help(true); }

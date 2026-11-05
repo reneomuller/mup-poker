@@ -118,5 +118,6 @@ kbd { font-family: var(--s-mono); font-size: 11.5px; padding: 1px 6px; border-ra
   .rg-fab[hidden] { display: none; }
   .rg-fab .s-btn { width: 100%; min-height: 58px; font-size: 18px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   body.rg-hasfab .main { padding-bottom: 110px; }
+  body.rg-hasfab.adm .s-toast { bottom: calc(88px + env(safe-area-inset-bottom)); } /* toasts above the next-step button */
   .rg-keys { display: none; }
 }

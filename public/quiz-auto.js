@@ -14,7 +14,7 @@
   };
   const hdr = () => ({ 'x-dealer': ls.get('mup.dealer') || '' });
   let auto = ls.get(AUTO_KEY) !== '0';
-  let q = null, skew = 0, busy = false, fired = { seq: -1, at: 0 }, revealSeen = { seq: -1, at: 0 }, timer = null, lastAdv = 0;
+  let q = null, skew = 0, busy = false, fired = { seq: -1, at: 0 }, revealSeen = { seq: -1, at: 0 }, timer = null, lastAdv = 0, lastManual = 0;
 
   const css = document.createElement('style');
   css.textContent = `
@@ -76,6 +76,10 @@
 
   async function advance(isAuto) {
     if (!live() || busy) return;
+    // a double tap / double space lands after the first step already finished: without this it closed the
+    // question that had just opened (0 answers) or skipped the leaderboard
+    // (only against the previous manual press: right after an auto step the dealer may advance at once)
+    if (!isAuto) { if (Date.now() - lastManual < 1200) return; lastManual = Date.now(); }
     busy = true; lastAdv = Date.now(); render();
     try {
       const r = await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json', ...hdr() }, body: JSON.stringify({ op: 'quizAdvance', seq: q.seq || 0, ...(isAuto ? { auto: true } : {}) }) }).then((x) => x.json());

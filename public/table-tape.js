@@ -90,7 +90,7 @@
   }
   function renderTape(s) {
     const blocked = ['boardscreen'].some((id) => $(id)?.classList.contains('on'))
-      || ['quiz', 'exit', 'award'].some((id) => $(id) && !$(id).classList.contains('hidden'));
+      || ['quiz', 'qzpodium', 'exit', 'award'].some((id) => $(id) && !$(id).classList.contains('hidden')); // qzpodium: the quiz+ finale
     const show = tapeOn(s) && pending(s) && !blocked;
     T.toggle(bar, 'on', show);
     T.toggle(document.body, 'tapeon', show);
@@ -116,7 +116,8 @@
         const at = Math.max(W, visEnd);
         const it = addItem(s, r, at);
         it.el.classList.add('fresh');
-        for (const o of items) if (o !== it && o.x >= at) { o.x += it.w + gap(); place(o); }
+        // queued items sit exactly at `at` up to float drift from the frame loop: compare with a tolerance
+        for (const o of items) if (o !== it && o.x >= at - 2) { o.x += it.w + gap(); place(o); }
         flash(r);
       }
     }
