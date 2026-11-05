@@ -1334,9 +1334,11 @@
     const fast = feat('quiz') && S?.quiz?.state === 'question';
     let ms = fast ? 1000 : 2500;
     if (document.hidden) ms *= 3;
+    if (window.PN) ms = PN.delay(ms); // v4 guard: exponential backoff while offline
     loopT = setTimeout(loop, ms);
   }
   function kick(d = 150) { clearTimeout(loopT); loopT = setTimeout(loop, d); }
+  if (window.PN) PN.kick = kick; // v4 guard (play-net.js): retry button / reconnect re-polls at once
   document.addEventListener('visibilitychange', () => { if (!document.hidden) kick(0); });
   window.addEventListener('online', () => kick(0));
 

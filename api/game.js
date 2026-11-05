@@ -9,6 +9,7 @@ import * as A from './_lib/archive.js';
 import * as W from './_lib/wall.js';
 import * as D from './_lib/demand.js';
 import * as AC from './_lib/access.js';
+import * as GU from './_lib/guard.js'; // v4 guard: PIN brute-force limits, rid dedupe
 
 // Dealer is open (no password) unless DEALER_LOCK=1 and DEALER_PASSWORD are set in Vercel.
 const DEALER_PW = process.env.DEALER_LOCK === '1' ? process.env.DEALER_PASSWORD || 'mup-dealer' : '';
@@ -342,7 +343,7 @@ async function loadForAnswer(sid) {
   return m && m.v2ArchivedAt ? { ...d, meta: F.normalize(m) } : load(true);
 }
 
-async function studentAction(b) {
+async function studentAction(b, req) {
   const { meta, players, slips } = b.op === 'quizAnswer' ? await loadForAnswer(String(b.sid || '')) : await load(true);
   if (b.op === 'register') {
     if (!meta.regOpen) return fail('Registrace je zavřená. Požádej dealera.');
@@ -359,7 +360,9 @@ async function studentAction(b) {
   if (b.op === 'tokenLogin') { // v3 §9: one-time login QR from the dealer
     const r = await AC.tokenLogin(b, meta.removed, pinHash);
     invalidate();
-    return r.error ? fail(r.error, { relogin: true }) : ok(r);
+    if (r.error) return fail((await GU.failed(meta, req, players[String(b.sid || '')])) ? GU.TOO_MANY : r.error, { relogin: true });
+    await GU.clear({ id: r.sid }); // v4 guard: a used login link resets the counter (the lock went with the new PIN)
+    return ok(r);
   }
   if (b.op === 'restore') {
     const sid = String(b.sid || '');
@@ -368,7 +371,8 @@ async function studentAction(b) {
     if ((meta.removed || []).includes(sid)) return fail('Přihlas se znovu.', { relogin: true });
     let p = players[sid];
     if (p) {
-      if (p.pin && p.pin !== pinHash(sid, b.pin)) return fail('Špatný PIN.', { relogin: true });
+      if (p.pin && p.pin !== pinHash(sid, b.pin)) return fail((await GU.failed(meta, req, p)) ? GU.TOO_MANY : 'Špatný PIN.', { relogin: true });
+      if (GU.locked(meta, p)) return fail(GU.TOO_MANY, { relogin: true });
       if (!p.pin) { p.pin = pinHash(sid, b.pin); await S.hset('players', sid, p); }
     } else {
       const name = String(b.name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
@@ -396,7 +400,8 @@ async function studentAction(b) {
   if (!p) return fail('Hráč nenalezen. Přihlas se znovu.', { relogin: true });
   if (!/^\d{4}$/.test(String(b.pin || ''))) return fail('PIN musí mít 4 číslice.');
   if (!p.pin) { p.pin = pinHash(p.id, b.pin); await S.hset('players', p.id, p); invalidate(); }
-  else if (p.pin !== pinHash(p.id, b.pin)) return fail('Špatný PIN.', { relogin: true });
+  else if (p.pin !== pinHash(p.id, b.pin)) return fail((await GU.failed(meta, req, p)) ? GU.TOO_MANY : 'Špatný PIN.', { relogin: true });
+  if (GU.locked(meta, p)) return fail(GU.TOO_MANY, { relogin: true });
 
   if (b.op === 'login') return ok({ sid: p.id });
 
@@ -977,6 +982,7 @@ async function dealerAction(b) {
       return ok();
     }
     case 'loginLink': { // v3 §9: one-time login QR for a student who lost the PIN
+      await GU.clear(players[String(b.sid || '')]); // v4 guard: drop the lock (AC.loginLink writes the record)
       const r = await AC.loginLink(players, b.sid);
       invalidate();
       return r.error ? fail(r.error) : ok(r);
@@ -985,6 +991,7 @@ async function dealerAction(b) {
       const p = players[b.sid];
       if (!p) return fail('Hráč nenalezen.');
       p.pin = null;
+      await GU.clear(p); // v4 guard: drop the lock and the failed-try counter
       await S.hset('players', p.id, p);
       invalidate();
       return ok();
@@ -1076,7 +1083,8 @@ export default async function handler(req, res) {
         if (asW) viewer = { role: 'student', p: asW };
         else if (wsid) {
           const p = players[wsid];
-          if (!p || !p.pin || p.pin !== pinHash(p.id, String(req.headers['x-pin'] || ''))) return send(res, 401, { ok: false, error: 'Přihlas se znovu.', relogin: true });
+          if (!p || !p.pin || p.pin !== pinHash(p.id, String(req.headers['x-pin'] || ''))) return send(res, 401, { ok: false, error: p?.pin && (await GU.failed(meta, req, p)) ? GU.TOO_MANY : 'Přihlas se znovu.', relogin: true });
+          if (GU.locked(meta, p)) return send(res, 401, { ok: false, error: GU.TOO_MANY, relogin: true });
           viewer = { role: 'student', p };
         } else if (dealerOk(req)) viewer = { role: 'dealer' };
         else return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
@@ -1089,8 +1097,9 @@ export default async function handler(req, res) {
       const sid = req.headers['x-sid'], pin = req.headers['x-pin'];
       if (sid && pin) {
         const p = players[sid];
-        if (p && p.pin && p.pin === pinHash(p.id, pin)) out.me = meState(meta, p, slips, bd, players, qa, proj);
-        else out.meError = p ? 'pin' : 'unknown';
+        const good = p && p.pin && p.pin === pinHash(p.id, pin);
+        if (good && !GU.locked(meta, p)) out.me = meState(meta, p, slips, bd, players, qa, proj);
+        else out.meError = !p ? 'unknown' : GU.locked(meta, p) || (!good && p.pin && (await GU.failed(meta, req, p))) ? 'locked' : 'pin'; // v4 guard
         if (out.me && F.on(meta, 'wall')) out.me.wallRev = W.rev(meta, p.team); // v3 §4: badge, read from meta only
       }
       const asP = AC.asPlayer(req, players); // v3 §10: dealer preview, GET ?as=<sid> with x-dealer
@@ -1126,7 +1135,7 @@ export default async function handler(req, res) {
       // card / roundTerms exist for both: with a sid it is a student editing their own team
       // restore with a `dump` is the dealer's backup push (before v2 it was routed to the phones' restore and never ran)
       const student = (studentOps.includes(b.op) && !(b.op === 'restore' && b.dump)) || (['card', 'roundTerms', ...W.OPS].includes(b.op) && !!b.sid);
-      if (student) r = await studentAction(b);
+      if (student) r = await GU.once(b, () => studentAction(b, req)); // v4 guard: same sid:rid runs once
       else {
         if (!dealerOk(req)) return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
         r = await serial(() => dealerAction(b));

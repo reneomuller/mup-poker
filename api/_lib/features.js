@@ -9,6 +9,7 @@ export const FEATURE_DEFAULTS = {
   rounds: false, market: false, tranches: false, exit: false,
   wall: true,
   demand: true,
+  guard: true, // v4: PIN brute-force limits (api/_lib/guard.js) + the phone's offline banner / retry queue (public/play-net.js)
 };
 export const OFF = 'Tato funkce je vypnutá.';
 export const REASON_LABELS = { milestone: 'Splněný milník', traction: 'Trakce', team: 'Tým', risk: 'Riziko', market: 'Trh', other: 'Jiné' };

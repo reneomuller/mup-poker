@@ -44,6 +44,7 @@ export async function tokenLogin(b, removed, pinHash) {
     if (!p || !tokenOk(p, b.token)) return { error: LT_FAIL };
     const pin = String(crypto.randomInt(0, 10000)).padStart(4, '0');
     delete p.lt;
+    delete p.lock; // v4 guard: a valid login link always works and ends a PIN lockout
     p.pin = pinHash(p.id, pin);
     await S.hset('players', p.id, p);
     return { sid: p.id, pin, name: p.name, team: p.team };
