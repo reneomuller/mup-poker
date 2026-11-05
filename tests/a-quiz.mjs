@@ -276,16 +276,22 @@ ok((await adv({ auto: true })).ok && (await c.get()).quiz.state === 'board', 'au
 r = await adv({ auto: true });
 ok(!r.ok && (await c.get()).quiz.state === 'board', 'auto refused on the board: ' + r.error);
 ok((await adv()).ok && (await c.get()).quiz.idx === 1, 'board → question 2');
-await Promise.all(S.map((s) => c.spost({ op: 'quizAnswer', sid: s.sid, pin: s.pin, choice: 0 })));
+await Promise.all(S.slice(0, 17).map((s) => c.spost({ op: 'quizAnswer', sid: s.sid, pin: s.pin, choice: 0 })));
 r = await adv({ auto: true });
-ok(r.ok && (await c.get()).quiz.state === 'reveal', 'auto reveal once everyone answered');
+ok(!r.ok && (await c.get()).quiz.state === 'question', '17/18 answered, time left: auto refused');
+await new Promise((res) => setTimeout(res, 6700)); // 5 s question + 1.5 s grace
+r = await adv({ auto: true });
+ok(r.ok && (await c.get()).quiz.state === 'reveal', 'auto reveal once time is up (+1.5 s grace)');
 await adv(); await adv();
 st = await c.get();
 ok(st.quiz.state === 'question' && st.quiz.idx === 2, 'question 3 (no step skipped)');
-await adv(); await adv();
+await Promise.all(S.map((s) => c.spost({ op: 'quizAnswer', sid: s.sid, pin: s.pin, choice: 2 })));
+r = await adv({ auto: true });
+ok(r.ok && (await c.get()).quiz.state === 'reveal', 'auto reveal once everyone answered');
+await adv();
 ok((await c.get()).quiz.state === 'board', 'question 3 → reveal → board');
 ok((await adv()).ok && (await c.get()).quiz.state === 'done', 'board after the last question → done');
 ok(!(await adv()).ok, 'advance refused when done');
 const dva = (await c.get('?view=dealer')).dealer;
-ok(dva.points.filter((e) => e.kind === 'quiz' && e.qi === 1 && e.run === dva.quiz.runId).length === 18, 'advance scores the question');
+ok(dva.points.filter((e) => e.kind === 'quiz' && e.qi === 1 && e.run === dva.quiz.runId).length === 17, 'advance scores the question');
 done('a-quiz');
