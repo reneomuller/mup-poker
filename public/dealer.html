@@ -2,35 +2,159 @@
 <html lang="cs">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#0b2a1e">
-<title>Dealer · Investiční stůl</title>
-<link rel="stylesheet" href="/fonts/fonts.css">
-<link rel="stylesheet" href="/style.css">
-<link rel="stylesheet" href="/play.css">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0B1030">
+<title>Admin · Investiční stůl</title>
+<link rel="stylesheet" href="/fonts/stand-fonts.css">
+<link rel="stylesheet" href="/stand.css">
 <link rel="stylesheet" href="/dealer.css">
 </head>
-<body>
-<main id="app" class="dealer">
-  <section id="dlogin" class="hidden">
-    <div class="hero"><h1>Dealer</h1><p>Investiční stůl · RainbowJet × MUP</p></div>
-    <div class="card"><div class="field"><label class="lbl">Heslo dealera</label><input class="input" id="dpw" type="password"></div>
-      <button class="btn" id="dgo" style="width:100%">Vstoupit</button><div class="err msg" id="derr"></div></div>
-  </section>
-  <section id="dgame" class="hidden">
-    <header class="top"><div><div class="who" data-t="dealer.title">Dealer</div><div class="muted small" id="dsub"></div></div>
-      <div class="links"><a class="btn sm" href="/cms" style="text-decoration:none;margin-right:8px">Upravit texty</a><a href="/table" target="_blank">Stůl ↗</a> · <a href="/play" target="_blank">Hráč ↗</a> · <a href="#" id="ghosthdr">Ghost ↗</a></div></header>
-    <div id="warns"></div>
-    <div class="card" id="ctrl"></div>
-    <div class="card" id="bets"></div>
-    <div class="card" id="qboard"></div>
-    <div class="card" id="rj"></div>
-    <div class="card" id="vals"></div>
-    <div class="card" id="players"></div>
-    <div class="card" id="teams"></div>
-    <div class="card" id="tools"></div>
-  </section>
-</main>
+<body class="s-app adm">
+<section id="dlogin" class="hidden">
+  <div class="login s-card s-hero">
+    <div class="s-label">RainbowJet × MUP</div>
+    <h1 class="s-h1">Admin</h1>
+    <p class="s-muted">Investiční stůl – řízení hry</p>
+    <div class="s-field"><label class="s-label" for="dpw">Heslo dealera</label><input class="s-input" id="dpw" type="password" autocomplete="current-password"></div>
+    <button class="s-btn s-primary s-block" id="dgo">Vstoupit</button>
+    <div class="err" id="derr"></div>
+  </div>
+</section>
+
+<div id="dgame" class="hidden">
+  <header class="hdr">
+    <div class="bar" id="bar">
+      <div class="bar-st">
+        <span class="blk" id="tbBlock"></span>
+        <span class="ph" id="tbPhase"></span>
+        <span class="tm" id="tbTimer" hidden></span>
+      </div>
+      <div class="kpi">
+        <div><b id="tbPlayers">0</b><span id="tbPlayersL">hráčů</span></div>
+        <div><b id="tbBets">0</b><span>investovalo</span></div>
+      </div>
+      <div class="bar-act">
+        <div class="nx"><span class="s-label" id="tbKick">Další krok</span><button class="s-btn s-primary" id="bprimary">…</button></div>
+        <button class="s-btn s-ghost" id="bundo" title="Vrátit poslední krok"><span aria-hidden="true">↶</span><span class="lg">Zpět</span></button>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="Sekce">
+      <div class="brand"><div class="s-label">RainbowJet × MUP</div><div class="bt">Investiční stůl</div><div class="s-gradbar"></div></div>
+      <button data-atab="hra">Hra<span class="tb" data-badge="hra"></span></button>
+      <button data-atab="investice">Investice<span class="tb" data-badge="investice"></span></button>
+      <button data-atab="rj">RJ<span class="tb" data-badge="rj"></span></button>
+      <button data-atab="oceneni">Ocenění<span class="tb" data-badge="oceneni"></span></button>
+      <button data-atab="startupy">Startupy<span class="tb" data-badge="startupy"></span></button>
+      <button data-atab="kviz">Kvíz<span class="tb" data-badge="kviz"></span></button>
+      <button data-atab="body">Body<span class="tb" data-badge="body"></span></button>
+      <button data-atab="hraci">Hráči<span class="tb" data-badge="hraci"></span></button>
+      <button data-atab="funkce">Funkce<span class="tb" data-badge="funkce"></span></button>
+      <button data-atab="data">Data<span class="tb" data-badge="data"></span></button>
+      <button data-atab="texty">Texty<span class="tb" data-badge="texty"></span></button>
+      <div class="navlinks"><a href="/table" target="_blank" rel="noopener">Stůl ↗</a><a href="/play" target="_blank" rel="noopener">Mobil ↗</a><a href="/cms">Texty ↗</a></div>
+    </nav>
+  </header>
+
+  <main class="main">
+    <section class="panel" data-panel="hra" hidden>
+      <div class="cols c-main">
+        <div class="s-card" id="ctrl"></div>
+        <div class="stack">
+          <div class="s-card" id="clockbox"></div>
+          <div class="s-card" id="regbox"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" data-panel="investice" hidden>
+      <div class="cols c-main">
+        <div class="s-card" id="live"></div>
+        <div class="s-card" id="bets"></div>
+      </div>
+      <div class="s-card" id="qboard" hidden></div>
+    </section>
+
+    <section class="panel" data-panel="rj" hidden>
+      <div class="s-card" id="rjfund"></div>
+      <div class="cols c-main">
+        <div class="s-card" id="rj"></div>
+        <div class="s-card" id="tranches" hidden></div>
+      </div>
+    </section>
+
+    <section class="panel" data-panel="oceneni" hidden>
+      <div class="cols c-main">
+        <div class="s-card" id="vals"></div>
+        <div class="s-card" id="drivers" hidden></div>
+      </div>
+      <div class="s-card" id="market" hidden></div>
+      <div class="s-card" id="exit" hidden></div>
+      <p class="offnote" id="ocnote" hidden></p>
+    </section>
+
+    <section class="panel" data-panel="startupy" hidden>
+      <div class="s-card" id="cardsbox" hidden>
+        <div class="ch"><h3>Karty startupů</h3><span class="s-label">one-liner · popis · milníky</span></div>
+        <p class="hint">Karty vidí studenti v mobilu i na plátně. Za každý nově odškrtnutý milník dostane každý člen týmu 300 bodů.</p>
+        <div class="tgrid" id="cards"></div>
+      </div>
+      <div class="cols c-main">
+        <div class="s-card" id="teams"></div>
+        <div class="stack">
+          <div class="s-card" id="rounds" hidden></div>
+          <div class="s-card" id="mdefs" hidden></div>
+        </div>
+      </div>
+      <p class="offnote" id="stnote" hidden></p>
+    </section>
+
+    <section class="panel" data-panel="kviz" hidden>
+      <div class="s-card" id="qzlive"></div>
+      <div class="s-card" id="qzsets" hidden></div>
+    </section>
+
+    <section class="panel" data-panel="body" hidden>
+      <div class="cols c-main">
+        <div class="stack">
+          <div class="s-card" id="ptsadd"></div>
+          <div class="s-card" id="ptstop" hidden></div>
+        </div>
+        <div class="s-card" id="ptsledger" hidden></div>
+      </div>
+    </section>
+
+    <section class="panel" data-panel="hraci" hidden>
+      <div class="s-card" id="players"></div>
+      <div class="cols c-even">
+        <div class="s-card" id="awards" hidden></div>
+        <div class="s-card" id="ghostbox"></div>
+      </div>
+    </section>
+
+    <section class="panel" data-panel="funkce" hidden>
+      <div class="s-card" id="features"></div>
+    </section>
+
+    <section class="panel" data-panel="data" hidden>
+      <div class="s-card" id="archives"></div>
+      <div class="s-card" id="dtables"></div>
+      <div class="cols c-even">
+        <div class="s-card" id="tools"></div>
+        <div class="s-card" id="danger"></div>
+      </div>
+    </section>
+
+    <section class="panel" data-panel="texty" hidden>
+      <div class="s-card s-hero texty">
+        <div class="s-label">Texty a obsah</div>
+        <h2 class="s-h2">Upravit texty na plátně, v mobilech a bankovky</h2>
+        <p class="s-muted">Editor má živý náhled. Změny uvidí všichni do dvou sekund po uložení.</p>
+        <a class="s-btn s-primary" href="/cms">Otevřít editor textů →</a>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="s-toast" id="toast" role="status" aria-live="polite"></div>
 <script src="/common.js"></script>
 <script src="/dealer.js"></script>
 </body>
