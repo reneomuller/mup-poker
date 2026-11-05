@@ -245,7 +245,7 @@
   const closeBetting = () => act('phase', { phase: 'closed' });
   async function doShowdown() {
     const n = S.betCount, m = S.playerCount;
-    if (!confirm(`Spustit showdown? Započítá se ${n} ${pl(n, 'investor', 'investoři', 'investorů')} z ${m}. Kdo neinvestoval, v tomto bloku nic nevloží.`)) return;
+    if (!confirm(`Spustit showdown? ${pl(n, 'Započítá', 'Započítají', 'Započítá')} se ${n} ${pl(n, 'investor', 'investoři', 'investorů')} z\u00a0${m}. Kdo neinvestoval, v tomto bloku nic nevloží.`)) return;
     const r = await act('showdown', {}, 'Showdown proběhl');
     if (r.ok && r.skipped?.length) alert('Neplatné investice (nezapočítány):\n' + r.skipped.map((x) => `${x.name}: ${x.error}`).join('\n'));
   }
