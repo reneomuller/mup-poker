@@ -43,6 +43,7 @@
     const lob = el.querySelector('.qzp-lob');
     if (lob) lob.hidden = true;
     el.classList.remove('qzp-img', 'qzp-hasWhy');
+    delete el.dataset.qpa;
   }
 
   async function pollReady() {
@@ -80,6 +81,10 @@
     if (src) img.alt = q.q || '';
     media.hidden = !src;
     el.classList.toggle('qzp-img', !!src);
+    // long answers next to an image (or above an explanation) get a smaller font so 4 × 80 chars still fit
+    const maxA = Math.max(0, ...(q.a || []).map((x) => String(x).length));
+    const roomy = !src && !(mode === 'reveal' && q.why);
+    el.dataset.qpa = roomy ? '' : maxA > 50 ? 'xl' : maxA > 28 ? 'l' : '';
     // why: only at reveal, under the answers, tied to the correct one by colour and letter
     const why = el.querySelector('.qzp-why');
     const w = mode === 'reveal' && q.why ? q.why : '';

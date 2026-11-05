@@ -35,6 +35,12 @@
 .quiz.qzp-img .qzp-why { grid-row: 3; } .quiz.qzp-img .qz-foot { grid-row: 4; }
 .quiz.qzp-img .qz-main.enter .qzp-media img { animation: qzin .55s cubic-bezier(.2,.8,.2,1) both; }
 
+.quiz[data-qpa="l"] .qz-a { font-size: 2.1rem; }
+.quiz[data-qpa="xl"] .qz-a { font-size: 1.7rem; line-height: 1.15; }
+.quiz[data-qpa="xl"] .qz-l { width: 4.2rem; height: 4.2rem; font-size: 2.4rem; }
+.quiz[data-qpa="xl"] .qz-tile { gap: 1.1rem; padding: .9rem 1.2rem; }
+.quiz[data-qpa="xl"] .qz-n { font-size: 1.6rem; }
+.quiz.qzp-img[data-qpa="xl"][data-state="question"] .qz-play, .quiz.qzp-img[data-qpa="xl"][data-state="reveal"] .qz-play { grid-template-columns: minmax(0, 26rem) minmax(0, 1fr); }
 /* „Proč“ under the answers at reveal, in the correct answer's colour */
 .qzp-why { --qc: #3FCF8E; flex: none; display: flex; align-items: baseline; gap: 1.2rem; padding: 1.1rem 1.6rem; border-radius: 1.2rem; font-size: 2.3rem; line-height: 1.3;
   background: rgba(20,26,68,.9); border: .15rem solid color-mix(in srgb, var(--qc) 60%, transparent); border-left: .7rem solid var(--qc); animation: qzin .6s .5s both; }
