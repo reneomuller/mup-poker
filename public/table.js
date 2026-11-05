@@ -20,6 +20,8 @@
     'table.driver.round': 'Kolo',
     'table.driver.market': 'Trh',
     'table.driver.exit': 'Exit',
+    'table.driver.demand': 'Poptávka',
+    'table.mult.title': 'násobek bloku',
     'table.award.kick': 'Ocenění',
     'table.award.sharpest': 'Nejlepší investor',
     'table.award.analyst': 'Nejlepší analytik',
@@ -90,10 +92,37 @@
     .replace(/(\d) (?=\d{3}(\D|$))/g, '$1\u00a0')
     .replace(/(\d) (?=[%$])/g, '$1\u00a0')
     .replace(/(^|[\s(„])([vkszouaiVKSZOUAI]) /g, '$1$2\u00a0');
+  // v3 live numbers: Vnow / mult / rank / chg from the server, with v2 fallbacks (fixed price: V + money sent this round)
+  const pending = (s) => s.phase === 'betting' || s.phase === 'closed';
+  const vnow = (t) => Number(t.Vnow ?? ((t.V || 0) + (t.live || 0))) || 0;
+  const chgOf = (t) => (t.chg != null ? Number(t.chg) || 0 : t.V ? vnow(t) / t.V - 1 : 0);
+  const mult2 = (m) => '×' + nb((Number(m) || 0).toLocaleString('cs-CZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  const chgTxt = (c) => { const p = Math.round(Math.abs(c) * 1000) / 10; return (c >= 0 ? '▲ ' : '▼ ') + nb(p.toLocaleString('cs-CZ', { maximumFractionDigits: p >= 10 ? 0 : 1 })) + ' %'; };
+  function ranks(s) {
+    const order = [...s.teams].sort((a, b) => vnow(b) - vnow(a));
+    const r = {};
+    order.forEach((t, i) => { r[t.id] = t.rank ?? i + 1; });
+    return r;
+  }
+  // the block's demand multiple: live while pending, remembered / read from the drivers afterwards
+  const multMem = {};
+  function blockMult(s, tid, blk = s.block) {
+    const t = (s.teams || []).find((x) => x.id === tid);
+    if (pending(s) && t && t.mult != null) { (multMem[blk] = multMem[blk] || {})[tid] = Number(t.mult); return Number(t.mult); }
+    const dm = s.demand?.[blk]?.mult?.[tid];
+    if (dm != null) return Number(dm);
+    for (const x of s.drivers?.[tid] || []) {
+      if (x.kind !== 'demand' || (x.block != null && x.block !== blk)) continue;
+      if (x.mult != null) return Number(x.mult);
+      const m = /×\s*([\d]+(?:[,.]\d+)?)/.exec(x.note || x.label || '');
+      if (m) return Number(m[1].replace(',', '.'));
+    }
+    return multMem[blk]?.[tid] ?? null;
+  }
   const team = (s, id) => (s.teams || []).find((t) => t.id === id) || { id, name: '', color: '#888' };
   const on = (s, k) => !!(s.features && s.features[k]);
   const rem = () => Math.min(innerWidth / 100, innerHeight / 56.25);
-  window.TBL = { $, esc, typo, fmtM, pct, num1, mult, nb, setText, setHTML, toggle, fit, tween, team, on, rem, sleep, stage, screens: [], state: () => S };
+  window.TBL = { $, esc, typo, fmtM, pct, num1, mult, mult2, vnow, nb, setText, setHTML, toggle, fit, tween, team, on, rem, sleep, stage, screens: [], state: () => S };
 
   function playUrl() { return location.origin + '/play'; }
   function qrSvg(text) {
@@ -121,6 +150,7 @@
       plate.innerHTML = `<div class="rnd hidden"></div>
         <div class="nm"><span class="star hidden">★</span><span class="dot"></span><span class="tn"></span></div>
         <div class="val tnum">—</div>
+        <div class="vr"><span class="rk"></span><span class="chg hidden"></span><span class="mx hidden"></span></div>
         <div class="cap hidden"><div class="capbar"><i class="cf"></i><i class="cc"></i><i class="cr"></i></div></div><div class="sub"></div>
         <div class="delta"></div><div class="badge"></div>`;
       const spot = document.createElement('div');
@@ -207,20 +237,52 @@
     try {
       const d = s.reveal.delta || {};
       const potPt = center($('pot'));
+      const blk = s.reveal.block || s.block;
       for (const t of s.teams) {
-        const x = d[t.id] || 0;
-        if (!x || !seatEls[t.id]) continue;
-        const sp = stackPt(t.id);
-        const n = Math.max(2, Math.min(12, Math.round(Math.abs(x) / 250000)));
-        if (x > 0) fly(potPt, sp, 'g', n); else fly(sp, potPt, 'k', n);
-        await sleep(820);
-        renderStack(seatEls[t.id].stack, t.cls, t.rj);
-        tween(seatEls[t.id].val, t.V, fmtM, 1100);
-        badge(t.id, sign(x), x < 0 ? 'neg' : '');
+        const x = d[t.id] || 0, m = blockMult(s, t.id, blk);
+        const hasM = m != null && Math.abs(m - 1) > 0.004;
+        if ((!x && !hasM) || !seatEls[t.id]) continue;
+        const e = seatEls[t.id];
+        if (x) {
+          const sp = stackPt(t.id);
+          const n = Math.max(2, Math.min(12, Math.round(Math.abs(x) / 250000)));
+          if (x > 0) fly(potPt, sp, 'g', n); else fly(sp, potPt, 'k', n);
+          await sleep(820);
+        }
+        renderStack(e.stack, t.cls, t.rj);
+        // the number already climbed live during investing: it only settles (no second count-up)
+        tween(e.val, vnow(t), fmtM, 700);
+        celebrate(e, hasM && m < 1);
+        renderVR(s, t, e, true);
+        badge(t.id, hasM ? mult2(m) + (x ? ' · ' + sign(x) : '') : sign(x), (hasM ? m < 1 : x < 0) ? 'neg' : '');
         await sleep(380);
       }
       $('pile').innerHTML = ''; potShown = 0;
     } finally { busy = false; }
+  }
+
+  function celebrate(e, neg) {
+    const v = e.val;
+    v.classList.remove('pop', 'popneg');
+    void v.offsetWidth;
+    v.classList.add(neg ? 'popneg' : 'pop');
+    clearTimeout(v._pop); v._pop = setTimeout(() => v.classList.remove('pop', 'popneg'), 1400);
+  }
+  // rank chip, live change and (after the showdown) the block's multiple
+  function renderVR(s, t, e, showMult) {
+    const P = e.plate, rk = P.querySelector('.rk'), cg = P.querySelector('.chg'), mx = P.querySelector('.mx');
+    const r = (e._ranks || {})[t.id] ?? t.rank;
+    setText(rk, r ? '#' + r : '');
+    toggle(rk, 'hidden', !r);
+    toggle(rk, 'first', r === 1);
+    const c = chgOf(t), showC = Math.abs(c) >= 0.0005;
+    toggle(cg, 'hidden', !showC);
+    if (showC) { setText(cg, chgTxt(c)); toggle(cg, 'down', c < 0); }
+    const settled = !pending(s) && ['showdown', 'rj'].includes(s.phase);
+    const m = settled || showMult ? blockMult(s, t.id, s.reveal?.kind === 'class' ? s.reveal.block || s.block : s.block) : null;
+    const showM = m != null && Math.abs(m - 1) > 0.004;
+    toggle(mx, 'hidden', !showM);
+    if (showM) { setText(mx, mult2(m)); toggle(mx, 'down', m < 1); mx.title = tx('table.mult.title'); }
   }
 
   function rjFace(x) {
@@ -246,7 +308,7 @@
           fly(c, stackPt(t.id), x > 0 ? 'p' : 'k', Math.max(2, Math.min(8, Math.round(Math.abs(x) / 500000))), 0.4);
           await sleep(650);
           renderStack(e.stack, t.cls, t.rj);
-          tween(e.val, t.V, fmtM, 1000);
+          tween(e.val, vnow(t), fmtM, 1000);
           badge(t.id, sign(x), x < 0 ? 'neg' : 'pink');
         }
         await sleep(250);
@@ -258,7 +320,7 @@
     const d = s.reveal.delta || {};
     for (const t of s.teams) {
       if (!seatEls[t.id]) continue;
-      tween(seatEls[t.id].val, t.V, fmtM, 1600);
+      tween(seatEls[t.id].val, vnow(t), fmtM, 1600);
       if (d[t.id]) badge(t.id, sign(d[t.id]), d[t.id] < 0 ? 'neg' : '');
     }
   }
@@ -273,7 +335,7 @@
       fly(from, stackPt(r.team), 'p', Math.max(2, Math.min(8, Math.round((r.amt || 0) / 250000))), 0.4);
       await sleep(900);
       renderStack(e.stack, t.cls, t.rj);
-      tween(e.val, t.V, fmtM, 1000);
+      tween(e.val, vnow(t), fmtM, 1000);
       badge(r.team, '+' + fmtM(r.amt || 0), 'pink');
       renderTranches(s);
     } finally { busy = false; }
@@ -301,7 +363,7 @@
       for (const t of s.teams) {
         if (!seatEls[t.id]) continue;
         const p = fx[t.id];
-        tween(seatEls[t.id].val, t.V, fmtM, 1400);
+        tween(seatEls[t.id].val, vnow(t), fmtM, 1400);
         if (p) badge(t.id, pct(p), p < 0 ? 'neg' : '');
       }
       await sleep(6500);
@@ -417,7 +479,8 @@
 
   // ---------- seats ----------
   function renderSeats(s, animate) {
-    const leader = [...s.teams].sort((a, b) => b.V - a.V)[0]?.id;
+    const leader = [...s.teams].sort((a, b) => vnow(b) - vnow(a))[0]?.id;
+    const rk = ranks(s);
     const cap = on(s, 'captable'), rounds = on(s, 'rounds');
     const rx = rjDelta(s);
     const anyPriced = rounds && Object.values(s.rounds || {}).some((r) => r && r.kind && r.kind !== 'flat');
@@ -437,7 +500,9 @@
         : c ? `${esc(tx('table.cap.founders'))} <b>${pct(c.founders, false)}</b>`
         : esc(inv > 0 ? tx('table.seat.invested', { amount: fmtM(inv) }) : tx('table.seat.valuation')));
       toggle(sub, 'live', !!lv); toggle(sub, 'neg', lv < 0);
-      toggle(P.querySelector('.star'), 'hidden', !(inv > 0 && t.id === leader && s.teams.some((x) => x.V !== t.V)));
+      toggle(P.querySelector('.star'), 'hidden', !((inv > 0 || lv > 0) && t.id === leader && s.teams.some((x) => vnow(x) !== vnow(t))));
+      e._ranks = rk;
+      if (!busy) renderVR(s, t, e, false);
       setText(P.querySelector('.badge'), tx('table.badge'));
       toggle(P, 'presenting', s.phase === 'pitch' && s.presenting === t.id);
       // cap table: founders / class / RJ split under the value
@@ -456,7 +521,7 @@
         toggle(rb, 'hidden', r.kind === 'flat' && !anyPriced);
       }
       if (!busy) {
-        tween(e.val, t.V, fmtM, animate ? 900 : 0);
+        tween(e.val, vnow(t), fmtM, animate ? 900 : 0);
         renderStack(e.stack, Math.max(0, t.cls + lv), t.rj);
       }
       if (e.val._fitT !== e.val._t) { e.val._fitT = e.val._t; fit(e.val, 0.75); }
@@ -534,7 +599,9 @@
   function renderChart(s) {
     const svg = $('chart'), box = svg.parentNode;
     const W = Math.max(200, box.clientWidth), Ht = Math.max(150, box.clientHeight), u = rem();
-    const H = s.history.length ? s.history : [{ label: 'Start', V: {} }];
+    const H0 = s.history.length ? s.history : [{ label: 'Start', V: {} }];
+    const live = pending(s) && s.teams.some((t) => Math.abs(vnow(t) - t.V) >= 1);
+    const H = live ? [...H0, { label: tx('table.board.now'), V: Object.fromEntries(s.teams.map((t) => [t.id, vnow(t)])) }] : H0;
     const key = JSON.stringify([W, Ht, H.map((h) => [h.label, h.V]), s.teams.map((t) => [t.name, t.color])]);
     if (svg._key === key) return;
     svg._key = key;
@@ -613,12 +680,16 @@
   function renderRank(s) {
     const H = s.history || [];
     const prev = H.length > 1 ? H[H.length - 2].V : null;
-    const items = [...s.teams].sort((a, b) => b.V - a.V).map((t) => ({ key: t.id, t }));
+    const items = [...s.teams].sort((a, b) => vnow(b) - vnow(a)).map((t) => ({ key: t.id, t }));
+    const v3 = s.teams.some((t) => t.chg != null || t.Vnow != null) || pending(s);
+    const settled = ['showdown', 'rj'].includes(s.phase);
     keyedList($('rank'), items, 5.6, ({ t }, i) => {
       const p = prev?.[t.id];
-      const ch = p ? ((t.V - p) / p) * 100 : 0;
-      const chs = p && Math.abs(ch) >= 0.05 ? `<small class="${ch >= 0 ? 'up' : 'down'}">${ch >= 0 ? '▲' : '▼'} ${pct(Math.abs(ch), false)}</small>` : `<small class="muted">${esc(tx('table.board.same'))}</small>`;
-      return `<span class="pos">${i + 1}</span><span class="tn"><span class="dot" style="background:${t.color}"></span><span class="nmx">${esc(t.name)}</span></span><span class="tv"><b>${esc(fmtM(t.V))}</b>${chs}</span>`;
+      const ch = v3 ? chgOf(t) * 100 : p ? ((t.V - p) / p) * 100 : 0;
+      const chs = (v3 || p) && Math.abs(ch) >= 0.05 ? `<small class="${ch >= 0 ? 'up' : 'down'}">${ch >= 0 ? '▲' : '▼'} ${pct(Math.abs(ch), false)}</small>` : `<small class="muted">${esc(tx('table.board.same'))}</small>`;
+      const m = pending(s) ? (t.mult ?? null) : settled ? blockMult(s, t.id) : null;
+      const ms = m != null && Math.abs(m - 1) > 0.004 ? `<small class="mx ${m < 1 ? 'down' : ''}">${esc(mult2(m))}</small>` : '';
+      return `<span class="pos">${i + 1}</span><span class="tn"><span class="dot" style="background:${t.color}"></span><span class="nmx">${esc(t.name)}</span></span><span class="tv"><b>${esc(fmtM(vnow(t)))}</b><span class="tvs">${ms}${chs}</span></span>`;
     });
   }
 
@@ -652,13 +723,13 @@
       });
     }
   }
-  addTexts({ 'table.board.noPoints': 'Zatím nikdo nemá body.' });
+  addTexts({ 'table.board.noPoints': 'Zatím nikdo nemá body.', 'table.board.now': 'Teď' });
 
   function renderTicker(s) {
     const show = on(s, 'drivers') && s.drivers && typeof s.drivers === 'object';
     const box = $('ticker');
     const all = [];
-    if (show) for (const [tid, arr] of Object.entries(s.drivers)) for (const d of arr || []) all.push({ ...d, team: d.team || tid });
+    if (show) for (const [tid, arr] of Object.entries(s.drivers)) for (const d of arr || []) if (d.kind !== 'demand' || Math.abs(d.delta || 0) >= 1) all.push({ ...d, team: d.team || tid });
     all.sort((a, b) => (b.ts || 0) - (a.ts || 0));
     const items = all.slice(0, 14);
     toggle(box, 'hidden', !items.length);

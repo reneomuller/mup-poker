@@ -218,3 +218,7 @@
 .ex-val { font-family: var(--serif); font-weight: 700; font-size: 2rem; text-align: right; white-space: nowrap; }
 .ex-ret { font-weight: 800; font-size: 1.7rem; text-align: right; white-space: nowrap; }
 .ex-empty { font-size: 1.8rem; color: var(--muted); }
+/* v3: streak line next to the fastest correct answer */
+.qz-fast { flex-wrap: wrap; row-gap: .3rem; }
+.qz-st { color: #ffcf8a; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.qz-st b { color: var(--cream); }
