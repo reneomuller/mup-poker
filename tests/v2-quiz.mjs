@@ -115,8 +115,11 @@ await main(async () => {
   const scoreOk = S.slice(0, 9).every((s) => { const a = run0?.answers?.[s.sid]; const e = qe.find((x) => x.playerId === s.sid); return a && e && e.amt === quizScore(a.ms, 20) && e.amt >= 500 && e.amt <= 1000; });
   ok(scoreOk, 'score = round(1000 × (1 − 0.5 × ms / (time × 1000))), clamped 500…1000');
   ok(!qe.some((e) => e.playerId === G.sid), 'ghost scores nothing');
-  const fastestSid = S.slice(0, 9).map((s) => [s, run0?.answers?.[s.sid]?.ms ?? 1e9]).sort((a, b) => a[1] - b[1])[0][0];
-  ok(st.quiz.fastest && st.quiz.fastest.name === fastestSid.name && st.quiz.fastest.team === fastestSid.team && typeof st.quiz.fastest.ms === 'number', `fastest correct = ${fastestSid.name} (not the ghost): ${JSON.stringify(st.quiz.fastest)}`);
+  // answers are timed in whole ms, so concurrent answers can tie: any student at the minimum counts as fastest
+  const ms0 = (s) => run0?.answers?.[s.sid]?.ms ?? 1e9;
+  const minMs0 = Math.min(...S.slice(0, 9).map(ms0));
+  const tied0 = S.slice(0, 9).filter((s) => ms0(s) === minMs0);
+  ok(st.quiz.fastest && tied0.some((s) => s.name === st.quiz.fastest.name && s.team === st.quiz.fastest.team) && typeof st.quiz.fastest.ms === 'number', `fastest correct = one of ${tied0.map((s) => s.name).join('/')} (not the ghost): ${JSON.stringify(st.quiz.fastest)}`);
   const mesR = await Promise.all(S.map((s) => c.me(s)));
   ok(mesR.every((m, i) => m.me.quiz.myCorrect === (choice0(i) === null ? (m.me.quiz.myCorrect === null ? null : false) : choice0(i) === 2)), 'myCorrect true/false at reveal');
   ok(mesR.every((m, i) => m.me.quiz.myPoints === (i < 9 ? qe.find((e) => e.playerId === S[i].sid)?.amt : 0) || (i >= 15 && m.me.quiz.myPoints === null)), 'myPoints = points of this question (0 for wrong)');
