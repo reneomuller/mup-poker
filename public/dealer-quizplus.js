@@ -153,7 +153,7 @@
         ...[0, 1, 2, 3].map((k) => (k < x.counts.length ? x.counts[k] : '')), ...[0, 1, 2, 3].map((k) => x.a[k] ?? ''),
       ].map(q).join(';'));
     }
-    const name = `kviz-vysledky-${String(data.title || 'kviz').replace(/[^\wÀ-ſ-]+/g, '-')}-${new Date(data.ts || Date.now()).toISOString().slice(0, 16).replace(/[:T]/g, '-')}.csv`;
+    const name = `kviz-vysledky-${String(data.title || 'kviz').replace(/[^\wÀ-ſ-]+/g, '-')}-${((d) => new Date(d - d.getTimezoneOffset() * 60000))(new Date(data.ts || Date.now())).toISOString().slice(0, 16).replace(/[:T]/g, '-')}.csv`; // local time, not UTC
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' }));
     a.download = name;
