@@ -111,10 +111,14 @@
     document.body.classList.remove('p-ingame');
     const el = $('login');
     el.classList.remove('hidden');
-    const key = JSON.stringify([S.teams, S.players.length, S.regOpen, tab, MUP.cv()]);
-    if (key === loginKey) return;
-    loginKey = key;
     if (!S.regOpen) tab = 'old';
+    // the "new" form doesn't depend on who else is playing, so classmates joining never rebuild it
+    const key = JSON.stringify([S.teams.map((t) => [t.id, t.name]), tab === 'old' ? S.players.map((p) => [p.id, p.name, p.team]) : 0, S.regOpen, tab, MUP.cv()]);
+    if (key === loginKey) return;
+    // never rebuild under someone's fingers (it rebuilds on the next poll after they leave the field)
+    const a = document.activeElement;
+    if (loginKey && a && el.contains(a) && /INPUT|SELECT|TEXTAREA/.test(a.tagName)) return;
+    loginKey = key;
     const keep = { name: $('lname')?.value, team: $('lteam')?.value, who: $('lwho')?.value, pin: $('lpin')?.value };
     const teamOpts = S.teams.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
     const byTeam = S.teams.map((t) => {
