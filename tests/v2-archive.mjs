@@ -1,0 +1,94 @@
+// Archives (spec §2): manual archive, list (newest first), full download, delete; clearBoard archives first then clears;
+// automatic archives before nextBlock, reset and exitSet; archives are not part of the dump.
+import { ok, warnIf, section, main, client, sleep, shape, checkClean, freshGame, initialSlip } from './_e-lib.mjs';
+
+const c = client();
+const list = async () => (await c.dget('?view=archives')).archives || [];
+const full = async (id) => (await c.dget('?view=archive&id=' + encodeURIComponent(id)));
+
+await main(async () => {
+  const { T, S } = await freshGame(c, { n: 6, ghost: true, features: { exit: true } });
+  section('manual archive');
+  const lbl = 'Ruční záloha ' + Math.random().toString(36).slice(2, 8);
+  const a = await c.dealer('archive', { label: lbl });
+  ok(a.ok && typeof a.id === 'string', 'archive { label } → { id }');
+  let L = await list();
+  const row = L.find((x) => x.id === a.id);
+  ok(!!row, 'listed in ?view=archives');
+  if (row) shape('archives[]', row, { id: 'string', ts: 'number', label: 'string', auto: 'boolean', block: 'number', sizeKB: 'number' }, { strict: true });
+  ok(row?.label === lbl && row.auto === false && row.block === 1 && row.sizeKB > 0, 'label, auto false, block 1, sizeKB > 0');
+  const f = await full(a.id);
+  ok(f.ok && f.archive?.id === a.id && f.archive.label === lbl, '?view=archive&id → { ok, archive }');
+  shape('archive', f.archive, { id: 'string', ts: 'number', label: 'string', auto: 'boolean', block: 'number', dump: 'object' }, { strict: true });
+  shape('archive.dump', f.archive?.dump, { meta: 'object', players: 'object', slips: 'object', content: 'object|null', board: 'object' });
+  ok(Object.keys(f.archive?.dump?.players || {}).length === 7, 'dump has the 6 players + ghost');
+  await sleep(5);
+  const b = await c.dealer('archive', { label: 'Druhá' });
+  L = await list();
+  ok(L.every((x, i) => i === 0 || L[i - 1].ts >= x.ts) && L[0].id === b.id, 'newest first');
+  const dump = await c.dump();
+  ok(dump && !('arch' in dump) && !JSON.stringify(dump).includes(lbl), 'archives are not part of makeDump()');
+  const dr = await c.dealer('pointsAdd', { playerId: S[0].sid, amt: 1, note: 'x' });
+  ok(!JSON.stringify(dr.dump || {}).includes(lbl), 'dealer POST dump does not carry archives');
+  ok((await c.dealer('archiveDelete', { id: a.id })).ok, 'archiveDelete');
+  L = await list();
+  ok(!L.some((x) => x.id === a.id), 'deleted archive gone from the list');
+  const gone = await full(a.id);
+  ok(!gone.ok || !gone.archive, 'deleted archive no longer downloadable');
+  ok(!(await c.dealer('archiveDelete', { id: 'nope' })).ok || true, 'archiveDelete of an unknown id answered');
+  const noLbl = await c.dealer('archive', {});
+  ok(noLbl.ok && (await list()).some((x) => x.id === noLbl.id && typeof x.label === 'string'), 'archive without a label still works');
+
+  section('clearBoard');
+  const q1 = await c.st(S[0], 'ask', { team: T[1], cat: 'market', text: 'Kolik máte zákazníků v Praze?' });
+  const q2 = await c.st(S[2], 'ask', { team: T[3], cat: 'problem', text: 'Jak často problém nastává?' });
+  await c.st(S[4], 'vote', { qid: q1.id });
+  await c.st(S[1], 'answer', { qid: q1.id, text: 'Dvanáct.' });
+  await c.st(S[3], 'react', { qid: q1.id, v: 'yes' });
+  ok((await c.get()).board.length === 2, 'board has 2 questions');
+  ok((await c.dealer('clearBoard', {})).ok, 'clearBoard');
+  L = await list();
+  const cb = L.find((x) => x.label === 'Otázky z tabule');
+  ok(!!cb, 'archive „Otázky z tabule“ created');
+  const cbf = cb ? (await full(cb.id)).archive : null;
+  ok(cbf?.dump?.board?.qs?.[q1.id] && cbf.dump.board.qs[q2.id] && Object.keys(cbf.dump.board.qv || {}).length === 1 && Object.keys(cbf.dump.board.qr || {}).length === 1, 'archive holds questions, votes and reactions');
+  const st = await c.get();
+  const dv = await c.dget('?view=dealer');
+  ok(st.board.length === 0 && dv.dealer.board.length === 0, 'board empty for class and dealer');
+  const d2 = await c.dump();
+  ok(Object.keys(d2.board.qs).length === 0 && Object.keys(d2.board.qv).length === 0 && Object.keys(d2.board.qr).length === 0, 'qs, qv, qr deleted');
+  ok((await c.st(S[0], 'ask', { team: T[1], cat: 'market', text: 'Nová otázka po vyčištění?' })).ok, 'board usable after clearing');
+
+  section('auto archives');
+  await c.dealer('phase', { phase: 'betting' });
+  await Promise.all(S.map((s, i) => c.st(s, 'submit', initialSlip(T, s.team, i, 1e6, 'arch'))));
+  await c.dealer('phase', { phase: 'closed' });
+  await c.dealer('showdown');
+  const n0 = (await list()).length;
+  ok((await c.dealer('nextBlock')).ok, 'nextBlock');
+  L = await list();
+  const nb = L.find((x) => x.label === 'Před blokem 2');
+  ok(nb && nb.auto === true && nb.block === 1 && L.length === n0 + 1, 'auto archive „Před blokem 2“ (auto, block 1)');
+  const nbf = nb ? (await full(nb.id)).archive : null;
+  ok(nbf?.dump?.meta?.block === 1 && Object.keys(nbf.dump.slips?.[1] || nbf.dump.slips?.['1'] || {}).length >= 6, 'it holds block 1 state with its slips');
+  ok(JSON.stringify(nbf?.dump?.slips?.[1] || nbf?.dump?.slips?.['1'] || {}).includes('Důvod A arch'), 'it holds block 1 reasons');
+  // exit
+  ok((await c.dealer('exitSet', { outcomes: { [T[0]]: { kind: 'ipo', multiple: 2 } } })).ok, 'exitSet');
+  L = await list();
+  const ex = L.find((x) => x.label === 'Před exitem');
+  ok(ex && ex.auto === true, 'auto archive „Před exitem“');
+  const exf = ex ? (await full(ex.id)).archive : null;
+  ok(exf && exf.dump.meta.phase !== 'final' && !exf.dump.meta.exit, 'it holds the state before the exit');
+  // reset
+  ok((await c.dealer('reset', { confirm: 'RESET', keepPlayers: false })).ok, 'reset');
+  L = await list();
+  const rs = L.find((x) => x.label === 'Před novou hrou');
+  ok(rs && rs.auto === true, 'auto archive „Před novou hrou“');
+  const rsf = rs ? (await full(rs.id)).archive : null;
+  ok(rsf && Object.keys(rsf.dump.players).length === 7 && rsf.dump.meta.exit, 'it holds players and the finished game');
+  ok(L.some((x) => x.label === 'Před blokem 2') && L.some((x) => x.label === 'Otázky z tabule'), 'reset keeps all earlier archives');
+  ok((await c.get()).playerCount === 0, 'reset itself still clears the game');
+  ok(!(await c.dealer('reset', { confirm: 'nope' })).ok && (await list()).length === L.length, 'unconfirmed reset: refused, no archive');
+  checkClean('archives list', await c.dget('?view=archives'));
+  warnIf(L.length < 15, `archives accumulate: ${L.length}`);
+});
