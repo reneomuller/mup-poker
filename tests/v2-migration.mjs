@@ -108,7 +108,7 @@ await main(async () => {
   ok(st.content?.texts?.['play.login.title'] === 'Investiční stůl – test', 'CMS texts kept');
   ok(st.board?.some((q) => q.id === q1.id && q.answer?.text === 'Zatím 12 pilotních.'), 'question board data kept');
   checkClean('public state after migration', st);
-  shape('features', st.features, Object.fromEntries(Object.keys(FEATURE_DEFAULTS).map((k) => [k, 'boolean'])), { strict: true });
+  shape('features', st.features, Object.fromEntries(Object.entries(FEATURE_DEFAULTS).map(([k, v]) => [k, typeof v])), { strict: true });
   ok(Object.entries(FEATURE_DEFAULTS).every(([k, v]) => st.features?.[k] === v), 'feature defaults applied to the old meta');
   ok(JSON.stringify(st.reasonLabels) === JSON.stringify(REASON_LABELS), 'reasonLabels exported');
   ok(Array.isArray(st.milestoneDefs) && MILESTONES.every(([k, l, b]) => st.milestoneDefs.some((d) => d.key === k && d.label === l && d.block === b)) && st.milestoneDefs.length === 9, 'default milestoneDefs seeded');

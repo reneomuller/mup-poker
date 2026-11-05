@@ -8,6 +8,7 @@ import * as E from './_lib/economy.js';
 import * as A from './_lib/archive.js';
 import * as W from './_lib/wall.js';
 import * as D from './_lib/demand.js';
+import * as TP from './_lib/tape.js';
 import * as AC from './_lib/access.js';
 
 // Dealer is open (no password) unless DEALER_LOCK=1 and DEALER_PASSWORD are set in Vercel.
@@ -170,6 +171,7 @@ function publicState(meta, players, slips, bd, tx = {}, qa = {}, proj = D.projec
   if (F.on(meta, 'exit') && meta.exit) v2.exit = E.publicExit(meta, players);
   if (F.on(meta, 'points')) v2.points = F.publicPoints(meta, players);
   v2.demand = D.publicDemand(meta);
+  Object.assign(v2, TP.publicTape(meta, slips, players));
   return {
     ...v2,
     now: Date.now(), teams, block: meta.block, maxBlock: G.CFG.MAX_BLOCK, phase: meta.phase,
@@ -588,7 +590,7 @@ async function dealerAction(b) {
   switch (b.op) {
     // ---------- v2 ----------
     case 'features': {
-      for (const [k, v] of Object.entries(b.set || {})) if (k in F.FEATURE_DEFAULTS) meta.features[k] = !!v;
+      for (const [k, v] of Object.entries(b.set || {})) if (k in F.FEATURE_DEFAULTS) meta.features[k] = k === 'tapeNames' ? TP.flagValue(v) : !!v;
       await save();
       return ok({ features: meta.features });
     }

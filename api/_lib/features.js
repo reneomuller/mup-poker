@@ -9,6 +9,7 @@ export const FEATURE_DEFAULTS = {
   rounds: false, market: false, tranches: false, exit: false,
   wall: true,
   demand: true,
+  tape: true, tapeNames: 'initials', // v4 market tape on the projector; tapeNames: 'initials' | 'first' | 'off'
 };
 export const OFF = 'Tato funkce je vypnutá.';
 export const REASON_LABELS = { milestone: 'Splněný milník', traction: 'Trakce', team: 'Tým', risk: 'Riziko', market: 'Trh', other: 'Jiné' };
