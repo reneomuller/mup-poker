@@ -34,6 +34,7 @@ html.rc-open, html.rc-open body { overflow: hidden; }
 .rc-bar i.on::after { content: ''; position: absolute; inset: 0; background: var(--s-grad); transform-origin: left; animation: rc-fill .6s var(--s-ease) both; }
 @keyframes rc-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .rc-x { position: absolute; z-index: 4; top: calc(26px + env(safe-area-inset-top, 0px)); right: 10px; width: 44px; height: 44px; border: 0; border-radius: 50%; background: rgba(11, 16, 48, .45); display: grid; place-items: center; cursor: pointer; }
+body:has(.pn-bar:not([hidden])) .rc-x { top: calc(54px + env(safe-area-inset-top, 0px)); } /* review: the guard's offline banner (z 96) covered the close button */
 .rc-x svg, .rc-nav svg { width: 22px; height: 22px; fill: none; stroke: var(--s-text); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .rc-x:focus-visible, .rc-nav:focus-visible, .rc .s-btn:focus-visible { outline: 3px solid var(--s-label); outline-offset: 2px; }
 .rc-nav { display: none; }
