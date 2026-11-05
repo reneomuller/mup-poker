@@ -41,6 +41,8 @@ await main(async () => {
   const rsA = await c.post({ op: 'restore', sid: A.sid, pin: A.pin, name: A.name, team: A.team });
   ok(!rsA.ok && rsA.error === TOO_MANY, 'locked: restore refused');
   ok((await login(c, S[1])).ok && !!(await c.me(S[1])).me, 'another player is not affected');
+  const dv = await c.dget('?view=dealer');
+  ok(dv.dealer?.rows?.find((r) => r.id === A.sid)?.locked === true && !dv.dealer.rows.find((r) => r.id === S[1].sid)?.locked, 'dealer view marks the locked player (and only that one)');
   const pubRaw = (await c.get())._raw;
   ok(!/"lock"\s*:/.test(pubRaw), 'the lock never shows in the public state');
 
@@ -109,7 +111,7 @@ await main(async () => {
   for (let i = 0; i < 12; i++) fr.push(await login(c, F, bad(F.pin), xf('10.5.0.1')));
   ok(fr.every((r) => r.error === WRONG), 'guard off: 12 wrong PINs are all „Špatný PIN.“');
   ok((await login(c, F)).ok, 'guard off: the right PIN works');
-  ok((await login(c, A, A.pin)).ok, 'guard off: an earlier lock is ignored');
+  ok((await login(c, V)).ok, 'guard off: an earlier lock (V) is ignored');
   await c.dealer('features', { set: { guard: true } });
 
   section('rid: the same request id runs once');

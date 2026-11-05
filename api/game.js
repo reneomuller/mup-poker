@@ -250,7 +250,7 @@ function callList(meta, players, slips) {
 
 function dealerState(meta, players, slips, bd, tx = {}, qa = {}) {
   const rows = Object.values(players).filter((p) => !p.ghost).map((p) => ({
-    id: p.id, name: p.name, team: p.team, hasPin: !!p.pin,
+    id: p.id, name: p.name, team: p.team, hasPin: !!p.pin, ...(GU.locked(meta, p) ? { locked: true } : {}), // v4 guard
     portfolio: r0(G.portfolio(meta, p.id)), holdings: G.hasHoldings(meta, p.id), slip: slips[p.id] || null,
   }));
   const st = G.stakes(meta, G.RJ);
