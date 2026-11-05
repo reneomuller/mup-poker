@@ -887,6 +887,7 @@
     const invN = m?.investorsNow ?? me.myTeamCap?.investors ?? t.cap?.investors;
     const mx = m?.mult ?? t.mult;
     const live = pendingLive();
+    const mxs = live ? mx : (m?.flows || []).filter((f) => f.settled && f.mult != null).sort((a, b) => b.block - a.block)[0]?.mult;
     const chgP = chg != null ? chg * 100 : null;
     let h = `<div class="s-card p-card p-tm" style="--tc:${esc(t.color)}">
       <div class="p-tm-h"><span class="p-su-ic">${esc(initials(t.name))}</span><div class="p-tm-n"><div class="s-label">Tvůj tým</div><h2 class="s-h2">${esc(m?.name || t.name)}</h2></div>
@@ -896,7 +897,7 @@
       <div class="p-stats p-stats-3">
         <div class="s-stat p-stat"><span class="s-label">Zakladatelé</span><span class="s-v">${founders != null ? esc(pct(founders)) : '–'}</span></div>
         <div class="s-stat p-stat"><span class="s-label">Investoři</span><span class="s-v">${invN != null ? esc(num(invN)) : '–'}</span></div>
-        <div class="s-stat p-stat"><span class="s-label">Poptávka</span><span class="s-v ${mx > 1 ? 's-up' : mx < 1 ? 's-down' : ''}">${mx != null && live ? '×' + esc(num(mx, 2)) : '–'}</span></div>
+        <div class="s-stat p-stat"><span class="s-label">${live ? 'Poptávka teď' : 'Poptávka'}</span><span class="s-v ${mxs > 1 ? 's-up' : mxs < 1 ? 's-down' : ''}">${mxs != null ? '×' + esc(num(mxs, 2)) : '–'}</span></div>
       </div>
       ${m?.history ? valChart(m.history) : ''}
     </div>`;
