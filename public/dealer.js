@@ -34,6 +34,21 @@
   const tlabel = (id) => `<span class="tl">${dot(team(id).color)}<span>${tname(id)}</span></span>`;
   const num = (v) => Number(String(v).replace(',', '.')) || 0;
   const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  // v3 live numbers (fall back to v2 fields until the server sends them)
+  const vNow = (t) => (t && Number.isFinite(t.Vnow) ? t.Vnow : t?.V || 0);
+  const pendingNow = () => !!(S && D && ['betting', 'closed'].includes(S.phase) && !(D.settled || {})[S.block + 'c']);
+  const multTxt = (m) => '×' + nb((Number(m) || 0).toLocaleString('cs-CZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  const rankOf = (t) => {
+    if (Number.isFinite(t.rank)) return t.rank;
+    return 1 + S.teams.filter((x) => vNow(x) > vNow(t)).length;
+  };
+  const chgTxt = (c) => (Number.isFinite(c) && Math.abs(c) >= 0.0005 ? `<span class="${c > 0 ? 's-up' : 's-down'}">${c > 0 ? '▲' : '▼'}\u00a0${esc(pct(Math.abs(c) * 100, 0))}</span>` : '');
+  const demandOf = (blk) => { const m = (D && (D.demand || D.meta?.demand)) || (S && (S.demand || S.meta?.demand)) || null; return (m && m[blk]) || null; };
+  const liveHTML = (t, opt = {}) => {
+    const m = Number(t.mult), live = pendingNow();
+    return `<span class="lv${live ? ' on' : ''}"><b>${esc(fmtM(vNow(t)))}</b>${live && Number.isFinite(m) ? `<span class="lm" title="Živý násobek poptávky v tomto bloku">${esc(multTxt(m))}</span>` : ''}${opt.rank === false ? '' : `<span class="lr" title="Pořadí podle ocenění">#${rankOf(t)}</span>`}${chgTxt(t.chg)}</span>`;
+  };
+  const liveDeps = () => (S ? S.teams.map((t) => [t.id, t.V, t.Vnow, t.mult, t.rank, t.chg]) : []);
   const byTeamName = (a, b) => team(a.team).name.localeCompare(team(b.team).name, 'cs') || String(a.name).localeCompare(String(b.name), 'cs');
 
   function download(name, text, type = 'application/json') {
@@ -51,7 +66,7 @@
   const PH = { lobby: 'Lobby', pitch: 'Pitch', betting: 'Investování', closed: 'Investování zavřeno', showdown: 'Showdown', rj: 'Smart money odhaleno', final: 'Demo Day' };
   const REASONS = { milestone: 'Splněný milník', traction: 'Trakce', team: 'Tým', risk: 'Riziko', market: 'Trh', other: 'Jiné' };
   const reasonLabels = () => ({ ...REASONS, ...((S && S.reasonLabels) || {}) });
-  const DRK = { class: 'Třída', rj: 'RJ', revalue: 'Přecenění', round: 'Kolo', market: 'Trh', exit: 'Exit' };
+  const DRK = { class: 'Třída', rj: 'RJ', revalue: 'Přecenění', round: 'Kolo', market: 'Trh', exit: 'Exit', demand: 'Poptávka' };
   const AWK = { sharpest: 'Nejlepší investor', analyst: 'Nejlepší analytik', contrarian: 'Proti proudu', custom: 'Vlastní ocenění' };
   const EXK = { acquired: 'Akvizice', ipo: 'IPO', hold: 'Bez exitu', writeoff: 'Odpis' };
   const RK = { up: 'Up round', flat: 'Flat round', down: 'Down round' };
@@ -66,6 +81,8 @@
     ['market', 'Tržní karty', 'Události na trhu, které posunou ocenění vybraných týmů.'],
     ['tranches', 'Tranše RJ', 'RainbowJet slíbí peníze, které uvolní až po splnění podmínky.'],
     ['exit', 'Exit', 'Finále: akvizice, IPO nebo odpis a konečné pořadí investorů.'],
+    ['demand', 'Cena podle poptávky', 'Jako na burze: po showdownu se cena startupu změní podle toho, kolik peněz přilákal oproti ostatním.'],
+    ['wall', 'Nástěnky týmů', 'Každý tým má soukromou nástěnku s\u00a0otázkami a úkoly od vás i od svých členů.'],
   ];
   const featKnown = () => !!(S && S.features && typeof S.features === 'object');
   const F = (k) => !!(S && S.features && S.features[k]);
@@ -175,7 +192,7 @@
   $('dpw').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('dgo').click(); });
 
   // ---------- tabs ----------
-  const TABS = ['hra', 'investice', 'rj', 'oceneni', 'startupy', 'kviz', 'body', 'hraci', 'funkce', 'data', 'texty'];
+  const TABS = ['hra', 'investice', 'rj', 'oceneni', 'startupy', 'walls', 'kviz', 'body', 'hraci', 'funkce', 'data', 'texty'];
   let tab = TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'hra';
   function setTab(k) {
     if (!TABS.includes(k)) return;
@@ -187,6 +204,7 @@
     const strip = $('tabs'), btn = strip.querySelector(`[data-atab="${k}"]`);
     if (btn && strip.scrollWidth > strip.clientWidth) strip.scrollTo({ left: btn.offsetLeft - 40, behavior: 'smooth' });
     if (changed) window.scrollTo(0, 0);
+    if (k !== 'walls') unmountWall();
     if (S) renderPanel();
     if (['hraci', 'body', 'data'].includes(k)) loadData();
     if (k === 'data') loadArchives();
@@ -294,6 +312,7 @@
     badge('body', featKnown() && !F('points') ? 'vyp.' : '', 'dim');
     badge('hraci', String(s.playerCount));
     badge('rj', D.settled[s.block + 'r'] ? '✓' : D.rj?.slip?.submitted ? 'uloženo' : '', 'dim');
+    { const n = wallUnreadTotal(); badge('walls', featKnown() && !F('wall') ? 'vyp.' : n ? String(n) : '', featKnown() && !F('wall') ? 'dim' : n ? 'live' : ''); }
     tickClock();
   }
   function tickClock() {
@@ -438,7 +457,8 @@
   function renderLive() {
     const rows = D.rows || [];
     const sc = !!D.settled[S.block + 'c'];
-    const el = gate('live', [S.block, S.phase, sc, S.teams.map((t) => [t.id, t.name, t.color, t.live]), rows.map((r) => [r.id, r.name, r.team, !!r.slip?.submitted, r.slip?.ts])]);
+    const dem = sc ? demandOf(S.block) : null;
+    const el = gate('live', [S.block, S.phase, sc, S.teams.map((t) => [t.id, t.name, t.color, t.live]), liveDeps(), dem, rows.map((r) => [r.id, r.name, r.team, !!r.slip?.submitted, r.slip?.ts])]);
     if (!el) return;
     const agg = {};
     for (const t of S.teams) agg[t.id] = { in: 0, out: 0, n: 0 };
@@ -458,9 +478,10 @@
         return `<div class="fb"><div class="fbh">${tlabel(t.id)}<b class="${net > 0 ? 's-up' : net < 0 ? 's-down' : ''}">${net ? sgnM(net) : '0 $'}</b></div>
           <div class="fbbar"><i style="width:${(a.in / max) * 100}%;background:${esc(t.color)}"></i></div>
           ${a.out ? `<div class="fbbar out"><i style="width:${(a.out / max) * 100}%"></i></div>` : ''}
-          <div class="fbm">${a.in ? `+${fmtM(a.in)} od ${a.n} ${pl(a.n, 'investora', 'investorů', 'investorů')}` : 'zatím nic'}${a.out ? ` · −${fmtM(a.out)} vybráno` : ''}</div></div>`;
+          <div class="fbm">${a.in ? `+${fmtM(a.in)} od ${a.n} ${pl(a.n, 'investora', 'investorů', 'investorů')}` : 'zatím nic'}${a.out ? ` · −${fmtM(a.out)} vybráno` : ''}</div>
+          <div class="fbv"><span class="s-label">${pendingNow() ? 'ocenění živě' : 'ocenění'}</span>${liveHTML(t)}${dem && dem.mult && Number.isFinite(Number(dem.mult[t.id])) ? `<span class="dm" title="Násobek poptávky v bloku ${S.block}">poptávka ${esc(multTxt(dem.mult[t.id]))}</span>` : ''}</div></div>`;
       }).join('')}</div>
-      <div class="fbt">Celkem vloženo <b>${fmtM(totIn)}</b></div>
+      <div class="fbt">Celkem vloženo <b>${fmtM(totIn)}</b>${pendingNow() && F('demand') ? ' · ceny se po showdownu přepočítají podle poptávky (živý odhad)' : ''}</div>
       <div class="sep"></div>
       <div class="lab">${missing.length ? `Ještě neinvestovali (${missing.length})` : 'Všichni odeslali ✓'}</div>
       <div class="chips">${missing.map((r) => `<span class="nchip">${dot(team(r.team).color)}${esc(r.name)}</span>`).join('')}</div>`;
@@ -669,14 +690,14 @@
   let vReason = {};
   function renderVals() {
     const locked = ['betting', 'closed'].includes(S.phase);
-    const el = gate('vals', [S.teams.map((t) => [t.id, t.name, t.color, t.V, t.cls, t.rj, t.cap]), S.phase, S.reasonLabels, F('captable')]);
+    const el = gate('vals', [S.teams.map((t) => [t.id, t.name, t.color, t.V, t.cls, t.rj, t.cap]), liveDeps(), S.phase, S.reasonLabels, F('captable')]);
     if (!el) return;
     vReason = {};
     const RL = reasonLabels();
     el.innerHTML = `<div class="ch"><h3>${E('dealer.sec.vals')}</h3>${locked ? '<span class="s-badge s-warn">během investování nelze</span>' : ''}</div>
       <p class="hint">Nové ocenění zadejte v milionech $ (např. 14,5) nebo klikněte na procenta. Zvolte důvod, ten uvidí všichni. Zprávu uvidí jen členové týmu v mobilu; poslat jde i samotná zpráva.</p>
       ${S.teams.map((t) => `<div class="vblock" data-t="${t.id}">
-        <div class="vrow"><div>${tlabel(t.id)}<div class="meta">teď <b>${esc(fmtM(t.V))}</b> · třída ${esc(fmtM(t.cls))} · RJ ${esc(fmtM(t.rj))}${F('captable') && t.cap ? ` · zakladatelé ${esc(pct(t.cap.founders))}` : ''}</div></div>
+        <div class="vrow"><div>${tlabel(t.id)}<div class="meta">teď <b>${esc(fmtM(t.V))}</b>${pendingNow() ? ` · živě ${liveHTML(t)}` : ` · #${rankOf(t)}`} · třída ${esc(fmtM(t.cls))} · RJ ${esc(fmtM(t.rj))}${F('captable') && t.cap ? ` · zakladatelé ${esc(pct(t.cap.founders))}` : ''}</div></div>
           <div class="vin"><input class="s-input sm vv" inputmode="decimal" placeholder="${esc(mil(t.V))}" aria-label="Nové ocenění ${tname(t.id)} v mil. $"><span class="u">mil. $</span></div></div>
         <div class="vtools">${[-25, -10, 10, 25, 50].map((p) => `<button class="pq" data-p="${p}">${p > 0 ? '+' : '−'}${Math.abs(p)} %</button>`).join('')}<span class="vsep"></span>${Object.entries(RL).map(([k, l]) => `<button class="s-chip rc" data-r="${k}">${esc(l)}</button>`).join('')}</div>
         <textarea class="s-input sm vw" rows="1" placeholder="Zpráva pro ${tname(t.id)}: proč se ocenění hýbe, co zlepšit…"></textarea></div>`).join('')}
@@ -871,6 +892,17 @@
       redraw('teams');
       act('startValuation', { V: v }, 'Výchozí ocenění nastaveno');
     };
+  }
+
+  function renderStLive() {
+    const dem = D.settled[S.block + 'c'] ? demandOf(S.block) : null;
+    const el = gate('stlive', [liveDeps(), S.teams.map((t) => [t.id, t.name, t.color]), S.phase, S.block, dem, pendingNow()]);
+    if (!el) return;
+    const live = pendingNow();
+    const list = [...S.teams].sort((a, b) => rankOf(a) - rankOf(b) || vNow(b) - vNow(a));
+    el.innerHTML = `<div class="ch"><h3>Ocenění startupů</h3><span class="s-badge ${live ? 's-ok' : ''}">${live ? 'živě během investování' : dem ? `po showdownu bloku ${S.block}` : `blok ${S.block}`}</span></div>
+      ${live && F('demand') ? '<p class="hint">Živý odhad: cena se mění podle poptávky v\u00a0tomto bloku. Po showdownu bude stejná.</p>' : ''}
+      <div class="lboard">${list.map((t) => `<div class="lbr"><span class="lbn">#${rankOf(t)}</span>${tlabel(t.id)}${liveHTML(t, { rank: false })}${dem && dem.mult && Number.isFinite(Number(dem.mult[t.id])) ? `<span class="dm">poptávka ${esc(multTxt(dem.mult[t.id]))}</span>` : ''}</div>`).join('')}</div>`;
   }
 
   function renderCards() {
@@ -1501,13 +1533,104 @@
     $('wipe').onclick = () => prompt('Napište RESET pro smazání všeho:') === 'RESET' && act('reset', { confirm: 'RESET', keepPlayers: false }, 'Smazáno');
   }
 
+  // ---------- Nástěnky ----------
+  let wallW = null, wallTeam = store.get('mup.wallTeam') || 'all', wallSig = '';
+  const wallRevs = () => (D && (D.wallRev || D.meta?.wallRev)) || (S && S.meta?.wallRev) || (S && S.wallRev && typeof S.wallRev === 'object' ? S.wallRev : null) || null;
+  const wallSeen = (() => { try { return JSON.parse(store.get('mup.wallSeen') || '{}') || {}; } catch { return {}; } })();
+  const saveSeen = () => store.set('mup.wallSeen', JSON.stringify(wallSeen));
+  const wallUnread = (id) => { const r = wallRevs(); if (!r) return 0; return Math.max(0, (Number(r[id]) || 0) - (Number(wallSeen[id]) || 0)); };
+  const wallUnreadTotal = () => (S && wallRevs() ? S.teams.reduce((a, t) => a + wallUnread(t.id), 0) : 0);
+  function markSeen(ids) {
+    const r = wallRevs();
+    if (!r) return;
+    for (const id of ids) if (r[id] != null) wallSeen[id] = Number(r[id]) || 0;
+    saveSeen();
+    renderWallChips();
+    if (S) renderTop();
+  }
+  let seenNext = new Set(); // teams the dealer just wrote to: their own write is not "unread"
+  const pickTeam = (b) => (b && b.team) || (wallTeam !== 'all' ? wallTeam : undefined);
+  async function wcall(op, body) {
+    const r = await post({ op, ...body }, H());
+    if (!r.ok) { const e = new Error(r.error || 'Něco se nepovedlo.'); e.res = r; throw e; }
+    if (body.all) S.teams.forEach((t) => seenNext.add(t.id)); else if (body.team) seenNext.add(body.team);
+    return r;
+  }
+  const wallApi = {
+    async list(teamId) {
+      const tid = teamId || wallTeam;
+      const j = await get(H(), '?view=wall&team=' + encodeURIComponent(tid));
+      if (!j || j.ok === false) throw new Error((j && j.error) || 'Nástěnku se nepodařilo načíst.');
+      markSeen(tid === 'all' ? S.teams.map((t) => t.id) : [tid]);
+      if (tid === 'all') return { walls: j.walls || {} };
+      return j.stickers || [];
+    },
+    post: (b = {}) => wcall('wallPost', b.all ? { all: true, kind: b.kind, text: b.text } : { team: pickTeam(b), kind: b.kind, text: b.text }),
+    reply: (b = {}) => wcall('wallReply', { team: pickTeam(b), id: b.id, text: b.text }),
+    done: (b = {}) => wcall('wallDone', { team: pickTeam(b), id: b.id, done: !!b.done }),
+    del: (b = {}) => wcall('wallDelete', { team: pickTeam(b), id: b.id, ...(b.reply ? { reply: b.reply } : {}) }),
+  };
+  function unmountWall() {
+    if (!wallW) return;
+    try { wallW.destroy(); } catch (e) { console.warn(e); }
+    wallW = null;
+  }
+  function renderWallChips() {
+    const box = $('wchips');
+    if (!box || !S) return;
+    const chips = [{ id: 'all', name: 'Všechny týmy', color: '' }, ...S.teams];
+    const sig = JSON.stringify([wallTeam, chips.map((t) => [t.id, t.name, t.color, t.id === 'all' ? wallUnreadTotal() : wallUnread(t.id)])]);
+    if (sig === wallSig) return;
+    wallSig = sig;
+    box.innerHTML = chips.map((t) => {
+      const n = t.id === 'all' ? 0 : wallUnread(t.id);
+      return `<button class="wchip${t.id === wallTeam ? ' on' : ''}" data-wteam="${esc(t.id)}" role="tab" aria-selected="${t.id === wallTeam}"${t.color ? ` style="--tc:${esc(t.color)}"` : ''}>${t.color ? dot(t.color) : '<span class="wall-ic" aria-hidden="true">▦</span>'}<span>${esc(t.name)}</span>${n ? `<span class="wn" title="Nové od posledního otevření">${n}</span>` : ''}</button>`;
+    }).join('');
+    all(box, '[data-wteam]').forEach((b) => (b.onclick = () => {
+      wallTeam = b.dataset.wteam;
+      store.set('mup.wallTeam', wallTeam);
+      wallSig = '';
+      renderWallChips();
+      if (wallW) { try { wallW.setTeam(wallTeam); } catch (e) { console.warn(e); } }
+    }));
+  }
+  function renderWalls() {
+    if (seenNext.size) { const ids = [...seenNext]; seenNext = new Set(); markSeen(ids); }
+    if (wallTeam !== 'all' && !S.teams.some((t) => t.id === wallTeam)) wallTeam = 'all';
+    const off = featKnown() && !F('wall');
+    const note = $('wnote');
+    note.hidden = !off;
+    if (off) {
+      if (!note.dataset.on) { note.innerHTML = offCard('wall', 'Týmy teď nástěnku nevidí. Zapnout ji můžete tady nebo v záložce Funkce.'); note.dataset.on = '1'; }
+    } else note.dataset.on = '';
+    $('wallbox').hidden = off;
+    if (off) { unmountWall(); return; }
+    const r = wallRevs();
+    $('wallsum').textContent = r ? (wallUnreadTotal() ? `nové: ${wallUnreadTotal()}` : 'vše přečteno') : '';
+    renderWallChips();
+    const mount = $('wmount');
+    if (wallW || !mount) return;
+    if (!window.MupWall || typeof window.MupWall.mount !== 'function') {
+      if (!mount.dataset.miss) { mount.innerHTML = '<div class="wmiss">Nástěnky se nenačetly (chybí <code>/wall.js</code>). Obnovte stránku za chvíli.</div>'; mount.dataset.miss = '1'; }
+      return;
+    }
+    mount.innerHTML = ''; mount.dataset.miss = '';
+    try {
+      wallW = window.MupWall.mount(mount, {
+        role: 'dealer', teams: S.teams.map((t) => ({ id: t.id, name: t.name, color: t.color })), team: wallTeam,
+        api: wallApi, canSendAll: true, pollMs: 4000,
+      });
+    } catch (e) { console.error('MupWall.mount', e); wallW = null; }
+  }
+
   // ---------- panels ----------
   const PANELS = {
     hra: [renderFlow, renderClock, renderReg],
     investice: [renderLive, renderBets, renderQBoard],
     rj: [renderFund, renderRJ, renderTranches],
     oceneni: [renderVals, renderDrivers, renderMarket, renderExit, renderOcNote],
-    startupy: [renderCards, renderTeams, renderRounds, renderMdefs, renderStNote],
+    walls: [renderWalls],
+    startupy: [renderStLive, renderCards, renderTeams, renderRounds, renderMdefs, renderStNote],
     kviz: [renderQuizLive, renderQuizSets],
     body: [renderPointsAdd, renderPointsTop, renderLedger],
     hraci: [renderPlayers, renderAwards, renderGhost],

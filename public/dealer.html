@@ -7,6 +7,7 @@
 <title>Admin · Investiční stůl</title>
 <link rel="stylesheet" href="/fonts/stand-fonts.css">
 <link rel="stylesheet" href="/stand.css">
+<link rel="stylesheet" href="/wall.css">
 <link rel="stylesheet" href="/dealer.css">
 </head>
 <body class="s-app adm">
@@ -46,6 +47,7 @@
       <button data-atab="rj">RJ<span class="tb" data-badge="rj"></span></button>
       <button data-atab="oceneni">Ocenění<span class="tb" data-badge="oceneni"></span></button>
       <button data-atab="startupy">Startupy<span class="tb" data-badge="startupy"></span></button>
+      <button data-atab="walls">Nástěnky<span class="tb" data-badge="walls"></span></button>
       <button data-atab="kviz">Kvíz<span class="tb" data-badge="kviz"></span></button>
       <button data-atab="body">Body<span class="tb" data-badge="body"></span></button>
       <button data-atab="hraci">Hráči<span class="tb" data-badge="hraci"></span></button>
@@ -94,6 +96,7 @@
     </section>
 
     <section class="panel" data-panel="startupy" hidden>
+      <div class="s-card" id="stlive"></div>
       <div class="s-card" id="cardsbox" hidden>
         <div class="ch"><h3>Karty startupů</h3><span class="s-label">one-liner · popis · milníky</span></div>
         <p class="hint">Karty vidí studenti v mobilu i na plátně. Za každý nově odškrtnutý milník dostane každý člen týmu 300 bodů.</p>
@@ -107,6 +110,16 @@
         </div>
       </div>
       <p class="offnote" id="stnote" hidden></p>
+    </section>
+
+    <section class="panel" data-panel="walls" hidden>
+      <div class="s-card" id="wallbox">
+        <div class="ch"><h3>Nástěnky týmů</h3><span class="s-label" id="wallsum"></span></div>
+        <p class="hint">Otázky a úkoly pro týmy. Každý tým vidí jen svou nástěnku. Úkol můžete poslat všem týmům najednou.</p>
+        <div class="wchips" id="wchips" role="tablist" aria-label="Tým"></div>
+        <div class="wmount" id="wmount"></div>
+      </div>
+      <p class="offnote" id="wnote" hidden></p>
     </section>
 
     <section class="panel" data-panel="kviz" hidden>
@@ -157,6 +170,7 @@
 </div>
 <div class="s-toast" id="toast" role="status" aria-live="polite"></div>
 <script src="/common.js"></script>
+<script src="/wall.js"></script>
 <script src="/dealer.js"></script>
 </body>
 </html>
