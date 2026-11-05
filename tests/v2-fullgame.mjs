@@ -7,11 +7,11 @@ const c = client();
 const V = (st, t) => st.teams.find((x) => x.id === t).V;
 
 await main(async () => {
-  const { T, S, G } = await freshGame(c, { n: 18, ghost: true, features: ALL_ON });
+  const { T, S, G } = await freshGame(c, { n: 18, ghost: true, features: { ...ALL_ON, demand: false } });
   const ctx = { S, G };
   const inv = (label) => invariants(c, ctx, label);
   let st = await c.get();
-  ok(Object.values(st.features || {}).length >= 10 && Object.keys(ALL_ON).every((k) => st.features[k] === true), 'all 10 features switched on');
+  ok(Object.values(st.features || {}).length >= 10 && Object.keys(ALL_ON).every((k) => st.features[k] === (k !== 'demand')), 'all 10 v2 features switched on (demand off)');
   const members = (t) => S.filter((s) => s.team === t);
   const QSET = { id: 'fg', title: 'Kvíz celé hry', questions: [
     { q: 'Co znamená MVP?', a: ['Most Valuable Player', 'Minimální životaschopný produkt', 'Marketingový plán', 'Měsíční výnos'], correct: 1, time: 30 },
@@ -328,7 +328,7 @@ await main(async () => {
       const ar = await c.dget('?view=archives');
       ok((ar.archives || []).some((a) => a.label === `Před blokem ${blk + 1}` && a.auto === true), `auto archive "Před blokem ${blk + 1}"`);
       const ph = await Promise.all(S.slice(0, 6).map((s) => c.me(s)));
-      const leak = ph.filter((m) => new RegExp(`Líbí b${blk}-|Pochybuji b${blk}-|Důvod A b${blk}-|Ven b${blk}-|Dovnitř b${blk}-`).test(m._raw));
+      const leak = ph.filter((m) => new RegExp(`Líbí b${blk}-|Pochybuji b${blk}-|Důvod A b${blk}-|Ven b${blk}-|Dovnitř b${blk}-`).test(JSON.stringify({ ...m, me: { ...m.me, myTeam: undefined } })));
       ok(leak.length === 0, `phones in block ${blk + 1} never see block-${blk} notes or reasons`);
       await inv(`b${blk + 1} start`);
     }

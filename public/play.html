@@ -10,7 +10,9 @@
 <title>Investiční stůl · hráč</title>
 <link rel="stylesheet" href="/fonts/stand-fonts.css">
 <link rel="stylesheet" href="/stand.css">
+<link rel="stylesheet" href="/wall.css">
 <link rel="stylesheet" href="/play.css">
+<link rel="stylesheet" href="/play-desktop.css">
 </head>
 <body class="s-app p-app">
 <div class="p-net hidden" id="net" role="alert"><span class="p-net-dot"></span><span id="nettxt">Bez spojení – zkouším to znovu…</span><button type="button" id="netretry">Zkusit hned</button></div>
@@ -44,7 +46,7 @@
     </section>
     <section class="p-view" data-view="portfolio"><div id="portfolio"></div><div id="captable"></div></section>
     <section class="p-view" data-view="startups"><div id="startups"></div></section>
-    <section class="p-view" data-view="profile"><div id="profile"></div></section>
+    <section class="p-view" data-view="profile"><div id="teamv"></div><div class="s-card p-card p-wallcard hidden" id="wallcard"><div class="p-card-h"><h3 class="s-h3">Nástěnka týmu</h3><span class="s-label">jen pro váš tým</span></div><div id="wallbox"></div></div><div id="profile"></div></section>
   </div>
 
   <div class="p-dock hidden" id="dock"></div>
@@ -53,7 +55,7 @@
     <button type="button" data-nav="invest"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17l5-5 4 4 7-8"/><path d="M15 8h5v5"/></svg><span>Investovat</span><i class="p-dotnew"></i></button>
     <button type="button" data-nav="portfolio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg><span>Portfolio</span><i class="p-dotnew"></i></button>
     <button type="button" data-nav="startups"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg><span>Startupy</span><i class="p-dotnew"></i></button>
-    <button type="button" data-nav="profile"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c1.2-3.8 4-5.5 7.5-5.5s6.3 1.7 7.5 5.5"/></svg><span>Profil</span><i class="p-dotnew"></i></button>
+    <button type="button" data-nav="profile"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.5"/><path d="M2.5 20c1-3.4 3.4-5 6.5-5s5.5 1.6 6.5 5"/><circle cx="17" cy="7.5" r="2.8"/><path d="M16.5 13.2c2.6 0 4.4 1.4 5.1 4.3"/></svg><span>Tým</span><i class="p-dotnew"></i></button>
   </nav>
 </section>
 
@@ -61,6 +63,8 @@
 
 <script src="/common.js"></script>
 <script src="/play-kit.js"></script>
+<script src="/wall.js"></script>
+<script src="/play-access.js"></script>
 <script src="/play.js"></script>
 </body>
 </html>

@@ -60,7 +60,7 @@
     if (D.has('quiz-lobby')) quiz('board', { idx: -1, leaders: [] });
     if (D.has('quiz')) quiz('question', { ...QZ, time: 20, startedAt: t0 + 1000 - 0, endsAt: t0 + 21000, answered: Math.min(14, Math.floor((Date.now() - t0) / 900)) });
     if (D.has('quiz-long')) quiz('question', { q: 'Startup má měsíční opakované tržby 40 000 $, churn 5 % měsíčně a CAC 1 200 $. Který z následujících kroků nejvíc zlepší poměr LTV ku CAC během půl roku?', a: ['Snížit churn na polovinu díky lepšímu onboardingu a pravidelné péči o stávající zákazníky', 'Zdvojnásobit rozpočet na placenou reklamu a doufat, že se CAC časem sám sníží', 'Zavést roční předplatné se slevou, které zákazníky udrží déle a zlepší cash flow', 'Najmout dalšího obchodníka, i když zatím nemáme opakovatelný prodejní proces'], time: 30, startedAt: t0, endsAt: t0 + 30000, answered: 3 });
-    if (D.has('quiz-reveal')) quiz('reveal', { ...QZ, correct: 0, counts: [9, 3, 4, 1], answered: 17, fastest: { name: 'Lukáš Kučera', team: tid(5), ms: 2380 } });
+    if (D.has('quiz-reveal')) quiz('reveal', { ...QZ, correct: 0, counts: [9, 3, 4, 1], answered: 17, fastest: { name: 'Lukáš Kučera', team: tid(5), ms: 2380 }, topStreak: { name: 'Jana Dvořáková', team: tid(2), streak: 4 } });
     if (D.has('quiz-board')) quiz('board', { leaders: NAMES.slice(0, 10).map((n, i) => ({ name: n, team: tid(i), quizPoints: 2900 - i * 210, total: 4100 - i * 300 })) });
     if (D.has('exit') || D.has('exit-final')) {
       if (D.has('exit-final') || after(2000)) {
@@ -76,6 +76,38 @@
         s.phase = 'final';
       }
     }
+    // v3: fake the server's Vnow / mult / rank / chg (docs/V3-SPEC.md §1–2) on top of a real v2 GET
+    if (D.has('v3')) {
+      const pend = s.phase === 'betting' || s.phase === 'closed';
+      const L = s.teams.map((t) => t.live || 0);
+      const avgNet = L.reduce((a, b) => a + b, 0) / (L.length || 1), avgIn = L.reduce((a, b) => a + Math.max(0, b), 0) / (L.length || 1);
+      const F = {};
+      for (const [b, m] of Object.entries(V3.mult)) if (+b < s.block || (+b === s.block && !pend)) for (const id in m) F[id] = (F[id] || 1) * m[id];
+      const vs = (V3.start[s.block] = V3.start[s.block] || {});
+      s.drivers = { ...(s.drivers || {}) };
+      s.teams.forEach((t) => {
+        t.V = Math.round(t.V * (F[t.id] || 1));
+        const m = pend && avgIn ? Math.min(10, Math.max(0.1, 1 + ((t.live || 0) - avgNet) / avgIn)) : 1;
+        if (pend) (V3.mult[s.block] = V3.mult[s.block] || {})[t.id] = m;
+        t.mult = Math.round(m * 100) / 100;
+        t.Vnow = pend ? Math.round((t.V + (t.live || 0)) * m) : t.V;
+        if (vs[t.id] == null) { const hs = (s.history || []).filter((h) => h.block < s.block || h.label === 'Start'); vs[t.id] = hs[hs.length - 1]?.V?.[t.id] || t.V; }
+        t.chg = vs[t.id] ? t.Vnow / vs[t.id] - 1 : 0;
+      });
+      [...s.teams].sort((a, b) => b.Vnow - a.Vnow).forEach((t, i) => { t.rank = i + 1; });
+      s.demand = {};
+      for (const [b, m] of Object.entries(V3.mult)) {
+        if (+b === s.block && pend) continue;
+        s.demand[b] = { mult: m };
+        for (const t of s.teams) {
+          const x = m[t.id] || 1;
+          const note = 'Poptávka v bloku ' + b + ' (×' + x.toLocaleString('cs-CZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ')';
+          s.drivers[t.id] = [...(s.drivers[t.id] || []), { ts: Date.now() - 1000 * +b, block: +b, team: t.id, kind: 'demand', delta: Math.round(t.V - t.V / x), note }];
+        }
+      }
+      if (D.has('longnames')) s.teams.forEach((t, i) => { if (i % 2 === 0) t.name = t.name + ' – Zdravotní pomůcky pro seniory'; });
+    }
     return s;
   };
+  const V3 = { mult: {}, start: {} };
 })();
