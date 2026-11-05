@@ -28,10 +28,19 @@ export function newMeta(teams, startV) {
 
 export const valuation = (m, t) => m.ledger.P[t] * m.ledger.S[t];
 
+export const founderPct = (m, t) => (m.ledger.S[t] > 0 ? Math.round((CFG.FOUNDER_SHARES / m.ledger.S[t]) * 1000) / 10 : 0);
+
 export function snapshot(m, label) {
-  const V = {};
-  for (const t of m.teams) V[t.id] = Math.round(valuation(m, t.id));
-  return { ts: Date.now(), label, block: m.block, V };
+  const V = {}, F = {};
+  for (const t of m.teams) { V[t.id] = Math.round(valuation(m, t.id)); F[t.id] = founderPct(m, t.id); }
+  return { ts: Date.now(), label, block: m.block, V, F };
+}
+
+// RJ fund (tranches): what RainbowJet has put in, what is promised in locked tranches, what is left.
+export function rjFund(m) {
+  const invested = Math.round(m.rjPrincipal || 0);
+  const locked = (m.tranches || []).filter((x) => x.status === 'locked').reduce((a, x) => a + x.amt, 0);
+  return { capital: CFG.RJ_CAPITAL, invested, locked, available: Math.max(0, CFG.RJ_CAPITAL - invested - locked) };
 }
 
 export function stakes(m, inv) {
@@ -64,6 +73,10 @@ export function raised(m) {
 
 export function rules(m, inv) {
   const isRJ = inv === RJ;
+  if (isRJ && !hasHoldings(m, inv) && m.features?.tranches) {
+    // with tranches RJ does not have to go all-in: any amount up to what is left in the fund
+    return { mode: 'fund', capital: rjFund(m).available, cashoutMax: 0, exact: false };
+  }
   if (!hasHoldings(m, inv)) {
     return { mode: 'initial', capital: isRJ ? CFG.RJ_CAPITAL : CFG.STUDENT_CAPITAL, cashoutMax: 0, exact: false };
   }
@@ -92,7 +105,7 @@ export function validate(m, inv, ownTeam, raw) {
   const ids = m.teams.map((t) => t.id);
   const name = (t) => m.teams.find((x) => x.id === t)?.name || t;
   const r = rules(m, inv);
-  const out = r.mode === 'initial' ? {} : clean(raw?.out, ids);
+  const out = r.mode === 'initial' || r.mode === 'fund' ? {} : clean(raw?.out, ids);
   const inn = clean(raw?.in, ids);
   const errors = [];
   const st = stakes(m, inv);
@@ -105,8 +118,11 @@ export function validate(m, inv, ownTeam, raw) {
     inTotal += e.amt;
     if (t === ownTeam) errors.push('Do vlastního týmu investovat nemůžeš.');
     if (out[t]) errors.push(`Z týmu ${name(t)} nemůžeš ve stejném bloku vybírat a zároveň do něj vkládat.`);
+    if (!(m.ledger.P[t] > 0)) errors.push(`Do týmu ${name(t)} už investovat nejde.`);
   }
-  if (r.mode === 'initial') {
+  if (r.mode === 'fund') {
+    if (inTotal > r.capital) errors.push(`Smart money může teď investovat nejvýš ${fmt(r.capital)}.`);
+  } else if (r.mode === 'initial') {
     if (inTotal !== r.capital) errors.push(`Rozděl přesně ${fmt(r.capital)} (zatím ${fmt(inTotal)}).`);
   } else {
     if (r.exact && outTotal !== r.cashoutMax) errors.push(`V tomto bloku vyber přesně ${fmt(r.cashoutMax)} (zatím ${fmt(outTotal)}).`);
@@ -116,23 +132,50 @@ export function validate(m, inv, ownTeam, raw) {
   return { ok: errors.length === 0, errors, out, in: inn, outTotal, inTotal, mode: r.mode };
 }
 
+// Teams whose valuation is at or below the median of all teams (a "contrarian" buy).
+export function lowTeams(m) {
+  const vs = m.teams.map((t) => valuation(m, t.id)).sort((a, b) => a - b);
+  const n = vs.length;
+  const med = n ? (n % 2 ? vs[(n - 1) / 2] : (vs[n / 2 - 1] + vs[n / 2]) / 2) : 0;
+  const out = {};
+  for (const t of m.teams) out[t.id] = valuation(m, t.id) <= med + 1e-6;
+  return out;
+}
+
 // Trades happen at the block's fixed prices: selling cancels shares, buying issues new ones.
-export function apply(m, inv, v) {
+// Every buy is recorded as a lot (meta.lots[investor]); sells consume that investor's lots FIFO.
+// `low` (optional) = lowTeams() taken before a batch of trades, so the order of trades does not matter.
+export function apply(m, inv, v, low) {
   const L = m.ledger;
   const h = L.H[inv] || (L.H[inv] = {});
   const delta = {};
+  const lots = m.lots ? (m.lots[inv] || (m.lots[inv] = [])) : null;
+  low = low || lowTeams(m);
   for (const [t, e] of Object.entries(v.out)) {
+    if (!(L.P[t] > 0)) continue;
     const sh = Math.min(h[t] || 0, e.amt / L.P[t]);
     h[t] = (h[t] || 0) - sh;
     if (h[t] < 1e-9) h[t] = 0;
     L.S[t] -= sh;
     delta[t] = (delta[t] || 0) - sh * L.P[t];
+    if (lots) {
+      let left = sh;
+      for (const lot of lots) {
+        if (left <= 1e-12) break;
+        if (lot.team !== t || lot.shares <= 0) continue;
+        const take = Math.min(lot.shares, left);
+        lot.shares -= take; left -= take;
+      }
+      for (let i = lots.length - 1; i >= 0; i--) if (lots[i].shares < 1e-9) lots.splice(i, 1);
+    }
   }
   for (const [t, e] of Object.entries(v.in)) {
+    if (!(L.P[t] > 0)) continue;
     const sh = e.amt / L.P[t];
     h[t] = (h[t] || 0) + sh;
     L.S[t] += sh;
     delta[t] = (delta[t] || 0) + e.amt;
+    if (lots) lots.push({ team: t, shares: sh, price: L.P[t], block: m.block, ts: Date.now(), low: !!low[t] });
   }
   return delta;
 }
