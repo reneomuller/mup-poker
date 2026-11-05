@@ -7,7 +7,7 @@ const c = client();
 const V = (st, t) => st.teams.find((x) => x.id === t).V;
 
 await main(async () => {
-  const { T, S, G } = await freshGame(c, { n: 18, ghost: true, features: ALL_ON, parallel: true });
+  const { T, S, G } = await freshGame(c, { n: 18, ghost: true, features: { ...ALL_ON, demand: false }, parallel: true });
   ok(S.every((s) => s.ok), '18 parallel registrations');
   ok((await c.get()).playerCount === 18, 'playerCount 18 after parallel registration');
   const ctx = { S, G };

@@ -6,6 +6,8 @@ const dealer = (op, x = {}) => post({ op, ...x }, D);
 const assert = (c, m) => { if (!c) { console.error('FAIL:', m); process.exitCode = 1; } else console.log('ok  ', m); };
 const sum = (o) => Object.values(o).reduce((a, b) => a + b, 0);
 
+// v2 fixed-price expectations: demand pricing (v3) off
+await dealer('features', { set: { demand: false } });
 let st = await get();
 const teams = st.teams.map(t => t.id);
 await dealer('teams', { teams: teams.map((id, i) => ({ id, name: ['Lumio', 'Parkly', 'Tutorix', 'GreenBox', 'Hrajsport', 'Vetly'][i] })) });

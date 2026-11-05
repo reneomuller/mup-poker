@@ -4,7 +4,7 @@ import { ok, section, main, client, sum, sumAmt, invariants, freshGame, initialS
 
 const c = client();
 await main(async () => {
-  const { T, S } = await freshGame(c, { n: 6, ghost: false, features: ALL_ON });
+  const { T, S } = await freshGame(c, { n: 6, ghost: false, features: { ...ALL_ON, demand: false } });
   await c.dealer('phase', { phase: 'betting' });
   await Promise.all(S.map((s, i) => c.st(s, 'submit', initialSlip(T, s.team, i))));
   await c.dealer('phase', { phase: 'closed' });

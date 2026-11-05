@@ -36,8 +36,7 @@ if command -v timeout >/dev/null; then TMO=(timeout 600); elif command -v gtimeo
 unset KV_REST_API_URL KV_REST_API_TOKEN UPSTASH_REDIS_REST_URL UPSTASH_REDIS_REST_TOKEN DATABASE_URL POSTGRES_URL NEON_DATABASE_URL MUP_PG_LOCAL
 
 API_SUITES=(apitest.mjs apitest2.mjs multitest.mjs boardtest.mjs)
-for f in tests/v2-*.mjs; do [ -e "$f" ] && API_SUITES+=("$(basename "$f")"); done
-for f in tests/v3-*.mjs; do [ -e "$f" ] && API_SUITES+=("$(basename "$f")"); done
+for f in tests/v2-*.mjs tests/v3-*.mjs; do [ -e "$f" ] && API_SUITES+=("$(basename "$f")"); done
 UI_SUITES=()
 for f in tests/ui-*.py; do [ -e "$f" ] && UI_SUITES+=("$(basename "$f")"); done
 
