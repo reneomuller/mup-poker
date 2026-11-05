@@ -9,9 +9,20 @@ const TAG = 'tagE' + PORT;
 const OTHER = 'Tahle nástěnka patří jinému týmu.';
 let srv, mock, c;
 const dbName = PG_URL.split('/').pop().split('?')[0];
-function wipeDb() { if (MODE !== 'mem') execSync(`PGPASSWORD=pw psql -q -h localhost -U postgres -d ${dbName} -c 'drop table if exists mup_kv, mup_h, mup_log'`, { stdio: 'pipe' }); }
+// wipe the suite's database (E_PG_URL; psql may not be installed, so use the pg module, falling back to psql)
+async function wipeDb() {
+  if (MODE === 'mem') return;
+  try {
+    const { default: pg } = await import('pg');
+    const cl = new pg.Client({ connectionString: PG_URL });
+    await cl.connect();
+    try { await cl.query('drop table if exists mup_kv, mup_h, mup_log'); } finally { await cl.end(); }
+  } catch {
+    execSync(`PGPASSWORD=pw psql -q -h localhost -U postgres -d ${dbName} -c 'drop table if exists mup_kv, mup_h, mup_log'`, { stdio: 'pipe' });
+  }
+}
 async function boot() { srv = await startServer({ port: PORT, tag: TAG, mode: MODE, env: { DEALER_LOCK: '1', DEALER_PASSWORD: 'mup-dealer' } }); c = client(srv.base); }
-async function wipe() { await srv.stop(); if (MODE === 'redis') await mock.flush(); wipeDb(); await boot(); }
+async function wipe() { await srv.stop(); if (MODE === 'redis') await mock.flush(); await wipeDb(); await boot(); }
 const H = (s) => ({ 'x-sid': s.sid, 'x-pin': s.pin });
 const wall = (s, team) => c.get('?view=wall' + (team ? '&team=' + encodeURIComponent(team) : ''), H(s));
 const dwall = (team) => c.dget('?view=wall&team=' + encodeURIComponent(team));
@@ -25,7 +36,7 @@ await main(async () => {
     try { await fetch(`http://localhost:${MOCK_PORT}/__stats`); up = true; } catch {}
     mock = up ? { flush: () => fetch(`http://localhost:${MOCK_PORT}/__flush`).then((r) => r.text()) } : await startMock(MOCK_PORT);
   }
-  wipeDb();
+  await wipeDb();
   await boot();
   info(`storage ${(await c.get()).storage}`);
   let { T, S, G } = await freshGame(c, { n: 18, ghost: true });
