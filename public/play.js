@@ -813,7 +813,7 @@
   }
 
   // ---------- startups ----------
-  const DRIVER = { class: 'Peníze třídy', rj: 'RainbowJet', revalue: 'Přecenění', round: 'Kolo', market: 'Trh', exit: 'Exit' };
+  const DRIVER = { class: 'Peníze třídy', rj: 'RainbowJet', revalue: 'Přecenění', round: 'Kolo', market: 'Trh', exit: 'Exit', demand: 'Poptávka' };
   const ROUND = { up: 'Up round', down: 'Down round', flat: 'Flat round' };
   const EXITK = { acquired: 'Akvizice', ipo: 'IPO', hold: 'Bez exitu', writeoff: 'Odpis' };
   function renderStartups() {
