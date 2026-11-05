@@ -1,4 +1,35 @@
-# v2 handoff (5 Nov 2026, 01:55)
+# v3 handoff (5 Nov 2026, 04:00)
+
+Read `docs/V3-SPEC.md` (on top of `docs/V2-SPEC.md`). `main` = v3 plus the overnight audit and security fixes. Production ran v2 until this is pushed.
+
+## What v3 adds
+- Demand pricing (`demand`): after a block, price × (money in ÷ average per startup), clamped to ×0.1–×10. Rebalance blocks use 1 + net ÷ average inflow. Live during investing: the projected number equals the post-showdown number.
+- Tým tab (was Profil): live stats and named investors with reasons.
+- Private team sticker walls (`wall`). Wall writes never rewrite `meta`: the badge counter is `tx` field `wr:<team>`.
+- Quiz: Kahoot base score plus a streak bonus of +50 per correct answer in a row, max +250. `quizAdvance`, with `public/quiz-auto.js` for the „Další ▶“ / Automaticky buttons.
+- Login QR for lost PINs (`loginLink` / `tokenLogin`), dealer preview `/play?as=<sid>`, laptop layout for `/play`.
+- Security: client keys can never resolve to Object.prototype (`api/_lib/safe.js`). Student `restore` only brings back slips the server lost and checks them like submit. The wall/data views need the dealer header.
+
+## Tests
+- `bash tests/run-all.sh -m all -n 1 -A` (needs local Postgres `mup_e`, see below). Last run on `main`: 57 suite runs, 4399 checks, all green.
+- UI (Playwright, Python): `pip install playwright && playwright install chromium`, then `bash tests/run-all.sh -U -n 1`. Last run: admin 59, oldclients 79, phone 31, quiz 18, table 97, v3 60, all green.
+- `OLD_DIR=<a v2-base checkout> node tests/a-perf.mjs` checks the Redis commands per GET. Make sure nothing else listens on :8098/:8099 first.
+- An upgrade from v2 production data was simulated (v2 code on Redis+Postgres, then v3 on the same storage): state intact, live values correct, showdown with 19 slips.
+
+## In class (new)
+- The plates show live demand values during investing. **Showdown třídy** locks them in, so the numbers don't jump.
+- From Block 2, save RJ's sales only after the showdown, because repricing can make an earlier split invalid.
+- Small rebalance blocks can give extreme multiples (e.g. ×0,14). That's the formula as specified.
+- With „Automaticky“ ticked in ANY open admin tab, the quiz reveals by itself. Tick it in one tab only.
+- To roll back a mistake, use ↶ undo. Dealer `restore` only fills in data the server lost; an older backup leaves the state as it is (`restored: false`).
+- The dealer is open (no password) by the owner's choice. Lock it with `DEALER_LOCK=1` + `DEALER_PASSWORD` in Vercel, then redeploy.
+
+## Not in main
+Branch `v4-ideas` holds the overnight improvements (`docs/V4-IDEAS.md`, `docs/V4-OVERVIEW.md`). It is for review and not merged.
+
+---
+
+# Earlier: v2 handoff (5 Nov 2026, 01:55)
 
 Read `docs/V2-SPEC.md` first. It is the contract every part was built against.
 
