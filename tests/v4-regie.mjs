@@ -151,6 +151,8 @@ await main(async () => {
   ok(p.undoTop === null, 'nothing undoable yet');
   const sd = await c.dealer('showdown');
   ok(sd.ok, 'showdown');
+  const late = await c.dealer('nudge', { team: tMiss });
+  ok(!late.ok && /Showdown/.test(late.error), `no nudge after the showdown („${late.error}“)`);
   p = await pres();
   ok(p.undoTop?.op === 'showdown', `undo would revert the showdown (${p.undoTop?.op})`);
 

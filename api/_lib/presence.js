@@ -147,6 +147,7 @@ export async function dealerOp(b, meta, players, slips, save) {
     return ok({ plan });
   }
   // nudge: { team } | { all: true }, optional via: 'wall' | 'msg' (default: wall when walls are on)
+  if (meta.settled?.[meta.block + 'c']) return fail('Showdown tohoto bloku už proběhl.');
   const miss = missingByTeam(meta, players, slips);
   const targets = b.all === true ? meta.teams.map((t) => t.id).filter((t) => miss[t].length) : [b.team];
   if (b.all !== true && !meta.teams.some((t) => t.id === b.team)) return fail('Vyber tým.');
