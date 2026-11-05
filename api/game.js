@@ -1110,6 +1110,13 @@ export default async function handler(req, res) {
         const r = await QP.runView(meta, players, url.searchParams.get('runId'), S);
         return send(res, r.status || 200, r);
       }
+      // review: the student views recap / startup check the PIN themselves; a wrong PIN there must count and a
+      // locked player be refused like on every other route (else they were a PIN oracle around the guard lockout)
+      if ((view === 'recap' || view === 'startup') && req.headers['x-sid'] && !AC.asPlayer(req, players)) {
+        const gp = GU.own(players, String(req.headers['x-sid']));
+        if (gp?.pin && gp.pin !== pinHash(gp.id, String(req.headers['x-pin'] || ''))) return send(res, 401, { ok: false, error: (await GU.failed(meta, req, gp)) ? GU.TOO_MANY : 'Přihlas se znovu.', relogin: true });
+        if (GU.locked(meta, gp)) return send(res, 401, { ok: false, error: GU.TOO_MANY, relogin: true });
+      }
       if (view === 'recap' || view === 'report') { const r = await RC.view(view, req, { meta, players, pinHash }); return send(res, r.status, r.body); } // v4 recap
       if (view === 'presence') { const r = await PR.view(meta, players, slips, dealerOk(req)); return send(res, r.status, r.body); } // v4 regie
       if (view === 'wall') {
