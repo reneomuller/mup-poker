@@ -420,7 +420,7 @@
     if (!isOn()) { if (root && !root.classList.contains('hidden')) close(); return; }
     const quizUp = !document.getElementById('quiz') || !document.getElementById('quiz').classList.contains('hidden');
     const ask = /[#&]recap(=|$)/.test(location.hash);
-    if (root && !root.classList.contains('hidden')) return;
+    if (root && !root.classList.contains('hidden')) { if (quizUp) close(); return; } // a quiz question always wins
     if (ask && !update.asked) { update.asked = true; open(); return; }
     if (isFinal() && !PA.on && !quizUp && !lsGet(LSK(S, me))) open();
   }
