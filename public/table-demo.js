@@ -91,7 +91,7 @@
         if (pend) (V3.mult[s.block] = V3.mult[s.block] || {})[t.id] = m;
         t.mult = Math.round(m * 100) / 100;
         t.Vnow = pend ? Math.round((t.V + (t.live || 0)) * m) : t.V;
-        if (vs[t.id] == null) vs[t.id] = pend ? t.V : t.V;
+        if (vs[t.id] == null) { const hs = (s.history || []).filter((h) => h.block < s.block || h.label === 'Start'); vs[t.id] = hs[hs.length - 1]?.V?.[t.id] || t.V; }
         t.chg = vs[t.id] ? t.Vnow / vs[t.id] - 1 : 0;
       });
       [...s.teams].sort((a, b) => b.Vnow - a.Vnow).forEach((t, i) => { t.rank = i + 1; });

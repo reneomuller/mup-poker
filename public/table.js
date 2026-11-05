@@ -729,7 +729,7 @@
     const show = on(s, 'drivers') && s.drivers && typeof s.drivers === 'object';
     const box = $('ticker');
     const all = [];
-    if (show) for (const [tid, arr] of Object.entries(s.drivers)) for (const d of arr || []) all.push({ ...d, team: d.team || tid });
+    if (show) for (const [tid, arr] of Object.entries(s.drivers)) for (const d of arr || []) if (d.kind !== 'demand' || Math.abs(d.delta || 0) >= 1) all.push({ ...d, team: d.team || tid });
     all.sort((a, b) => (b.ts || 0) - (a.ts || 0));
     const items = all.slice(0, 14);
     toggle(box, 'hidden', !items.length);
