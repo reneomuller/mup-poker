@@ -1326,6 +1326,7 @@
         else if (r?.relogin) logout();
         return; // keep the last screen while reconnecting
       }
+      if (s.meError === 'locked') { PA.loginError = 'Moc pokusů se špatným PINem. Zkus to za pár minut, nebo požádej o QR přihlášení.'; logout(); return; } // v4 guard: say why
       if (++meFail >= 3) logout();
     } else if (!sid || !pin) showLogin();
   }
