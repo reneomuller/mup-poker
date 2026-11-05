@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nástěnka – demo</title>
+<link rel="stylesheet" href="/wall.css">
+<style>
+  :root { color-scheme: light dark; --demo-bg: #eef0f6; --demo-text: #14182b; --demo-panel: #ffffff; --demo-border: #d4d8e6; }
+  @media (prefers-color-scheme: dark) { :root { --demo-bg: #0b1030; --demo-text: #eef0f8; --demo-panel: #141a44; --demo-border: #3a4488; } }
+  body { margin: 0; background: var(--demo-bg); color: var(--demo-text); font: 15px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+  .demo-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 10px 16px; background: var(--demo-panel); border-bottom: 1px solid var(--demo-border); position: sticky; top: 0; z-index: 5; }
+  .demo-bar b { margin-right: 4px; font-size: 14px; }
+  .demo-bar button, .demo-bar select { font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--demo-border); background: transparent; color: inherit; cursor: pointer; }
+  .demo-bar button[aria-pressed="true"] { background: #3586d1; border-color: #3586d1; color: #fff; }
+  .demo-bar label { font-size: 13px; display: inline-flex; gap: 4px; align-items: center; }
+  main { max-width: 1280px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 18px; margin: 0 0 12px; }
+</style>
+</head>
+<body>
+<div class="demo-bar" role="toolbar" aria-label="Režim dema">
+  <b>Nástěnka</b>
+  <button type="button" data-mode="student">Student</button>
+  <button type="button" data-mode="dealer">MUP – tým</button>
+  <button type="button" data-mode="all">MUP – všechny týmy</button>
+  <select id="team" aria-label="Tým (MUP)"></select>
+  <label><input type="checkbox" id="fail"> chyba serveru</label>
+</div>
+<main>
+  <h1 id="h">Nástěnka týmu</h1>
+  <div id="wall"></div>
+</main>
+<script src="/wall.js"></script>
+<script>
+(function () {
+  'use strict';
+  // non-breaking space after single-letter prepositions/conjunctions
+  function nb(s) { return s.replace(/(^|[\s(„])([vkszouaiVKSZOUAI])\s/g, '$1$2 '); }
+  var TEAMS = [
+    { id: 'zp', name: 'Zdravotní pomůcky', color: '#3FCF8E' },
+    { id: 'billi', name: 'Billi', color: '#3586D1' },
+    { id: 'seeto', name: 'Seeto', color: '#FF8A47' },
+    { id: 'zpr', name: 'Zdravotní přehled', color: '#6754DF' },
+    { id: 'asset', name: 'AssetLink', color: '#FF5574' },
+    { id: 'vestity', name: 'Vestity', color: '#F5C451' },
+  ];
+  var ME = { role: 'student', id: 's1', name: 'Jana Nováková' };
+  var MUP = { role: 'dealer', name: 'MUP' };
+  var RJ = { role: 'dealer', name: 'RainbowJet' };
+  var st = function (id, name) { return { role: 'student', id: id, name: name }; };
+  var now = Date.now(), min = 60000;
+  var n = 0;
+  function rid() { return Math.random().toString(36).slice(2, 8); }
+  function S(team, kind, text, by, ago, extra) {
+    var s = { id: 'x' + (++n) + rid(), team: team, kind: kind, text: nb(text), by: by, ts: now - ago * min, done: false, replies: [] };
+    for (var k in extra || {}) s[k] = extra[k];
+    return s;
+  }
+  function R(text, by, ago) { return { id: 'r' + rid(), text: nb(text), by: by, ts: now - ago * min }; }
+  var G = 'g' + rid();
+  var DB = [];
+  TEAMS.forEach(function (t, i) {
+    DB.push(S(t.id, 'task', 'Do pátku nahrajte na Moodle pitch deck (max. 10 slidů) a jednu větu o tom, k čemu jste dospěli v rozhovorech se zákazníky.', MUP, 50 + i, { group: G }));
+  });
+  DB.push(
+    S('billi', 'q', 'Jak přesně funguje poptávkové ocenění? Když do nás v bloku 1 půjde dvakrát víc peněz než průměr, zdvojnásobí se cena akcie?', ME, 32, { replies: [
+      R('Ano. Násobek je přítok do vašeho týmu děleno průměrným přítokem, takže ×2. Omezené je to na 0,1 až 10.', MUP, 25),
+      R('Díky! Takže se vyplatí pitch vylepšit ještě před showdownem.', st('s2', 'Petr Svoboda'), 20),
+    ] }),
+    S('billi', 'task', 'Připravit 3 otázky pro mentora z RainbowJet – hlavně k cenotvorbě a k tomu, jak oslovit první B2B zákazníky.', st('s3', 'Tereza Malá'), 40, { done: true, doneBy: st('s3', 'Tereza Malá'), replies: [R('Hotovo, jsou ve sdíleném dokumentu.', st('s3', 'Tereza Malá'), 12)] }),
+    S('billi', 'task', 'Aktualizovat kartu týmu: nové logo a krátký popis v jedné větě.', ME, 18),
+    S('billi', 'q', 'Proč nám v bloku 2 klesla valuace, když jsme nic neprodali?', st('s2', 'Petr Svoboda'), 9, { replies: [R('Investoři přesunuli peníze jinam – čistý přítok byl záporný, takže násobek vyšel pod 1. Podívejte se na záložku Investoři u svého týmu.', RJ, 5)] }),
+    S('billi', 'q', 'Dlouhý text pro test: Máme za sebou tři rozhovory s účetními firmami a dva s malými e-shopy. Všichni říkají, že by fakturaci z mobilu chtěli, ale nikdo za ni nechce platit víc než 99 Kč měsíčně. Má smysl jít do freemium modelu, nebo raději udělat jednorázovou licenci? A jak to vysvětlit investorům, aby to nepůsobilo, že nemáme jasný byznys model? Uvažujeme i o partnerství s bankou, která by nás mohla nabízet svým klientům v rámci podnikatelského účtu.', ME, 4),
+    S('billi', 'task', 'Natočit 30s video o produktu na projekci <img src=x onerror=alert(1)> & „uvozovky“', RJ, 2),
+    S('seeto', 'q', 'Můžeme v rebalancování přesunout víc než 50 % portfolia?', st('s7', 'Adam Král'), 15),
+    S('seeto', 'task', 'Domluvit schůzku s mentorem na čtvrtek.', st('s8', 'Lucie Dvořáková'), 30, { done: true }),
+    S('zp', 'q', 'Kdy se zveřejní výsledky RJ smart money?', st('s9', 'Ondřej Beneš'), 7, { replies: [R('Po showdownu, v odhalení RJ.', MUP, 6)] }),
+    S('asset', 'q', 'Je možné změnit jméno týmu?', st('s10', 'Klára Horáková'), 3)
+  );
+  DB.forEach(function (s, i) { if (s.group && s.team === 'zp') { s.done = true; s.doneBy = st('s9', 'Ondřej Beneš'); } });
+
+  var mode = 'student', viewer = ME;
+  var failEl = document.getElementById('fail');
+  function wait(v) {
+    return new Promise(function (res, rej) {
+      setTimeout(function () { failEl.checked ? rej(new Error('Server neodpovídá. Zkus to za chvíli.')) : res(v); }, 250 + Math.random() * 300);
+    });
+  }
+  function isMine(by) { return mode === 'student' && by && by.id === ME.id; }
+  function out(s) {
+    return { id: s.id, kind: s.kind, text: s.text, by: s.by, ts: s.ts, group: s.group, mine: isMine(s.by), done: !!s.done, doneBy: s.doneBy,
+      replies: s.replies.map(function (r) { return { id: r.id, text: r.text, by: r.by, ts: r.ts, mine: isMine(r.by) }; }) };
+  }
+  function wallOf(team) {
+    return DB.filter(function (s) { return s.team === team; })
+      .sort(function (a, b) { var da = a.kind === 'task' && a.done ? 1 : 0, db = b.kind === 'task' && b.done ? 1 : 0; return da - db || b.ts - a.ts; })
+      .map(out);
+  }
+  function teamFor(o) { return mode === 'student' ? 'billi' : o.team; }
+  function check(text) { if (!text || !String(text).trim()) throw new Error('Text je prázdný.'); if (String(text).length > 500) throw new Error('Text je moc dlouhý.'); }
+  function get(team, id) { var s = DB.filter(function (x) { return x.team === team && x.id === id; })[0]; if (!s) throw new Error('Lísteček už neexistuje.'); return s; }
+  var api = {
+    list: function (team) {
+      if (mode === 'student') return wait(wallOf('billi'));
+      if (team === 'all') { var w = {}; TEAMS.forEach(function (t) { w[t.id] = wallOf(t.id); }); return wait({ walls: w }); }
+      return wait(wallOf(team));
+    },
+    post: function (o) {
+      return wait(null).then(function () {
+        check(o.text);
+        var by = mode === 'student' ? ME : MUP;
+        if (o.all) { var g = 'g' + rid(); TEAMS.forEach(function (t) { DB.push(S(t.id, o.kind, o.text, by, 0, { group: g })); }); }
+        else DB.push(S(teamFor(o), o.kind, o.text, by, 0));
+        return { ok: true };
+      });
+    },
+    reply: function (o) {
+      return wait(null).then(function () { check(o.text); get(teamFor(o), o.id).replies.push(R(o.text, mode === 'student' ? ME : MUP, 0)); return { ok: true }; });
+    },
+    done: function (o) {
+      return wait(null).then(function () { var s = get(teamFor(o), o.id); s.done = !!o.done; s.doneBy = o.done ? (mode === 'student' ? ME : MUP) : null; return { ok: true }; });
+    },
+    del: function (o) {
+      return wait(null).then(function () {
+        var s = get(teamFor(o), o.id);
+        if (o.reply) s.replies = s.replies.filter(function (r) { return r.id !== o.reply; });
+        else DB = DB.filter(function (x) { return x !== s; });
+        return { ok: true };
+      });
+    },
+  };
+  // simulate a teammate posting while the wall is open
+  setTimeout(function () { DB.push(S('billi', 'q', 'Kdo z nás půjde ve čtvrtek prezentovat?', st('s2', 'Petr Svoboda'), 0)); }, 9000);
+
+  var sel = document.getElementById('team');
+  TEAMS.forEach(function (t) { var o = document.createElement('option'); o.value = t.id; o.textContent = t.name; sel.appendChild(o); });
+  sel.value = 'billi';
+  var w = null;
+  var qs = new URLSearchParams(location.search);
+  function start(m) {
+    mode = m;
+    if (w) w.destroy();
+    document.querySelectorAll('[data-mode]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-mode') === m)); });
+    sel.hidden = m !== 'dealer';
+    document.getElementById('h').textContent = m === 'all' ? 'Nástěnky – všechny týmy' : 'Nástěnka týmu ' + (m === 'student' ? 'Billi' : TEAMS.filter(function (t) { return t.id === sel.value; })[0].name);
+    w = window.MupWall.mount(document.getElementById('wall'), {
+      role: m === 'student' ? 'student' : 'dealer',
+      teams: TEAMS,
+      team: m === 'student' ? 'billi' : (m === 'all' ? 'all' : sel.value),
+      api: api,
+      canSendAll: m !== 'student',
+      pollMs: +(qs.get('poll') || 4000),
+    });
+    window.demoWall = w;
+  }
+  document.querySelectorAll('[data-mode]').forEach(function (b) { b.addEventListener('click', function () { start(b.getAttribute('data-mode')); }); });
+  sel.addEventListener('change', function () { w.setTeam(sel.value); document.getElementById('h').textContent = 'Nástěnka týmu ' + sel.options[sel.selectedIndex].text; });
+  if (qs.get('stand')) { var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = '/stand.css'; document.head.insertBefore(l, document.head.firstChild); }
+  start(qs.get('mode') || 'student');
+})();
+</script>
+</body>
+</html>
