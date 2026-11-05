@@ -14,7 +14,8 @@ export const isDealer = (req) => !DEALER_PW || req.headers['x-dealer'] === DEALE
 
 // dealer op loginLink { sid }: a new token replaces the previous one; only its hash and expiry are stored
 export async function loginLink(players, sid) {
-  const p = players[String(sid || '')];
+  const k = String(sid || '');
+  const p = Object.hasOwn(players, k) ? players[k] : null;
   if (!p) return { error: 'Hráč nenalezen.' };
   const token = crypto.randomBytes(16).toString('base64url');
   const exp = Date.now() + ttl();
@@ -56,5 +57,5 @@ export function asPlayer(req, players) {
   const q = req.url && req.url.includes('as=') ? new URL(req.url, 'http://local').searchParams.get('as') : null;
   // the x-dealer header must be sent (even on an open dealer), so a plain GET with as= reveals nothing
   if (!q || req.headers['x-dealer'] === undefined || !isDealer(req)) return null;
-  return players[q] || null;
+  return Object.hasOwn(players, q) ? players[q] : null; // own keys only
 }

@@ -4,7 +4,10 @@
 //   r:<stickerId>:<replyId>  { id, text, by, ts, ghost? }
 //   d:<stickerId>            { done, by, ts }   (tasks only)
 // No team ever sees another team's wall; a ghost's stickers and replies are seen only by that ghost and the dealer.
-// meta.wallRev[team] is a cheap per-team counter for the phones' badge (read from meta, so a plain GET costs nothing extra).
+// The phones' badge is a cheap per-team counter in hash `tx`, field `wr:<team>` = { n, ts }. tx is already read by
+// every GET (cards / rounds / wall on), so the badge costs nothing extra, and a wall write never rewrites meta:
+// a student's read-modify-write of meta on another server instance could otherwise undo a dealer op saved meanwhile.
+// (meta.wallRev[team], the first v3 design, is still added in for data written by it.)
 import crypto from 'node:crypto';
 import * as S from './store.js';
 import * as F from './features.js';
@@ -20,7 +23,8 @@ const OTHER_TEAM = 'Tahle nástěnka patří jinému týmu.';
 const NOT_FOUND = 'Lísteček nenalezen.';
 const DEALER_BY = { role: 'dealer', name: 'MUP' };
 
-export const rev = (meta, team) => Number(meta?.wallRev?.[team]) || 0;
+export const revKey = (team) => 'wr:' + team;
+export const rev = (meta, team, tx) => (Number(meta?.wallRev?.[team]) || 0) + (Number(tx?.[revKey(team)]?.n) || 0);
 const teamIds = (meta) => (meta.teams || []).map((t) => t.id);
 
 function cleanText(t) {
@@ -30,13 +34,12 @@ function cleanText(t) {
   return { text: s };
 }
 
-// Increment meta.wallRev for these teams on a fresh copy of meta (only that field changes; meta.rev stays).
+// Increment the badge counter of these teams (one field per team in hash tx; meta is never written here).
 async function bump(teams) {
-  const m = await S.getJSON('meta');
-  if (!m) return;
-  if (!m.wallRev || typeof m.wallRev !== 'object') m.wallRev = {};
-  for (const t of teams) m.wallRev[t] = (Number(m.wallRev[t]) || 0) + 1;
-  await S.setJSON('meta', m);
+  await Promise.all(teams.map(async (t) => {
+    const cur = await S.hget('tx', revKey(t));
+    await S.hset('tx', revKey(t), { n: (Number(cur?.n) || 0) + 1, ts: Date.now() });
+  }));
 }
 
 const split = (h) => {
@@ -80,22 +83,22 @@ export function build(h, viewer) {
 
 // GET ?view=wall. Student: own team only (a `team` param naming another team is refused).
 // Dealer: ?team=<id> → that wall, ?team=all → { walls: { <teamId>: [stickers] } }.
-export async function view(meta, viewer, team) {
+export async function view(meta, viewer, team, tx = {}) {
   if (!F.on(meta, 'wall')) return fail(F.OFF);
   if (viewer.role === 'student') {
     const own = viewer.p.team;
     if (team && team !== own) return fail(OTHER_TEAM, 403);
-    return ok({ team: own, rev: rev(meta, own), stickers: build(await S.hgetall(key(own)), viewer) });
+    return ok({ team: own, rev: rev(meta, own, tx), stickers: build(await S.hgetall(key(own)), viewer) });
   }
   if (team === 'all') {
     const ids = teamIds(meta);
     const hs = await Promise.all(ids.map((t) => S.hgetall(key(t))));
     const walls = {}, revs = {};
-    ids.forEach((t, i) => { walls[t] = build(hs[i], viewer); revs[t] = rev(meta, t); });
+    ids.forEach((t, i) => { walls[t] = build(hs[i], viewer); revs[t] = rev(meta, t, tx); });
     return ok({ walls, revs });
   }
   if (!teamIds(meta).includes(team)) return fail('Vyber tým.');
-  return ok({ team, rev: rev(meta, team), stickers: build(await S.hgetall(key(team)), viewer) });
+  return ok({ team, rev: rev(meta, team, tx), stickers: build(await S.hgetall(key(team)), viewer) });
 }
 
 // One wall op. actor: { role: 'dealer' } | { role: 'student', p }. runMeta wraps the wallRev write
@@ -219,4 +222,6 @@ export async function dataWalls(meta) {
 
 export async function clearWalls(meta) {
   await Promise.all(teamIds(meta).map((t) => S.del(key(t))));
+  const tx = await S.hgetall('tx');
+  await Promise.all(Object.keys(tx).filter((f) => f.startsWith('wr:')).map((f) => S.hdel('tx', f)));
 }

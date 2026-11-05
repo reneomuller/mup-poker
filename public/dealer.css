@@ -405,7 +405,7 @@ details.sm > summary { cursor: pointer; margin-top: 10px; }
 @media (max-width: 899px) { .adm .s-toast { bottom: calc(16px + var(--s-safe-b)); } }
 
 .vblock textarea.s-input.vw { min-height: 42px; }
-.qsum { margin: 4px 0 0; padding: 0 0 0 22px; display: block; max-height: 340px; overflow: auto; font-size: 13.5px; }
+.qsum { margin: 4px 0 0; padding: 0 0 0 30px; display: block; max-height: 340px; overflow: auto; font-size: 13.5px; }
 .qsum li { padding: 6px 0; border-top: 1px solid var(--s-border); }
 .qsum li:first-child { border-top: 0; }
 .qsum li { display: list-item; }

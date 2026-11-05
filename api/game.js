@@ -9,6 +9,7 @@ import * as A from './_lib/archive.js';
 import * as W from './_lib/wall.js';
 import * as D from './_lib/demand.js';
 import * as AC from './_lib/access.js';
+import * as SF from './_lib/safe.js';
 
 // Dealer is open (no password) unless DEALER_LOCK=1 and DEALER_PASSWORD are set in Vercel.
 const DEALER_PW = process.env.DEALER_LOCK === '1' ? process.env.DEALER_PASSWORD || 'mup-dealer' : '';
@@ -61,7 +62,7 @@ async function load(fresh) {
   // v2 adds at most two cheap reads: hash tx (card texts + round terms) and, only while a quiz
   // question is open or revealed, that question's small answers hash.
   const qk = Q.answersKey(meta);
-  const needTx = F.on(meta, 'cards') || F.on(meta, 'rounds');
+  const needTx = F.on(meta, 'cards') || F.on(meta, 'rounds') || F.on(meta, 'wall'); // v3: tx also holds the wall badge counters
   const [players, slips, content, qs, qv, qr, tx, qa] = await Promise.all([
     S.hgetall('players'), S.hgetall('slip:' + meta.block), S.getJSON('content'), S.hgetall('qs'), S.hgetall('qv'), S.hgetall('qr'),
     needTx ? S.hgetall('tx') : {}, qk ? S.hgetall(qk) : {},
@@ -247,10 +248,12 @@ function callList(meta, players, slips) {
   };
 }
 
-function dealerState(meta, players, slips, bd, tx = {}, qa = {}) {
+function dealerState(meta, players, slips, bd, tx = {}, qa = {}, proj = null) {
   const rows = Object.values(players).filter((p) => !p.ghost).map((p) => ({
     id: p.id, name: p.name, team: p.team, hasPin: !!p.pin,
     portfolio: r0(G.portfolio(meta, p.id)), holdings: G.hasHoldings(meta, p.id), slip: slips[p.id] || null,
+    // v3 §2: the live (projected) portfolio while class trades are pending, for the Hráči tab
+    ...(proj?.pending ? { portfolioNow: r0(G.portfolio(proj.pm, p.id)), returnNow: F.returnPct(G.portfolio(proj.pm, p.id)) } : {}),
   }));
   const st = G.stakes(meta, G.RJ);
   const stakes = {};
@@ -265,6 +268,8 @@ function dealerState(meta, players, slips, bd, tx = {}, qa = {}) {
     quizSets: meta.quizSets, quiz: Q.dealerQuiz(meta, players, qa), points: meta.points,
     awards: meta.awards, rounds: meta.rounds, roundTerms: Object.fromEntries(Object.entries(tx).filter(([k]) => k.startsWith('rt:'))),
     rjFund: G.rjFund(meta), tranches: meta.tranches, exit: meta.exit, v2ArchivedAt: meta.v2ArchivedAt || null,
+    // v3 §4: per-team wall counters for the Nástěnky unread badges (dealer.js reads D.wallRev)
+    ...(F.on(meta, 'wall') ? { wallRev: Object.fromEntries(meta.teams.map((t) => [t.id, W.rev(meta, t.id, tx)])) } : {}),
   };
 }
 
@@ -363,10 +368,10 @@ async function studentAction(b) {
   }
   if (b.op === 'restore') {
     const sid = String(b.sid || '');
-    if (!/^[\w-]{4,24}$/.test(sid) || !/^\d{4}$/.test(String(b.pin || ''))) return fail('Přihlas se znovu.', { relogin: true });
+    if (!/^[\w-]{4,24}$/.test(sid) || SF.badKey(sid) || !/^\d{4}$/.test(String(b.pin || ''))) return fail('Přihlas se znovu.', { relogin: true });
     const sameGame = b.gid === meta.gid || meta.auto;
     if ((meta.removed || []).includes(sid)) return fail('Přihlas se znovu.', { relogin: true });
-    let p = players[sid];
+    let p = SF.own(players, sid); // never Object.prototype (sid "__proto__")
     if (p) {
       if (p.pin && p.pin !== pinHash(sid, b.pin)) return fail('Špatný PIN.', { relogin: true });
       if (!p.pin) { p.pin = pinHash(sid, b.pin); await S.hset('players', sid, p); }
@@ -384,15 +389,24 @@ async function studentAction(b) {
         const cur = blk === meta.block ? slips[sid] : (await S.hgetall('slip:' + blk))[sid];
         const ts = Number(sl.ts) || 0;
         if (cur && (Number(cur.ts) || 0) >= ts) continue;
+        // A phone only brings back what the server lost. A slip the server has changes only while betting is open,
+        // and a sent slip for the current block must pass the same checks as submit (no 5M slips, no edits after close).
+        if (cur && !(blk === meta.block && meta.phase === 'betting')) continue;
+        let out = cleanEntries(sl.out, meta), inn = cleanEntries(sl.in, meta);
+        if (sl.submitted && blk === meta.block) {
+          const v = G.validate(meta, sid, p.team, { out, in: inn });
+          if (!v.ok) continue;
+          out = v.out; inn = v.in;
+        }
         await S.hset('slip:' + blk, sid, {
-          out: cleanEntries(sl.out, meta), in: cleanEntries(sl.in, meta), notes: cleanNotes(sl.notes, meta), submitted: !!sl.submitted, ts: ts || Date.now(),
+          out, in: inn, notes: cleanNotes(sl.notes, meta), submitted: !!sl.submitted, ts: ts || Date.now(),
         });
       }
     }
     invalidate();
     return ok({ sid });
   }
-  const p = players[b.sid];
+  const p = SF.own(players, String(b.sid ?? '')); // own keys only (no "__proto__" player)
   if (!p) return fail('Hráč nenalezen. Přihlas se znovu.', { relogin: true });
   if (!/^\d{4}$/.test(String(b.pin || ''))) return fail('PIN musí mít 4 číslice.');
   if (!p.pin) { p.pin = pinHash(p.id, b.pin); await S.hset('players', p.id, p); invalidate(); }
@@ -496,7 +510,7 @@ async function studentAction(b) {
     const slip = slips[p.id];
     if (!slip?.submitted) return fail('Nejdřív investuj.');
     for (const k of ['in', 'out']) {
-      for (const [t, why] of Object.entries(b[k] || {})) if (slip[k]?.[t]) slip[k][t].why = String(why || '').trim().slice(0, 600);
+      for (const [t, why] of Object.entries(b[k] || {})) if (slip[k] && Object.hasOwn(slip[k], t)) slip[k][t].why = String(why || '').trim().slice(0, 600);
     }
     slip.ts = Date.now();
     await S.hset('slip:' + meta.block, p.id, slip);
@@ -557,7 +571,7 @@ async function restoreFrom(d) {
   if (d.tx && typeof d.tx === 'object') {
     const cur = await S.hgetall('tx');
     for (const [f, v] of Object.entries(d.tx)) {
-      if (!v || typeof v !== 'object' || !/^(card|rt):/.test(f)) continue;
+      if (!v || typeof v !== 'object' || !/^(card|rt|wr):/.test(f)) continue;
       const c = cur[f];
       if (!c || (Number(v.updatedAt || v.ts) || 0) > (Number(c.updatedAt || c.ts) || 0)) await S.hset('tx', f, v);
     }
@@ -688,7 +702,7 @@ async function dealerAction(b) {
         ids = Object.values(players).filter((p) => !p.ghost && p.team === b.team).map((p) => p.id);
         if (!ids.length) return fail('Tým zatím nemá žádné hráče.');
       } else {
-        const p = players[b.playerId];
+        const p = SF.own(players, String(b.playerId ?? ''));
         if (!p || p.ghost) return fail('Hráč nenalezen.');
         ids = [p.id];
       }
@@ -706,7 +720,7 @@ async function dealerAction(b) {
     }
     case 'award': {
       if (!F.AWARD_KINDS.includes(b.kind)) return fail('Neznámý druh ocenění.');
-      const p = players[b.playerId];
+      const p = SF.own(players, String(b.playerId ?? ''));
       if (!p || p.ghost) return fail('Hráč nenalezen.');
       const id = F.rid(4);
       const note = String(b.note || '').trim().slice(0, 200);
@@ -942,13 +956,13 @@ async function dealerAction(b) {
     }
     case 'content': {
       const texts = {};
-      for (const [k, v] of Object.entries(b.texts || {})) {
+      for (const [k, v] of Object.entries(b.texts || {}).slice(0, 600)) { // at most 600 keys
         if (/^[\w.]{1,80}$/.test(k) && typeof v === 'string' && v.trim()) texts[k] = v.slice(0, 2000);
       }
       let founders = null;
       if (Array.isArray(b.founders)) {
         founders = b.founders.slice(0, 12)
-          .map((f) => ({ name: String(f?.name || '').trim().slice(0, 40), wiki: String(f?.wiki || '').trim().slice(0, 120), story: String(f?.story || '').trim().slice(0, 200), photo: /^https:\/\//.test(f?.photo || '') ? String(f.photo).slice(0, 500) : '' }))
+          .map((f) => ({ name: String(f?.name || '').trim().slice(0, 40), wiki: /^[a-z-]{2,12}\/[^/?#\s]{1,110}$/.test(String(f?.wiki || '').trim()) ? String(f.wiki).trim() : '', /* „lang/Title“ only: the lang part becomes a hostname on the phones */ story: String(f?.story || '').trim().slice(0, 200), photo: /^https:\/\//.test(f?.photo || '') ? String(f.photo).slice(0, 500) : '' }))
           .filter((f) => f.name);
         if (!founders.length) founders = null;
       }
@@ -982,7 +996,7 @@ async function dealerAction(b) {
       return r.error ? fail(r.error) : ok(r);
     }
     case 'resetPin': {
-      const p = players[b.sid];
+      const p = SF.own(players, String(b.sid ?? ''));
       if (!p) return fail('Hráč nenalezen.');
       p.pin = null;
       await S.hset('players', p.id, p);
@@ -990,7 +1004,7 @@ async function dealerAction(b) {
       return ok();
     }
     case 'movePlayer': {
-      const p = players[b.sid];
+      const p = SF.own(players, String(b.sid ?? ''));
       if (!p || !meta.teams.some((t) => t.id === b.team)) return fail('Hráč nebo tým nenalezen.');
       p.team = b.team;
       await S.hset('players', p.id, p);
@@ -998,7 +1012,7 @@ async function dealerAction(b) {
       return ok();
     }
     case 'removePlayer': {
-      const p = players[b.sid];
+      const p = SF.own(players, String(b.sid ?? ''));
       if (!p) return fail('Hráč nenalezen.');
       if (G.hasHoldings(meta, p.id)) return fail('Hráč už má investice, nejde smazat. Můžeš mu resetovat PIN.');
       await S.hdel('players', p.id);
@@ -1057,7 +1071,9 @@ export default async function handler(req, res) {
       const bd = { qs, qv, qr };
       const view = url.searchParams.get('view');
       if (view === 'archives' || view === 'archive' || view === 'data') {
-        if (!dealerOk(req)) return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
+        // v3: the data view carries every team's wall, so (like the wall view) it needs the x-dealer header
+        // even on an open dealer – a plain browser visit to the URL shows nothing
+        if (!dealerOk(req) || (view === 'data' && req.headers['x-dealer'] === undefined)) return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
         if (view === 'archives') return send(res, 200, { ok: true, archives: await A.listArchives() });
         if (view === 'archive') {
           const archive = await A.getArchive(url.searchParams.get('id'));
@@ -1075,12 +1091,12 @@ export default async function handler(req, res) {
         let viewer;
         if (asW) viewer = { role: 'student', p: asW };
         else if (wsid) {
-          const p = players[wsid];
+          const p = SF.own(players, wsid);
           if (!p || !p.pin || p.pin !== pinHash(p.id, String(req.headers['x-pin'] || ''))) return send(res, 401, { ok: false, error: 'Přihlas se znovu.', relogin: true });
           viewer = { role: 'student', p };
-        } else if (dealerOk(req)) viewer = { role: 'dealer' };
+        } else if (req.headers['x-dealer'] !== undefined && dealerOk(req)) viewer = { role: 'dealer' }; // header required even on an open dealer
         else return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
-        const r = await W.view(meta, viewer, url.searchParams.get('team'));
+        const r = await W.view(meta, viewer, url.searchParams.get('team'), tx);
         return send(res, r.status, r.body);
       }
       const proj = D.project(meta, slips, players);
@@ -1088,21 +1104,21 @@ export default async function handler(req, res) {
       out.content = content;
       const sid = req.headers['x-sid'], pin = req.headers['x-pin'];
       if (sid && pin) {
-        const p = players[sid];
+        const p = SF.own(players, sid);
         if (p && p.pin && p.pin === pinHash(p.id, pin)) out.me = meState(meta, p, slips, bd, players, qa, proj);
         else out.meError = p ? 'pin' : 'unknown';
-        if (out.me && F.on(meta, 'wall')) out.me.wallRev = W.rev(meta, p.team); // v3 §4: badge, read from meta only
+        if (out.me && F.on(meta, 'wall')) out.me.wallRev = W.rev(meta, p.team, tx); // v3 §4: badge, from the tx hash the GET already read
       }
       const asP = AC.asPlayer(req, players); // v3 §10: dealer preview, GET ?as=<sid> with x-dealer
       if (asP) {
         out.me = meState(meta, asP, slips, bd, players, qa, proj); out.asDealer = true; delete out.meError;
-        if (F.on(meta, 'wall')) out.me.wallRev = W.rev(meta, asP.team);
+        if (F.on(meta, 'wall')) out.me.wallRev = W.rev(meta, asP.team, tx);
       }
       if (url.searchParams.get('view') === 'log' && dealerOk(req)) {
         return send(res, 200, { ok: true, storage: S.storageMode, pgEnv: S.pgEnvKey, log: await S.readLog(Number(url.searchParams.get('limit')) || 5000) });
       }
       if (url.searchParams.get('view') === 'dealer' && dealerOk(req)) {
-        out.dealer = dealerState(meta, players, slips, bd, tx, qa);
+        out.dealer = dealerState(meta, players, slips, bd, tx, qa, proj);
         if (url.searchParams.get('dump') === '1') out.dealer.dump = await makeDump();
         if (url.searchParams.get('all') === '1') {
           const all = {};
