@@ -13,5 +13,17 @@
   ],
   "regions": [
     "fra1"
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "v2-*": false,
+      "v2-base": false,
+      "v2-server": false,
+      "v2-phone": false,
+      "v2-table": false,
+      "v2-admin": false,
+      "v2-qa": false,
+      "v2-int": false
+    }
+  }
 }
