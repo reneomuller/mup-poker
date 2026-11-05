@@ -205,6 +205,20 @@ export async function hgetall(key) {
   return out;
 }
 
+// Rarely read hashes (the archive index): after a Redis flush they can be written again before anyone
+// reads them, so Redis may hold only the newest fields. Read both stores and merge; Redis wins on conflicts.
+export async function hgetallBoth(key) {
+  if (!(redis && q)) return hgetall(key);
+  const k = P + key;
+  await sync();
+  let pm = {};
+  try { pm = await pg.hgetall(k); } catch (e) { console.error('postgres read failed', e?.message); }
+  const rm = await rHgetall(k);
+  const out = {};
+  for (const [f, v] of Object.entries({ ...pm, ...rm })) out[f] = parse(v);
+  return out;
+}
+
 export async function hget(key, field) {
   const k = P + key;
   if (redis) {

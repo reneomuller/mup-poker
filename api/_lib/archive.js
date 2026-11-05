@@ -26,7 +26,7 @@ export async function createArchive(label, auto, meta, players, content) {
 }
 
 export async function listArchives() {
-  const idx = await S.hgetall('archi');
+  const idx = await S.hgetallBoth('archi');
   return Object.values(idx).filter(Boolean).sort((a, b) => b.ts - a.ts);
 }
 export const getArchive = (id) => S.hget('arch', String(id || ''));

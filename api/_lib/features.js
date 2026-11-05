@@ -95,7 +95,7 @@ export function addDrivers(m, kind, delta, note, extra) {
   const ts = Date.now();
   for (const t of m.teams) {
     const d = r0(delta[t.id] || 0);
-    if (!d && kind !== 'exit') continue;
+    if (!d && kind !== 'exit' && !(kind === 'round' && t.id in delta)) continue;
     if (kind === 'exit' && delta[t.id] === undefined) continue;
     const n = typeof note === 'object' && note ? note[t.id] || '' : note || '';
     const x = extra?.[t.id] ? { ...extra[t.id] } : {};

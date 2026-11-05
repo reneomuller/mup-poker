@@ -52,12 +52,15 @@ export function applyRounds(m, tx) {
       delta[t.id] = tm.pre - prevV;
       notes[t.id] = KIND_NOTE[roundKind(pct)];
       changed = true;
+    } else {
+      delta[t.id] = 0; // flat round: no price change, still one driver per team with terms
+      notes[t.id] = KIND_NOTE.flat;
     }
   }
   m.rounds[blk] = locked;
   m.settled[blk + 't'] = true;
+  if (Object.keys(delta).length) F.addDrivers(m, 'round', delta, notes);
   if (changed) {
-    F.addDrivers(m, 'round', delta, notes);
     m.history.push(G.snapshot(m, `Kolo bloku ${blk}`));
     F.recordPf(m);
   }
