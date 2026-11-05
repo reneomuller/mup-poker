@@ -284,7 +284,11 @@ select.s-input option, select.s-input optgroup { background: var(--s-bg-2); colo
 .trow input[type=color] { width: 44px; height: 40px; border: 1px solid var(--s-border-2); border-radius: 10px; background: var(--s-bg-2); padding: 3px; cursor: pointer; }
 .tgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
 .tcard { padding: 12px; border-radius: 14px; background: var(--s-bg-2); border: 1px solid var(--s-border); display: grid; gap: 6px; align-content: start; }
-.tch { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
+.tch { display: flex; justify-content: space-between; align-items: center; gap: 8px; cursor: pointer; list-style: none; }
+.tch::-webkit-details-marker { display: none; }
+.tch::after { content: '▾'; color: var(--s-faint); font-size: 12px; transition: transform .2s; }
+details:not([open]) > .tch::after { transform: rotate(-90deg); }
+.tcb { display: grid; gap: 6px; margin-top: 8px; }
 .tcard .lab { margin-top: 6px; margin-bottom: 0; }
 .ms { display: grid; gap: 8px; }
 .msb { display: grid; gap: 2px; }

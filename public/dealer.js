@@ -882,14 +882,15 @@
       const el = gate(id, [t.name, t.color, c, defs]);
       if (!el) continue;
       const blocks = [...new Set(defs.map((d) => d.block))].sort((a, b) => a - b);
-      el.innerHTML = `<div class="tch">${tlabel(t.id)}<span class="s-faint sm">${Object.values(c.milestones || {}).filter(Boolean).length}/${defs.length} milníků</span></div>
+      const prevD = el.querySelector('details'), isOpen = prevD ? prevD.open : window.innerWidth >= 900;
+      el.innerHTML = `<details ${isOpen ? 'open' : ''}><summary class="tch">${tlabel(t.id)}<span class="s-faint sm">${c.oneLiner ? '' : 'bez one-lineru · '}${Object.values(c.milestones || {}).filter(Boolean).length}/${defs.length} milníků</span></summary><div class="tcb">
         <label class="lab">One-liner <span class="cnt" data-cnt="oneLiner"></span></label>
         <input class="s-input sm" data-k="oneLiner" maxlength="90" value="${esc(c.oneLiner || '')}" placeholder="Co dělají, jednou větou">
         <label class="lab">Popis <span class="cnt" data-cnt="sub"></span></label>
         <textarea class="s-input sm" data-k="sub" maxlength="220" rows="3" placeholder="Pro koho, jaký problém, čím jsou jiní">${esc(c.sub || '')}</textarea>
         <div class="lab">Milníky</div>
         <div class="ms">${blocks.map((b) => `<div class="msb"><span class="s-label">Blok ${esc(b)}</span>${defs.filter((d) => d.block === b).map((d) => `<label class="mchk"><input type="checkbox" data-m="${esc(d.key)}" ${c.milestones?.[d.key] ? 'checked' : ''}><span>${esc(d.label)}</span></label>`).join('')}</div>`).join('') || '<span class="s-faint sm">Žádné milníky.</span>'}</div>
-        <div class="tcf"><span class="s-faint sm" data-st></span><button class="s-btn s-sm s-primary" data-save>Uložit kartu</button></div>`;
+        <div class="tcf"><span class="s-faint sm" data-st></span><button class="s-btn s-sm s-primary" data-save>Uložit kartu</button></div></div></details>`;
       watchDirty(el, id);
       const cnt = () => all(el, '[data-cnt]').forEach((s) => { const f = el.querySelector(`[data-k="${s.dataset.cnt}"]`); s.textContent = `${f.value.length}/${f.maxLength}`; });
       cnt();
