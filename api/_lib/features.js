@@ -7,6 +7,7 @@ import { QUIZ_SEED } from './quiz-seed.js';
 export const FEATURE_DEFAULTS = {
   captable: true, cards: true, drivers: true, track: true, quiz: true, points: true,
   rounds: false, market: false, tranches: false, exit: false,
+  demand: true,
 };
 export const OFF = 'Tato funkce je vypnutá.';
 export const REASON_LABELS = { milestone: 'Splněný milník', traction: 'Trakce', team: 'Tým', risk: 'Riziko', market: 'Trh', other: 'Jiné' };
