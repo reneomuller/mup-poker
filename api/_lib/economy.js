@@ -169,7 +169,8 @@ export function applyExit(m, outcomes) {
     if (o.kind === 'acquired' || o.kind === 'ipo') m.ledger.P[t] *= o.multiple;
     else if (o.kind === 'writeoff') m.ledger.P[t] = 0;
   }
-  const delta = deltaSince(m, before);
+  const all = deltaSince(m, before), delta = {};
+  for (const [t, o] of Object.entries(outcomes)) if (o.kind !== 'hold') delta[t] = all[t];
   const notes = {};
   const label = { acquired: 'Akvizice', ipo: 'IPO', hold: 'Bez exitu', writeoff: 'Odpis' };
   for (const [t, o] of Object.entries(outcomes)) notes[t] = o.kind === 'acquired' || o.kind === 'ipo' ? `${label[o.kind]} ${String(o.multiple).replace('.', ',')}×` : label[o.kind];
