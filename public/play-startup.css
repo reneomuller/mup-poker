@@ -43,6 +43,10 @@ body.sd-lock { overflow: hidden; }
 .sd-live { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 6px; font-size: 12.5px; color: var(--s-muted); }
 
 /* chart */
+.sd-seg { display: inline-flex; gap: 2px; margin-top: 12px; padding: 3px; border-radius: 999px; background: var(--s-surface); border: 1px solid var(--s-border); }
+.sd-seg button { min-height: 34px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: var(--s-muted); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.sd-seg button.on { background: var(--s-surface-3); color: var(--s-text); }
+.sd-seg button:focus-visible { outline: 2px solid var(--s-text); outline-offset: 1px; }
 .sd-chart { margin: 10px 0 4px; }
 .sd-plot { position: relative; }
 .sd-svg { display: block; width: 100%; height: auto; overflow: visible; }

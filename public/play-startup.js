@@ -21,7 +21,7 @@
 
   let X = null; // play.js context
   let openId = null, data = null, dataFor = null, dataKey = null, loadErr = false, reqSeq = 0;
-  let lastFocus = null, tip = null, moreOpen = new Set(), wrap = null, sheet = null, body = null;
+  let lastFocus = null, tip = null, moreOpen = new Set(), wrap = null, sheet = null, body = null, mode = 'v';
 
   const st = () => (X ? X.state() : {});
   const on = () => { const { S } = st(); return !!(S && S.features && S.features.startupPage !== false); };
@@ -63,7 +63,7 @@
     const was = openId;
     openId = id;
     tip = null;
-    if (was !== id) { data = null; dataFor = null; dataKey = null; loadErr = false; moreOpen = new Set(); }
+    if (was !== id) { data = null; dataFor = null; dataKey = null; loadErr = false; moreOpen = new Set(); mode = 'v'; }
     if (!was) lastFocus = document.activeElement;
     wrap.hidden = false;
     layout();
@@ -117,9 +117,25 @@
     else if (pendingLive()) last.live = true;
     return pts;
   }
-  function chartHTML(t) {
-    const pts = points(t);
-    if (!pts.length) return '';
+  // „Moje pozice“: the student's stake value in this startup per block (server replay), plus the live value
+  function minePoints(t, d) {
+    const { me } = st();
+    const pts = (d?.mySeries || []).map((p) => ({ ...p }));
+    const now = (me.stakesNow || me.stakes || {})[t.id] || 0, last = pts[pts.length - 1];
+    if (!last || Math.abs(last.V - now) > 0.5) pts.push({ label: 'Teď', block: st().S.block, V: now, live: pendingLive() });
+    else if (pendingLive()) last.live = true;
+    return pts;
+  }
+  function chartHTML(t, d) {
+    const { me } = st();
+    const stake = (me.stakesNow || me.stakes || {})[t.id] || 0;
+    const canMine = t.id !== me.team && Array.isArray(d?.mySeries) && (d.mySeries.length > 0 || stake > 0);
+    if (!canMine) mode = 'v';
+    const mine = mode === 'mine';
+    const pts = mine ? minePoints(t, d) : points(t);
+    const what = mine ? 'Tvůj podíl v' : 'Ocenění';
+    const seg = canMine ? `<div class="sd-seg" role="group" aria-label="Co ukazuje graf"><button type="button" data-sd="mode" data-m="v" aria-pressed="${!mine}" class="${mine ? '' : 'on'}">Ocenění</button><button type="button" data-sd="mode" data-m="mine" aria-pressed="${mine}" class="${mine ? 'on' : ''}">Moje pozice</button></div>` : '';
+    if (!pts.length) return seg;
     const W = 340, H = 150, pl = 58, pr = 12, pt = 14, pb = 10;
     const vals = pts.map((p) => p.V);
     let lo = Math.min(...vals), hi = Math.max(...vals);
@@ -133,7 +149,7 @@
     const line = pts.map((p, i) => `${x(i).toFixed(1)},${y(p.V).toFixed(1)}`).join(' ');
     const grid = [hi - (hi - lo) * 0.12, (hi + lo) / 2, lo + (hi - lo) * 0.12];
     const area = n > 1 ? `<polygon class="sd-area" points="${x(0).toFixed(1)},${H - pb} ${line} ${x(n - 1).toFixed(1)},${H - pb}" fill="url(#sdg)"/>` : '';
-    const svg = `<svg class="sd-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Graf ocenění ${esc(t.name)}: od ${esc(fmtM(vals[0]))} do ${esc(fmtM(vals[n - 1]))}" focusable="false">
+    const svg = `<svg class="sd-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Graf: ${esc(what)} ${esc(t.name)}, od ${esc(fmtM(vals[0]))} do ${esc(fmtM(vals[n - 1]))}" focusable="false">
       <defs><linearGradient id="sdg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${up ? '#3FCF8E' : '#FF5C6C'}" stop-opacity=".30"/><stop offset="1" stop-color="${up ? '#3FCF8E' : '#FF5C6C'}" stop-opacity="0"/></linearGradient></defs>
       ${grid.map((g) => `<line class="sd-gl" x1="${pl}" x2="${W - pr}" y1="${y(g).toFixed(1)}" y2="${y(g).toFixed(1)}"/>`).join('')}
       ${area}
@@ -153,12 +169,12 @@
       const p = pts[tip], prev = tip ? pts[tip - 1].V : null, ch = prev ? (p.V / prev - 1) * 100 : null;
       const lx = (x(tip) / W) * 100, ly = (y(p.V) / H) * 100;
       tipH = `<div class="sd-tip ${lx > 62 ? 'r' : lx < 38 ? 'l' : ''} ${ly < 40 ? 'below' : ''}" style="left:${lx.toFixed(2)}%;top:${ly.toFixed(2)}%" role="status">
-        <span class="s-label">${esc(p.label)}${p.live ? ' · živě' : ''}</span><b class="s-num">${esc(fmtM(p.V))}</b>${ch != null && Math.abs(ch) >= 0.05 ? `<span class="${ch > 0 ? 's-up' : 's-down'}">${ch > 0 ? '▲' : '▼'}${NB}${esc(pct(Math.abs(ch)))}</span>` : ''}</div>`;
+        <span class="s-label">${mine ? 'Tvůj podíl · ' : ''}${esc(p.label)}${p.live ? ' · živě' : ''}</span><b class="s-num">${esc(fmtM(p.V))}</b>${ch != null && Math.abs(ch) >= 0.05 ? `<span class="${ch > 0 ? 's-up' : 's-down'}">${ch > 0 ? '▲' : '▼'}${NB}${esc(pct(Math.abs(ch)))}</span>` : ''}</div>`;
     }
-    const table = `<table class="sd-vh"><caption>Ocenění ${esc(t.name)} po blocích</caption><thead><tr><th scope="col">Bod</th><th scope="col">Ocenění</th></tr></thead>
+    const table = `<table class="sd-vh"><caption>${esc(what)} ${esc(t.name)} po blocích</caption><thead><tr><th scope="col">Bod</th><th scope="col">${mine ? 'Hodnota podílu' : 'Ocenění'}</th></tr></thead>
       <tbody>${pts.map((p) => `<tr><th scope="row">${esc(p.label)}${p.live ? ' (živě)' : ''}</th><td>${esc(fmt(p.V))}</td></tr>`).join('')}</tbody></table>`;
     const xl = n > 1 ? `<div class="sd-xl"><span>${esc(pts[0].label)}</span>${n > 2 ? `<span>${esc(pts[Math.floor((n - 1) / 2)].label)}</span>` : ''}<span>${esc(pts[n - 1].label)}</span></div>` : '';
-    return `<div class="sd-chart" data-key="chart"><div class="sd-plot">${svg}<div class="sd-yl" aria-hidden="true">${yl}</div>${hits}${tipH}</div>${xl}${table}</div>`;
+    return `${seg}<div class="sd-chart ${mine ? 'mine' : ''}" data-key="chart"><div class="sd-plot">${svg}<div class="sd-yl" aria-hidden="true">${yl}</div>${hits}${tipH}</div>${xl}${table}</div>`;
   }
 
   // ---------- content ----------
@@ -192,7 +208,7 @@
         ${showDemand ? `<span class="p-mx sd-dm ${t.mult > 1 ? 's-up' : t.mult < 1 ? 's-down' : ''}" title="Poptávka v tomto bloku">Poptávka ${esc(xmult(t.mult))}</span>` : ''}</div>
       ${live ? '<div class="sd-live"><span class="p-lv"><i></i>živě</span><span>ocenění po tomto bloku, jak to teď vypadá</span></div>' : ''}
     </div>`;
-    h += chartHTML(t);
+    h += chartHTML(t, d);
     h += `<div class="sd-kn" role="list" aria-label="Klíčová čísla">
       <div class="sd-k" role="listitem"><span class="s-label">Cena akcie</span><b class="s-num">${P != null && P > 0 ? esc(numF(P, 2)) + NB + '$' : '–'}</b></div>
       <div class="sd-k" role="listitem"><span class="s-label">Investoři</span><b class="s-num">${invN != null ? esc(num(invN)) : '–'}</b></div>
@@ -266,19 +282,18 @@
   }
 
   // the Startupy cards: tappable, keyboard-reachable, the selected one marked
+  // (play.js puts cardAttrs() into each card's HTML, so its DOM morph never strips them from a focused card)
+  function cardAttrs(t) {
+    if (!X || !on()) return '';
+    return ` tabindex="0" role="button" aria-haspopup="dialog" aria-expanded="${t.id === openId}" aria-label="${esc('Detail startupu ' + t.name)}"`;
+  }
   function markCards() {
-    const cards = document.querySelectorAll('#startups .p-su');
     const enabled = on();
-    cards.forEach((el) => {
+    document.querySelectorAll('#startups .p-su').forEach((el) => {
       const id = (el.getAttribute('data-key') || '').slice(2);
-      if (!enabled) return;
-      if (el.getAttribute('tabindex') !== '0') { el.setAttribute('tabindex', '0'); el.setAttribute('role', 'button'); el.setAttribute('aria-haspopup', 'dialog'); }
-      const t = teamOf(id);
-      const lab = `Detail startupu ${t ? t.name : id}`;
-      if (el.getAttribute('aria-label') !== lab) el.setAttribute('aria-label', lab);
-      el.classList.add('sd-card');
-      el.classList.toggle('sd-sel', id === openId);
-      el.setAttribute('aria-expanded', id === openId ? 'true' : 'false');
+      el.classList.toggle('sd-card', enabled);
+      el.classList.toggle('sd-sel', enabled && id === openId);
+      if (enabled && el.getAttribute('aria-expanded') !== String(id === openId)) el.setAttribute('aria-expanded', String(id === openId));
     });
   }
 
@@ -289,6 +304,7 @@
     const k = a.dataset.sd;
     if (k === 'close') { tap(); close(); }
     else if (k === 'tip') { const i = +a.dataset.i; tip = tip === i ? null : i; tap(); paint(); const b = body.querySelector(`.sd-hit[data-i="${i}"]`); if (b) b.focus({ preventScroll: true }); }
+    else if (k === 'mode') { const m = a.dataset.m === 'mine' ? 'mine' : 'v'; if (m !== mode) { mode = m; tip = null; tap(); paint(); const b = body.querySelector(`[data-sd="mode"][data-m="${m}"]`); if (b) b.focus({ preventScroll: true }); } }
     else if (k === 'more') { const key = a.dataset.k; if (moreOpen.has(key)) moreOpen.delete(key); else moreOpen.add(key); tap(); paint(); }
     else if (k === 'invest') invest();
   }
@@ -389,6 +405,6 @@
       markCards();
       if (openId) { paint(); fetchData(false); }
     },
-    open, close, isOpen: () => openId,
+    open, close, cardAttrs, isOpen: () => openId,
   };
 })();

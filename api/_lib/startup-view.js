@@ -47,6 +47,38 @@ function position(meta, proj, p, t) {
   };
 }
 
+// „Moje pozice“: the viewer's stake value in team t at every history snapshot. Shares change only at a
+// block's showdown (meta.flows[b] = what each investor moved), at that block's trade price = the price in the
+// first „Blok b“ snapshot ÷ the block's demand multiple. Price at a snapshot = V × founders% ÷ FOUNDER_SHARES.
+// Returns null when the replay does not land on the real holdings (e.g. trades from before flows were kept).
+function mySeries(meta, p, t) {
+  if (!p) return null;
+  const FS = G.CFG.FOUNDER_SHARES;
+  const price = (s) => (s?.V?.[t] > 0 && s?.F?.[t] > 0 ? (s.V[t] * s.F[t]) / 100 / FS : null);
+  let sh = 0;
+  const done = new Set(), out = [];
+  for (const s of meta.history || []) {
+    const b = s.block;
+    if (s.label === `Blok ${b}` && !done.has(b) && meta.settled?.[b + 'c']) {
+      done.add(b);
+      const mv = meta.flows?.[b]?.[p.id];
+      const i = mv?.in?.[t]?.amt || 0, o = mv?.out?.[t]?.amt || 0;
+      if (i || o) {
+        const P = price(s);
+        if (!P) return null;
+        const Pt = P / (meta.demand?.[b]?.mult?.[t] || 1);
+        sh = Math.max(0, sh - o / Pt) + i / Pt;
+      }
+    }
+    const P = price(s);
+    if (P != null && s.V?.[t] > 0) out.push({ label: s.label, block: b, V: Math.round(sh * P) });
+  }
+  const real = meta.ledger.H[p.id]?.[t] || 0;
+  if (Math.abs(sh - real) > Math.max(1, real * 0.01)) return null;
+  const first = out.findIndex((x) => x.V > 0);
+  return first < 0 ? [] : out.slice(first);
+}
+
 export function view(req, url, { meta, players, slips, pinHash }) {
   if (meta.features?.startupPage === false) return fail(403, OFF);
   const who = viewerOf(req, players, pinHash);
@@ -74,7 +106,7 @@ export function view(req, url, { meta, players, slips, pinHash }) {
       ok: true, team: t, block: meta.block, phase: meta.phase, pending: proj.pending,
       P: meta.ledger.P[t] || 0, Pnow: proj.pm.ledger.P[t] || 0, V: mt.V, Vnow: mt.Vnow, mult: mt.mult, rank: mt.rank, of: mt.of, chg: mt.chg,
       founders: mt.founders, investorsNow: mt.investorsNow, history: mt.history,
-      mine: position(meta, proj, who.p, t), current, blocks,
+      mine: position(meta, proj, who.p, t), mySeries: mySeries(meta, who.p, t), current, blocks,
     },
   };
 }

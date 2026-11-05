@@ -89,6 +89,11 @@ await main(async () => {
   ok(v2.investorsNow === mt.investorsNow && v2.founders === mt.founders, 'investors and founders % equal the Tým tab');
   const vI2 = await sv(inv, X);
   ok(near(vI2.mine.value, vI.mine.value) && near(vI2.mine.cost, amt), 'position unchanged by the showdown (it was already live)');
+  const meI2 = (await c.me(inv)).me;
+  ok(Array.isArray(vI2.mySeries) && vI2.mySeries.length >= 1 && vI2.mySeries[0].label === 'Blok 1' && near(vI2.mySeries.at(-1).V, meI2.stakes[X], 2),
+    `„Moje pozice“ series ends at the real stake (${vI2.mySeries?.at(-1)?.V} / ${meI2.stakes[X]})`);
+  ok(Array.isArray(vN.mySeries) && vN.mySeries.length === 0, 'no stake → empty series');
+  ok(dv.mySeries === null, 'dealer → no series');
 
   section('RJ after its reveal');
   const rjS = await c.dealer('rjSave', { in: { [X]: { amt: 4_000_000, why: 'RJ důvod' }, [T[3]]: { amt: 3_000_000, why: '' }, [T[4]]: { amt: 3_000_000, why: '' } }, out: {} });
@@ -119,6 +124,17 @@ await main(async () => {
   ok(!v4._raw.includes('TAJNE2'), 'no block 2 reasons');
   ok(v4.current && v4.current.totalIn - v4.current.totalOut === t4.live, `block 2 net (${v4.current && v4.current.totalIn - v4.current.totalOut}) = public live (${t4.live})`);
   ok(v4.Vnow === t4.Vnow && v4.rank === t4.rank, 'live valuation and rank equal the public state in block 2');
+  for (const s of S.slice(0, 6)) {
+    const me = (await c.me(s)).me;
+    for (const t of T) {
+      if (t === s.team) continue;
+      const v = await sv(s, t);
+      const real = me.stakes[t] || 0;
+      const last = v.mySeries?.at(-1)?.V ?? 0;
+      if (!Array.isArray(v.mySeries) || !near(last, real, Math.max(2, real * 0.005))) ok(false, `series of ${s.name} in ${t}: ${last} vs stake ${real}`);
+    }
+  }
+  ok(true, '„Moje pozice“ series match the real stakes for 6 students × 5 teams after RJ and block 1');
 
   section('flag off');
   await c.dealer('features', { set: { startupPage: false } });
