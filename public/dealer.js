@@ -312,7 +312,7 @@
     badge('body', featKnown() && !F('points') ? 'vyp.' : '', 'dim');
     badge('hraci', String(s.playerCount));
     badge('rj', D.settled[s.block + 'r'] ? '✓' : D.rj?.slip?.submitted ? 'uloženo' : '', 'dim');
-    { const n = wallUnreadTotal(); badge('walls', featKnown() && !F('wall') ? 'vyp.' : n ? String(n) : '', featKnown() && !F('wall') ? 'dim' : n ? 'live' : ''); }
+    { const n = wallUnreadTotal(); badge('walls', wallOff() ? 'vyp.' : n ? String(n) : '', wallOff() ? 'dim' : n ? 'live' : ''); }
     tickClock();
   }
   function tickClock() {
@@ -1535,6 +1535,7 @@
 
   // ---------- Nástěnky ----------
   let wallW = null, wallTeam = store.get('mup.wallTeam') || 'all', wallSig = '';
+  const wallOff = () => !!(S && S.features && S.features.wall === false); // missing key = server without v3 yet: still try
   const wallRevs = () => (D && (D.wallRev || D.meta?.wallRev)) || (S && S.meta?.wallRev) || (S && S.wallRev && typeof S.wallRev === 'object' ? S.wallRev : null) || null;
   const wallSeen = (() => { try { return JSON.parse(store.get('mup.wallSeen') || '{}') || {}; } catch { return {}; } })();
   const saveSeen = () => store.set('mup.wallSeen', JSON.stringify(wallSeen));
@@ -1597,11 +1598,11 @@
   function renderWalls() {
     if (seenNext.size) { const ids = [...seenNext]; seenNext = new Set(); markSeen(ids); }
     if (wallTeam !== 'all' && !S.teams.some((t) => t.id === wallTeam)) wallTeam = 'all';
-    const off = featKnown() && !F('wall');
+    const off = wallOff();
     const note = $('wnote');
     note.hidden = !off;
     if (off) {
-      if (!note.dataset.on) { note.innerHTML = offCard('wall', 'Týmy teď nástěnku nevidí. Zapnout ji můžete tady nebo v záložce Funkce.'); note.dataset.on = '1'; }
+      if (!note.dataset.on) { note.innerHTML = '<div class="off"><div><b>Nástěnky týmů jsou vypnuté.</b> Týmy je teď nevidí. Zapnout je můžete tady nebo v\u00a0záložce Funkce.</div><button class="s-btn s-sm" data-enable="wall">Zapnout</button></div>'; note.dataset.on = '1'; }
     } else note.dataset.on = '';
     $('wallbox').hidden = off;
     if (off) { unmountWall(); return; }
