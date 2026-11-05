@@ -234,8 +234,12 @@
     const running = ['question', 'reveal', 'board'].includes(q.state);
     if (op === 'quizStart' && running && !confirm('Kvíz právě běží. Spustit ho znovu od začátku?')) return;
     if (op === 'quizEnd' && running && (q.idx ?? -1) + 1 < (q.total || 0) && !confirm('Ukončit kvíz ještě před poslední otázkou? Na plátně zůstane konečné pořadí.')) return;
-    const extra = op === 'quizStart' ? { setId: qzSel || quizSets()[0]?.id } : {};
-    return act(op, extra);
+    // seq: a double click on a quiz that already moved on is a no-op on the server
+    const extra = op === 'quizStart' ? { setId: qzSel || quizSets()[0]?.id } : { seq: q.seq || 0 };
+    const r = await act(op, extra);
+    if (r.ok && r.quiz && S) { S.quiz = { ...S.quiz, ...r.quiz }; renderTop(); renderPanel(); }
+    if (r.ok && r.stale) toast('Kvíz se mezitím posunul – stav je aktualizovaný.');
+    return r;
   }
 
   // What the organiser most likely wants to do next (one click, top bar).
@@ -321,7 +325,8 @@
     if (!el) return;
     const ph = s.phase;
     const now = { lobby: 0, pitch: 1, betting: 2, closed: 3, showdown: 4, rj: 5, final: 6 }[ph] ?? -1;
-    const done = (i) => ({ 2: now >= 2 || sc, 3: now >= 3 || sc, 4: sc, 5: sr }[i] || false);
+    const mid = now >= 2 && now <= 5;
+    const done = (i) => ({ 2: (mid && now >= 2) || sc, 3: (mid && now >= 3) || sc, 4: sc, 5: sr }[i] || false);
     const pc = (i) => (i === ns.step ? 's-primary' : 's-ghost');
     if (!pteamSel || !s.teams.some((t) => t.id === pteamSel)) pteamSel = null;
     const selTeam = ns.team || pteamSel || s.presenting || s.teams[0]?.id;
@@ -348,7 +353,7 @@
           `<button class="s-btn s-sm ${pc(4)}" id="bshow" ${sc || !['betting', 'closed'].includes(ph) ? 'disabled' : ''}>${E('dealer.btn.showdown')}</button>`)}
         ${step(5, 'Smart money RainbowJet', sr ? 'Odhaleno.' : D.rj?.slip?.submitted ? 'Rozdělení je uložené, čeká na odhalení.' : 'Rozdělení zatím chybí. <button class="linkb" data-goto="rj">Zadat v záložce RJ →</button>',
           `<button class="s-btn s-sm ${pc(5)}" id="brj" ${!sc || sr ? 'disabled' : ''}>${E('dealer.btn.rj')}</button>`)}
-        ${step(6, s.block < s.maxBlock ? 'Další blok' : 'Demo Day', s.block < s.maxBlock ? `Začne blok ${s.block + 1} v lobby.` : 'Poslední blok – zbývá finále.',
+        ${step(6, ph === 'final' ? 'Demo Day' : s.block < s.maxBlock ? 'Další blok' : 'Demo Day', ph === 'final' ? 'Hra je ve finále. Tlačítkem Lobby ji vrátíte zpět.' : s.block < s.maxBlock ? `Začne blok ${s.block + 1} v lobby.` : 'Poslední blok – zbývá finále.',
           `<button class="s-btn s-sm ${s.block < s.maxBlock ? pc(6) : 's-ghost'}" id="bnext" ${s.block >= s.maxBlock ? 'disabled' : ''}>${E('dealer.btn.next')}</button>
            <button class="s-btn s-sm ${s.block >= s.maxBlock ? pc(6) : 's-ghost'}" id="bfinal">${E('dealer.btn.final')}</button>`)}
       </div>`;
@@ -624,9 +629,11 @@
     const el = gate('tranches', [list, f, S.teams.map((t) => [t.id, t.name, t.color])]);
     if (!el) return;
     const st = { locked: ['zamčeno', 's-warn'], released: ['uvolněno', 's-ok'], cancelled: ['zrušeno', ''] };
+    const empty = !(f.available > 0);
     el.innerHTML = `<div class="ch"><h3>Tranše RJ</h3><span class="s-label">k dispozici ${esc(fmtM(f.available || 0))}</span></div>
       <p class="hint">Slib peněz, které RJ uvolní až po splnění podmínky. Tým tranši uvidí hned, peníze dostane po uvolnění (koupí podíl za aktuální cenu).</p>
-      <div class="form2">
+      ${empty ? `<div class="off"><div><b>Ve fondu nic nezbývá.</b> RainbowJet už vložil celých ${esc(fmtM(f.capital || 10e6))}. Na tranše musí zůstat část fondu – zapněte je dřív, než RJ poprvé investuje, a nerozdělujte vše.</div></div>` : ''}
+      <div class="form2" ${empty ? 'hidden' : ''}>
         <select class="s-input sm" id="trteam" aria-label="Tým">${S.teams.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select>
         <input class="s-input sm" id="tramt" inputmode="numeric" placeholder="Částka $, např. 500 000" aria-label="Částka">
         <input class="s-input sm span2" id="trcond" maxlength="160" placeholder="Podmínka, např. 50 platících zákazníků" aria-label="Podmínka">
@@ -1031,7 +1038,7 @@
     tickClock();
   }
 
-  let qe = null, qeId = null;
+  let qe = null, qeId = null, qeOpen = false;
   const newId = () => 's' + Date.now().toString(36);
   function renderQuizSets() {
     if (!show('qzsets', F('quiz'))) return;
@@ -1065,12 +1072,23 @@
         <button class="s-btn s-sm s-ghost" id="qeimp">Importovat JSON</button>
         <button class="s-btn s-sm s-ghost" id="qeexp">Exportovat JSON</button>
         <input type="file" id="qefile" accept=".json,application/json" hidden></div>
-      <div class="s-field"><label class="lab" for="qetitle">Název sady</label><input class="s-input sm" id="qetitle" maxlength="60" value="${esc(qe.title || '')}"></div>
+      ${qeOpen ? `<div class="s-field"><label class="lab" for="qetitle">Název sady</label><input class="s-input sm" id="qetitle" maxlength="60" value="${esc(qe.title || '')}"></div>
       <div class="qlist">${qe.questions.map(qHTML).join('') || '<p class="hint">Sada je prázdná. Přidejte první otázku.</p>'}</div>
       <div class="inl"><button class="s-btn s-sm s-ghost" id="qeadd">+ Přidat otázku</button><span class="grow"></span>
         ${qe.isNew ? '' : '<button class="s-btn s-sm s-danger" id="qedel">Smazat sadu</button>'}
-        <button class="s-btn s-sm s-ghost" id="qedrop">Zahodit změny</button>
-        <button class="s-btn s-sm s-primary" id="qesave">Uložit sadu</button></div>`;
+        <button class="s-btn s-sm s-ghost" id="qedrop">${dirty.qzsets ? 'Zahodit změny' : 'Zavřít'}</button>
+        <button class="s-btn s-sm s-primary" id="qesave">Uložit sadu</button></div>`
+      : `<ol class="qsum">${qe.questions.map((q) => `<li><span>${esc(q.q)}</span><span class="s-faint sm">${'ABCD'[q.correct] || '?'} · ${esc(q.time)} s</span></li>`).join('') || '<li class="s-faint">Sada je prázdná.</li>'}</ol>
+      <div class="inl"><button class="s-btn s-sm" id="qeopen">Upravit otázky</button></div>`}`;
+    if (!qeOpen) {
+      $('qeset').onchange = (e) => { qeId = e.target.value || null; redraw('qzsets'); renderQuizSets(); };
+      $('qeopen').onclick = () => { qeOpen = true; drawQe(); };
+      $('qenew').onclick = () => { qeOpen = true; qe = { id: newId(), title: 'Nová sada', isNew: true, questions: [{ q: '', a: ['', '', '', ''], correct: 0, time: 20 }] }; setQeDirty(); drawQe(); };
+      $('qeimp').onclick = () => $('qefile').click();
+      $('qefile').onchange = async (e) => { const f = e.target.files?.[0]; if (f) { qeOpen = true; importJSON(await f.text()); } e.target.value = ''; };
+      $('qeexp').onclick = () => download(`kviz-${(qe.title || 'sada').replace(/[^\w\u00C0-\u017F-]+/g, '-')}.json`, JSON.stringify({ id: qe.id, title: qe.title, questions: qe.questions }, null, 1));
+      return;
+    }
     $('qeset').onchange = (e) => {
       if (dirty.qzsets && !confirm('Zahodit neuložené změny v sadě?')) { e.target.value = qe.id; return; }
       qeId = e.target.value || null; redraw('qzsets'); renderQuizSets();
@@ -1090,12 +1108,12 @@
       const r = await act('quizDelete', { id: qe.id }, 'Sada smazána');
       if (r.ok) { qeId = null; redraw('qzsets'); }
     };
-    $('qedrop').onclick = () => { redraw('qzsets'); if (qe.isNew) qeId = null; renderQuizSets(); };
+    $('qedrop').onclick = () => { if (dirty.qzsets && !confirm('Zahodit neuložené změny?')) return; qeOpen = false; redraw('qzsets'); if (qe.isNew) qeId = null; renderQuizSets(); };
     $('qesave').onclick = async () => {
       const c = cleanSet(qe);
       if (c.error) return toast(c.error, true);
       const r = await act('quizSave', { set: c.set }, 'Sada uložena');
-      if (r.ok) { qeId = c.set.id; redraw('qzsets'); }
+      if (r.ok) { qeId = c.set.id; qeOpen = false; redraw('qzsets'); }
     };
     all(el, '.qe').forEach((box) => {
       const i = +box.dataset.i, q = qe.questions[i];
@@ -1150,7 +1168,7 @@
     if (!el) return;
     if (!F('points')) { el.innerHTML = `<div class="ch"><h3>Body</h3></div>${offCard('points', 'Kvíz a ocenění se pak nesčítají do žebříčku.')}`; return; }
     el.innerHTML = `<div class="ch"><h3>Přidat nebo ubrat body</h3></div>
-      <div class="s-field"><label class="lab" for="ptarget">Komu</label><select class="s-input sm" id="ptarget"><optgroup label="Celý tým (každý člen)">${S.teams.map((t) => `<option value="team:${t.id}">Tým ${esc(t.name)}</option>`).join('')}</optgroup><optgroup label="Hráč">${rows.map((r) => `<option value="p:${r.id}">${esc(r.name)} · ${tname(r.team)}</option>`).join('')}</optgroup></select></div>
+      <div class="s-field"><label class="lab" for="ptarget">Komu</label><select class="s-input sm" id="ptarget"><optgroup label="Celý tým (každý člen)">${S.teams.map((t) => `<option value="team:${t.id}">${esc(t.name)} – celý tým</option>`).join('')}</optgroup><optgroup label="Hráč">${rows.map((r) => `<option value="p:${r.id}">${esc(r.name)} · ${tname(r.team)}</option>`).join('')}</optgroup></select></div>
       <div class="s-field"><label class="lab" for="pamt">Body (záporné ubírají)</label><div class="inl"><input class="s-input sm num" id="pamt" inputmode="numeric" value="${esc(pAmt)}">${[100, 250, 500, -100].map((v) => `<button class="pq" data-pv="${v}">${v > 0 ? '+' : '−'}${Math.abs(v)}</button>`).join('')}</div></div>
       <div class="s-field"><label class="lab" for="pnote">Za co</label><input class="s-input sm" id="pnote" maxlength="120" placeholder="Např. nejlepší otázka v diskusi"></div>
       <button class="s-btn s-primary" id="padd">Zapsat body</button>`;
@@ -1162,7 +1180,7 @@
       if (!amt || amt < -5000 || amt > 5000) return toast('Body musí být mezi −5 000 a 5 000 a nesmí být 0.', true);
       const [kind, id] = $('ptarget').value.split(':');
       const note = $('pnote').value.trim() || 'Body od RainbowJet';
-      const r = await act('pointsAdd', { ...(kind === 'team' ? { team: id } : { playerId: id }), amt, note, kind: 'manual' }, `${amt > 0 ? 'Přidáno' : 'Ubráno'} ${Math.abs(amt)} b. – ${kind === 'team' ? 'tým ' + team(id).name : pname(id)}`);
+      const r = await act('pointsAdd', { ...(kind === 'team' ? { team: id } : { playerId: id }), amt, note, kind: 'manual' }, `${amt > 0 ? 'Přidáno' : 'Ubráno'} ${Math.abs(amt)} b. – ${kind === 'team' ? team(id).name + ' (celý tým)' : pname(id)}`);
       if (r.ok) { $('pnote').value = ''; dirty.ptsadd = false; }
     };
   }
@@ -1354,6 +1372,7 @@
     const d = tableData();
     const DT = [['teams', 'Týmy'], ['players', 'Hráči'], ['alloc', 'Alokace'], ['points', 'Body']];
     const rows = d ? d.rows.filter((r) => !dq || norm(r.join(' ')).includes(norm(dq))) : [];
+    const tw = el.querySelector('.tblwrap'), scroll = tw ? [tw.scrollTop, tw.scrollLeft] : null;
     const cell = (v, i) => (d.num.includes(i) && typeof v === 'number' ? (d.cols[i].endsWith('%') ? esc(pct(v)) : esc(plain(v))) : esc(v));
     el.innerHTML = `<div class="ch"><h3>Data hry</h3><span class="s-label">${DV?.generated ? 'stav ' + esc(when(DV.generated)) : ''}</span></div>
       ${!DV ? '<p class="hint">Načítám…</p>' : !d ? '<p class="hint">Server zatím datový přehled nepodporuje. Investice stáhnete jako CSV níže.</p>' : `
@@ -1363,7 +1382,10 @@
       <div class="s-faint sm">${rows.length} ${pl(rows.length, 'řádek', 'řádky', 'řádků')}${rows.length > 400 ? ' · zobrazeno prvních 400, CSV obsahuje vše' : ''}</div>
       <div class="tblwrap"><table class="tbl"><thead><tr>${d.cols.map((c, i) => `<th class="${d.num.includes(i) ? 'r' : ''}">${esc(c)}</th>`).join('')}</tr></thead>
         <tbody>${rows.slice(0, 400).map((r) => `<tr>${r.map((v, i) => `<td class="${d.num.includes(i) ? 'r' : ''}">${cell(v, i)}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${d.cols.length}" class="s-faint">Nic nenalezeno.</td></tr>`}</tbody></table></div>`}`;
-    all(el, '[data-dt]').forEach((b) => (b.onclick = () => { dtab = b.dataset.dt; renderTables(); }));
+    const tw2 = el.querySelector('.tblwrap');
+    if (tw2 && scroll && !el.dataset.reset) { tw2.scrollTop = scroll[0]; tw2.scrollLeft = scroll[1]; }
+    delete el.dataset.reset;
+    all(el, '[data-dt]').forEach((b) => (b.onclick = () => { dtab = b.dataset.dt; el.dataset.reset = '1'; renderTables(); }));
     const s = $('dsearch');
     if (s) s.oninput = () => { dq = s.value; keys.dtables = null; const pos = s.selectionStart; s.blur(); renderTables(); const n = $('dsearch'); n.focus(); n.setSelectionRange(pos, pos); };
     if ($('dcsv')) $('dcsv').onclick = () => download(`investicni-stul-${dtab}-${stamp()}.csv`, csvText([d.cols, ...rows]), 'text/csv;charset=utf-8');

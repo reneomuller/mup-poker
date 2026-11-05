@@ -39,6 +39,7 @@ body.adm { margin: 0; overflow-x: hidden; }
 .nx { display: grid; gap: 3px; justify-items: end; }
 .nx .s-label { font-size: 10px; max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #bprimary { min-height: 46px; padding: 0 22px; white-space: nowrap; max-width: 340px; overflow: hidden; text-overflow: ellipsis; }
+#bprimary:disabled { background: var(--s-surface-2); box-shadow: none; color: var(--s-muted); opacity: 1; border: 1px solid var(--s-border-2); }
 #bundo { min-height: 46px; padding: 0 14px; font-size: 18px; }
 #bundo .lg { font-size: 14px; }
 
@@ -383,6 +384,7 @@ input.sw:disabled { opacity: .4; cursor: not-allowed; }
 .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tbl th { position: sticky; top: 0; background: var(--s-surface-2); text-align: left; font-family: var(--s-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--s-label); padding: 9px 10px; white-space: nowrap; font-weight: 500; }
 .tbl td { padding: 7px 10px; border-top: 1px solid var(--s-border); vertical-align: top; max-width: 380px; }
+.tbl td:first-child { white-space: nowrap; }
 .tbl .r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tbl tbody tr:hover td { background: rgba(255, 255, 255, .025); }
 .pinned { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 14px; border-radius: 14px; background: var(--s-grad-soft), var(--s-bg-2); border: 1px solid var(--s-border-2); margin-bottom: 12px; flex-wrap: wrap; }
@@ -398,3 +400,9 @@ details.sm > summary { cursor: pointer; margin-top: 10px; }
 @media (max-width: 899px) { .adm .s-toast { bottom: calc(16px + var(--s-safe-b)); } }
 
 .vblock textarea.s-input.vw { min-height: 42px; }
+.qsum { margin: 4px 0 0; padding: 0 0 0 22px; display: block; max-height: 340px; overflow: auto; font-size: 13.5px; }
+.qsum li { padding: 6px 0; border-top: 1px solid var(--s-border); }
+.qsum li:first-child { border-top: 0; }
+.qsum li { display: list-item; }
+.qsum li > span:first-child { margin-right: 8px; }
+.qsum li::marker { color: var(--s-label); font-family: var(--s-mono); font-size: 11px; }
