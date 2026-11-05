@@ -4,6 +4,7 @@ import * as S from './store.js';
 import * as G from './game.js';
 import * as F from './features.js';
 import * as Q from './quiz.js';
+import * as W from './wall.js';
 
 // The game minus archives and quiz answers: what the dealer laptop keeps and what an archive stores.
 export async function buildDump(meta, players, content) {
@@ -16,6 +17,7 @@ export async function buildDump(meta, players, content) {
 
 export async function createArchive(label, auto, meta, players, content) {
   const dump = await buildDump(meta, players, content);
+  dump.walls = await W.dumpWalls(meta); // v3 §4: the team walls too (reset clears them right after its archive)
   const ts = Date.now();
   const id = ts.toString(36) + crypto.randomBytes(3).toString('hex');
   const obj = { id, ts, label: String(label || 'Archiv').slice(0, 80), auto: !!auto, block: meta.block, dump };
