@@ -635,7 +635,7 @@
       html = `<div class="s-card p-card p-wait"><div class="p-wait-ic">${R.mode === 'initial' ? '$' : '⇄'}</div><div><h3 class="s-h3">${R.mode === 'initial' ? E('play.wait.initTitle', { capital: fmt(R.capital) }) : E('play.wait.rebTitle')}</h3>
         <p class="p-hint">${R.mode === 'initial' ? E('play.wait.initHint') : E('play.wait.rebHint', { max: fmt(R.cashoutMax) })}</p></div></div>`;
     } else if (['closed', 'showdown', 'rj'].includes(S.phase)) {
-      html = `<div class="s-card p-card p-wait p-wait-dim"><div class="p-wait-ic">–</div><div><h3 class="s-h3">V tomto bloku jsi nic neodeslal(a)</h3><p class="p-hint">Tvoje investice zůstávají, jak byly.</p></div></div>`;
+      html = `<div class="s-card p-card p-wait p-wait-dim"><div class="p-wait-ic">–</div><div><h3 class="s-h3">${s?.submitted ? 'V tomto bloku nic neměníš' : 'V tomto bloku jsi nic neodeslal(a)'}</h3><p class="p-hint">Tvoje investice zůstávají, jak byly.</p></div></div>`;
     }
     $('main').innerHTML = html;
     let rt = null;
@@ -814,7 +814,7 @@
 
   // ---------- profile ----------
   const AWARD = { sharpest: 'Nejlepší investor', analyst: 'Nejlepší analytik', contrarian: 'Proti proudu', custom: 'Ocenění' };
-  const PTK = { quiz: 'Kvíz', award: 'Ocenění', milestone: 'Milník', manual: 'Body' };
+  const PTK = { quiz: 'Kvíz', award: 'Ocenění', milestone: 'Milník', manual: 'Bonus' };
   let cardDirty = false, cardBusy = false, roundDraft = null;
   function renderProfile() {
     const t = team(me.team);

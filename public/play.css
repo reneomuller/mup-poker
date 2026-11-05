@@ -498,3 +498,14 @@ body:not(.p-app) .hero h1 { font-family: var(--serif); font-size: 34px; font-wei
 body:not(.p-app) .hero p { color: var(--gold-2); letter-spacing: .24em; text-transform: uppercase; font-size: 11px; font-weight: 700; margin-top: 8px; }
 body:not(.p-app) .hero .bills { position: relative; height: 120px; margin: 10px auto 22px; width: 260px; }
 body:not(.p-app) .hero .bill { position: absolute; left: 50%; bottom: 0; transform-origin: 50% 200%; }
+
+/* short screens: a leaner sticky bar */
+@media (max-height: 780px) {
+  .p-dock { padding-top: 8px; padding-bottom: 8px; }
+  .p-dock-row { min-height: 18px; margin-top: 4px; }
+  .p-dock-btns { margin-top: 4px; }
+  .p-dock-btns .s-btn { min-height: 46px; }
+  .p-top { padding-bottom: 8px; }
+  .p-phase { margin-top: 8px; }
+}
+.arow, .p-nrow, .p-slip { scroll-margin: 140px 0 230px; }
