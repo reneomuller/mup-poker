@@ -210,7 +210,7 @@
     const viaSel = wallOn ? `<label class="rg-via">Připomínka jako <select id="rgvia" class="s-input sm"><option value="wall" ${via === 'wall' ? 'selected' : ''}>úkol na nástěnce</option><option value="msg" ${via === 'msg' ? 'selected' : ''}>zpráva týmu</option></select></label>` : '<span class="s-faint">Připomínka přijde jako zpráva týmu.</span>';
     const settled = !!M().D.settled[S.block + 'c'];
     const missBody = !HL.players.length ? '<p class="s-faint">Zatím se nikdo nepřihlásil.</p>'
-      : settled ? `<p class="s-faint">Showdown bloku ${S.block} už proběhl${miss.length ? ` – neinvestovalo ${HL.notSubmitted.length} ${pl(HL.notSubmitted.length, 'student', 'studenti', 'studentů')}` : ''}. Připomínky se pošlou v\u00a0dalším bloku.</p>`
+      : settled ? `<p class="s-faint">Showdown bloku ${S.block} už proběhl${miss.length ? ` – ${pl(HL.notSubmitted.length, 'neinvestoval', 'neinvestovali', 'neinvestovalo')} ${HL.notSubmitted.length} ${pl(HL.notSubmitted.length, 'student', 'studenti', 'studentů')}` : ''}. Připomínky se pošlou v\u00a0dalším bloku.</p>`
       : !miss.length ? '<p class="s-up">Všichni v tomto bloku investovali.</p>'
         : `${live ? '' : '<p class="s-faint">Investování teď neběží – seznam je pro blok ' + S.block + '.</p>'}
           <div class="rg-nudgebar">${viaSel}<button type="button" class="s-btn s-sm" data-nudge="*">Připomenout všem</button></div>
