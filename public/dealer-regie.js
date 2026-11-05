@@ -418,7 +418,7 @@
     const el = $('rgpanel');
     if (!el || M().tab !== 'regie') return;
     if (!on()) {
-      const html = `<div class="s-card"><div class="off"><div><b>Režie je vypnutá.</b> Plán hodiny, zdraví třídy a připomínky se zapínají v Funkcích.</div><button class="s-btn s-sm" data-enable="regie">Zapnout</button></div></div>`;
+      const html = `<div class="s-card"><div class="off"><div><b>Režie je vypnutá.</b> Plán hodiny, zdraví třídy a připomínky se zapínají v\u00a0Funkcích.</div><button class="s-btn s-sm" data-enable="regie">Zapnout</button></div></div>`;
       if (el.innerHTML !== html) el.innerHTML = html;
       panelSig = '';
       return;
