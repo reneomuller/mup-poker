@@ -36,7 +36,7 @@
 (function () {
   'use strict';
   // non-breaking space after single-letter prepositions/conjunctions
-  function nb(s) { return s.replace(/(^|[\s(„])([vkszouaiVKSZOUAI])\s/g, '$1$2 '); }
+  function nb(s) { return s.replace(/(?<=^|[\s(„\u00a0])([vkszouaiVKSZOUAI]) /g, '$1\u00a0'); }
   var TEAMS = [
     { id: 'zp', name: 'Zdravotní pomůcky', color: '#3FCF8E' },
     { id: 'billi', name: 'Billi', color: '#3586D1' },
