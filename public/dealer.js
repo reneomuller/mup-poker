@@ -224,7 +224,10 @@
     if (r.ok && r.skipped?.length) alert('Neplatné investice (nezapočítány):\n' + r.skipped.map((x) => `${x.name}: ${x.error}`).join('\n'));
   }
   const doRjReveal = () => act('rjReveal', {}, 'Smart money odhaleno');
-  function doNext() { if (confirm(`Uzavřít blok ${S.block} a přejít na blok ${S.block + 1}?`)) return act('nextBlock', {}, `Blok ${S.block + 1}`); }
+  function doNext() {
+    const warn = D?.settled && !D.settled[S.block + 'c'] ? `\n\nPozor: showdown bloku ${S.block} ještě neproběhl. Investice studentů z tohoto bloku se nezapočítají. Nejdřív klikněte na „Showdown třídy“.` : '';
+    if (confirm(`Uzavřít blok ${S.block} a přejít na blok ${S.block + 1}?${warn}`)) return act('nextBlock', {}, `Blok ${S.block + 1}`);
+  }
   function doFinal() {
     if (S.block < S.maxBlock && !confirm(`Přepnout hru na Demo Day? Teprve je blok ${S.block} z ${S.maxBlock}.`)) return;
     return act('phase', { phase: 'final' });
