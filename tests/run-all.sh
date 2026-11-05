@@ -90,11 +90,11 @@ run_one() { # $1 mode, $2 suite, $3 run
   [ $self = 0 ] && stop_server
   [ "$mode" = redis ] && stop_mock
   local p f w
-  p=$(grep -c '^ok' "$log"); f=$(grep -c '^FAIL' "$log"); w=$(grep -c '^WARN' "$log")
+  p=$(grep -c '^ok' "$log"); f=$(grep -cE '^FAIL[ :]' "$log"); w=$(grep -c '^WARN' "$log")
   if [ "$rc" != 0 ] && [ "$f" = 0 ]; then f=1; fi
   if [ "$f" != 0 ]; then
     ANYFAIL=1
-    if [ $QUIET = 0 ]; then echo "---- $mode $suite run $run: $f failed (log $log)"; grep -E '^FAIL' "$log" | head -15; fi
+    if [ $QUIET = 0 ]; then echo "---- $mode $suite run $run: $f failed (log $log)"; grep -E '^FAIL[ :]' "$log" | head -15; fi
   fi
   ROWS+=("$(printf '%-6s %-24s %3s %5s %5s %5s %5ss' "$mode" "$suite" "$run" "$p" "$f" "$w" "$secs")")
   printf '%-6s %-24s run %s: pass %s fail %s warn %s (%ss)\n' "$mode" "$suite" "$run" "$p" "$f" "$w" "$secs"
