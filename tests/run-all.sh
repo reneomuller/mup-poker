@@ -49,8 +49,20 @@ stop_server() {
   SRV_PID=''
 }
 stop_mock() { [ -n "$MOCK_PID" ] && kill "$MOCK_PID" 2>/dev/null; MOCK_PID=''; sleep 0.1; }
+ROWS=(); ANYFAIL=0; CUR=''
+# the table of every suite that finished, plus the one that was running (also on Ctrl-C / kill)
+summary() {
+  echo
+  printf '%-6s %-24s %3s %5s %5s %5s %6s\n' mode suite run pass fail warn time
+  [ ${#ROWS[@]} -gt 0 ] && printf '%s\n' "${ROWS[@]}"
+  [ -n "$CUR" ] && echo "INTERRUPTED during: $CUR"
+  echo "logs: $LOGDIR"
+  if [ -n "$CUR" ]; then echo "INTERRUPTED"; elif [ $ANYFAIL = 0 ]; then echo "ALL PASSED"; else echo "SOME FAILED"; fi
+}
 trap 'stop_server; stop_mock' EXIT
-trap 'stop_server; stop_mock; exit 130' INT TERM
+CHILD=''
+stop_child() { [ -n "$CHILD" ] && { pkill -TERM -P "$CHILD" 2>/dev/null; kill "$CHILD" 2>/dev/null; }; CHILD=''; }
+trap 'stop_child; stop_server; stop_mock; summary; exit 130' INT TERM HUP
 
 store_env() { # $1 = mode
   case "$1" in
@@ -75,21 +87,23 @@ start_server() { # $1 = mode, $2 = log file
   echo "dev server did not start" >&2; return 1
 }
 
-ROWS=(); ANYFAIL=0
 run_one() { # $1 mode, $2 suite, $3 run
   local mode="$1" suite="$2" run="$3" log="$LOGDIR/$1-$2-$3.log" slog="$LOGDIR/$1-$2-$3.server.log"
   local self=0 rc=0
+  CUR="$mode $suite run $run"
   head -5 "tests/$suite" | grep -q '@self-managed' && self=1
   [ "$mode" != mem ] && wipe_pg
   [ "$mode" = redis ] && start_mock
   if [ $self = 0 ]; then start_server "$mode" "$slog" || { echo "server failed" > "$log"; }; fi
   local t0=$SECONDS
   case "$suite" in
-    *.py) BASE="http://localhost:$PB" E_MODE="$mode" ${TMO[@]+"${TMO[@]}"} python3 "tests/$suite" > "$log" 2>&1; rc=$? ;;
+    *.py) BASE="http://localhost:$PB" E_MODE="$mode" ${TMO[@]+"${TMO[@]}"} python3 "tests/$suite" > "$log" 2>&1 & ;;
     *) BASE="http://localhost:$PB/api/game" E_MODE="$mode" E_PORT=$((PB + 1)) MOCK_PORT="$MOCK_PORT" \
          MOCK_URL="$([ "$mode" = redis ] && echo "http://localhost:$MOCK_PORT")" \
-         ${TMO[@]+"${TMO[@]}"} node "tests/$suite" "http://localhost:$PB/api/game" > "$log" 2>&1; rc=$? ;;
+         ${TMO[@]+"${TMO[@]}"} node "tests/$suite" "http://localhost:$PB/api/game" > "$log" 2>&1 & ;;
   esac
+  # in the background + wait, so a Ctrl-C / kill is handled at once (summary) instead of after the suite
+  CHILD=$!; wait "$CHILD"; rc=$?; CHILD=''
   local secs=$((SECONDS - t0))
   [ $self = 0 ] && stop_server
   [ "$mode" = redis ] && stop_mock
@@ -102,6 +116,7 @@ run_one() { # $1 mode, $2 suite, $3 run
   fi
   ROWS+=("$(printf '%-6s %-24s %3s %5s %5s %5s %5ss' "$mode" "$suite" "$run" "$p" "$f" "$w" "$secs")")
   printf '%-6s %-24s run %s: pass %s fail %s warn %s (%ss)\n' "$mode" "$suite" "$run" "$p" "$f" "$w" "$secs"
+  CUR=''
 }
 
 for mode in $MODES; do
@@ -121,9 +136,5 @@ for mode in $MODES; do
   done
 done
 
-echo
-printf '%-6s %-24s %3s %5s %5s %5s %6s\n' mode suite run pass fail warn time
-printf '%s\n' "${ROWS[@]}"
-echo "logs: $LOGDIR"
-[ $ANYFAIL = 0 ] && echo "ALL PASSED" || echo "SOME FAILED"
+summary
 exit $ANYFAIL

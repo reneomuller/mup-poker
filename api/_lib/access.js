@@ -44,6 +44,7 @@ export async function tokenLogin(b, removed, pinHash) {
     if (!p || !tokenOk(p, b.token)) return { error: LT_FAIL };
     const pin = String(crypto.randomInt(0, 10000)).padStart(4, '0');
     delete p.lt;
+    delete p.lock; // v4 guard: a valid login link always works and ends a PIN lockout
     p.pin = pinHash(p.id, pin);
     await S.hset('players', p.id, p);
     return { sid: p.id, pin, name: p.name, team: p.team };
@@ -56,5 +57,5 @@ export function asPlayer(req, players) {
   const q = req.url && req.url.includes('as=') ? new URL(req.url, 'http://local').searchParams.get('as') : null;
   // the x-dealer header must be sent (even on an open dealer), so a plain GET with as= reveals nothing
   if (!q || req.headers['x-dealer'] === undefined || !isDealer(req)) return null;
-  return players[q] || null;
+  return Object.hasOwn(players, q) ? players[q] : null; // v4 guard: own keys only
 }

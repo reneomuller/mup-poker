@@ -1375,7 +1375,7 @@
     const dvp = {};
     for (const p of (DV && DV.players) || []) dvp[p.id] = p;
     const pts = pointsTotals();
-    const el = gate('players', [rows.map((r) => [r.id, r.name, r.team, r.hasPin, r.holdings, r.portfolio]), S.teams.map((t) => [t.id, t.name, t.color]), Object.values(dvp).map((p) => [p.id, p.returnPct]), pts, F('points'), F('track'), S.regOpen]);
+    const el = gate('players', [rows.map((r) => [r.id, r.name, r.team, r.hasPin, r.holdings, r.portfolio, !!r.locked]), S.teams.map((t) => [t.id, t.name, t.color]), Object.values(dvp).map((p) => [p.id, p.returnPct]), pts, F('points'), F('track'), S.regOpen]);
     if (!el) return;
     el.innerHTML = `<div class="ch"><h3>${E('dealer.sec.players')} (${rows.length})</h3><span class="s-badge ${S.regOpen ? 's-ok' : 's-warn'}">${S.regOpen ? 'registrace otevřená' : 'registrace zavřená'}</span></div>
       <p class="hint">Zapomenutý PIN: nejrychlejší je „QR“ – hráč ho naskenuje telefonem a\u00a0je zpátky přihlášený (dostane nový PIN). „PIN“ ho jen smaže a\u00a0hráč si při dalším přihlášení zvolí nový. „Náhled“ ukáže jeho mobil jen pro čtení. Smazat jde jen hráče bez investic.</p>
@@ -1384,7 +1384,7 @@
         ${rows.map((r) => {
           const ret = dvp[r.id]?.returnPct ?? (r.holdings ? (r.portfolio / 1e6 - 1) * 100 : null);
           return `<div class="pr ${F('points') ? 'wp' : ''}" data-id="${r.id}">
-            <span class="pn"><span class="nm">${dot(team(r.team).color)}${esc(r.name)}</span><span class="s-faint sm">${tname(r.team)}${r.hasPin ? '' : ' · <span class="s-down">PIN resetován</span>'}</span></span>
+            <span class="pn"><span class="nm">${dot(team(r.team).color)}${esc(r.name)}</span><span class="s-faint sm">${tname(r.team)}${r.hasPin ? '' : ' · <span class="s-down">PIN resetován</span>'}${r.locked ? ' · <span class="s-down" title="Moc špatných PINů – pomůže QR nebo reset PINu">zamčeno</span>' : ''}</span></span>
             <span class="pv" data-l="Portfolio">${r.holdings ? esc(fmtM(r.portfolio)) : '–'}</span>
             <span class="pv ${ret > 0 ? 's-up' : ret < 0 ? 's-down' : ''}" data-l="Výnos">${ret == null ? '–' : esc(signPct(ret))}</span>
             ${F('points') ? `<span class="pv" data-l="Body">${plain(pts[r.id] || 0)}</span>` : ''}

@@ -9,7 +9,11 @@ import { ok, warnIf, info, section, main, client, startServer, startMock, wipePg
 
 const PORT = Number(process.env.E_PORT || 3106);
 const TAG = 'tagE' + PORT;
-const mode = MODE === 'redis' ? 'redis' : 'pg';
+// E_MODE=mem has no Postgres: the storage that survives the restart is then the mock Upstash alone
+// (storage 'redis', own port), and there is no database to wipe.
+const mode = MODE === 'redis' ? 'redis' : MODE === 'pg' ? 'pg' : 'mock';
+const MOCK_ONLY = 9100 + (PORT % 1000);
+const srvOpts = () => (mode === 'mock' ? { mode: 'mem', env: { UPSTASH_REDIS_REST_URL: `http://localhost:${MOCK_ONLY}`, UPSTASH_REDIS_REST_TOKEN: 'test-token' } } : { mode });
 // OLD_DIR = an existing checkout of v2-base with node_modules (used as is, never deleted);
 // otherwise v2-base is extracted to /tmp/oldE with this checkout's node_modules.
 const OLD = process.env.OLD_DIR || '/tmp/oldE';
@@ -28,15 +32,16 @@ await main(async () => {
     execSync(`rm -rf ${OLD} && mkdir -p ${OLD} && git -C ${ROOT} archive ${ref} api dev-server.js public package.json | tar -x -C ${OLD} && ln -sfn ${ROOT}/node_modules ${OLD}/node_modules`);
   }
   ok(fs.existsSync(path.join(OLD, 'api/game.js')), `old v2-base code in ${OLD}`);
-  wipePg();
+  if (mode !== 'mock') wipePg();
   let mock = null;
   if (mode === 'redis') mock = await startMock(MOCK_PORT);
+  if (mode === 'mock') mock = await startMock(MOCK_ONLY);
 
   // ---------- 1. production state with the OLD code ----------
-  let srv = await startServer({ port: PORT, tag: TAG, cwd: OLD, mode });
+  let srv = await startServer({ port: PORT, tag: TAG, cwd: OLD, ...srvOpts() });
   let c = client(srv.base);
   let st = await c.get();
-  ok(st.storage === (mode === 'redis' ? 'redis+postgres' : 'postgres'), `old server storage = ${st.storage}`);
+  ok(st.storage === ({ redis: 'redis+postgres', pg: 'postgres', mock: 'redis' })[mode], `old server storage = ${st.storage}`);
   const T = st.teams.map((t) => t.id);
   await c.dealer('teams', { teams: T.map((id, i) => ({ id, name: TEAMS[i] })) });
   await c.dealer('content', { texts: { 'play.login.title': 'Investiční stůl – test' } });
@@ -89,7 +94,7 @@ await main(async () => {
 
   // ---------- 2. deploy: new code on the same storage ----------
   section('new code starts on production data');
-  srv = await startServer({ port: PORT, tag: TAG, cwd: ROOT, mode });
+  srv = await startServer({ port: PORT, tag: TAG, cwd: ROOT, ...srvOpts() });
   c = client(srv.base);
   // first contact after the deploy is a burst: table, dealer and phones poll at once
   const burst = await Promise.all([
@@ -196,7 +201,7 @@ await main(async () => {
 
   // restart: no second "Stav před v2"
   await srv.stop();
-  srv = await startServer({ port: PORT, tag: TAG, cwd: ROOT, mode });
+  srv = await startServer({ port: PORT, tag: TAG, cwd: ROOT, ...srvOpts() });
   c = client(srv.base);
   await c.get();
   const arch2 = await c.dget('?view=archives');
