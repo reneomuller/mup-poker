@@ -165,6 +165,11 @@ await main(async () => {
   const late = await c.post({ op: 'restore', sid: P.sid, pin: P.pin, name: P.name, team: P.team, gid: (await c.get()).gid, slips: { 1: { in: { [others[2]]: { amt: 1000000 } }, submitted: true, ts: Date.now() + 1e7 } } });
   const mp2 = await c.me(P);
   ok(late.ok && mp2.me?.slip?.in?.[others[0]]?.amt === 600000 && !mp2.me.slip.in[others[2]], 'after betting closed, restore cannot change a slip the server has');
+  const many = Object.fromEntries(Array.from({ length: 700 }, (_, i) => ['x.k' + i, 'text ' + i]));
+  await c.dealer('content', { texts: many, founders: [{ name: 'Jeff Bezos', wiki: 'en/Jeff_Bezos' }, { name: 'Zlý', wiki: 'evil.example/x?' }] });
+  const ct = (await c.get()).content;
+  ok(Object.keys(ct.texts).length === 600, `content op keeps at most 600 texts (${Object.keys(ct.texts).length})`);
+  ok(ct.founders[0].wiki === 'en/Jeff_Bezos' && ct.founders[1].wiki === '', 'founder wiki only as „lang/Title“ (no foreign host)');
   await srv.stop();
 
   // ---------- short window: the lock ends by itself ----------

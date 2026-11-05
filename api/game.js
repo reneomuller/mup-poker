@@ -956,13 +956,14 @@ async function dealerAction(b) {
     }
     case 'content': {
       const texts = {};
-      for (const [k, v] of Object.entries(b.texts || {})) {
+      for (const [k, v] of Object.entries(b.texts || {}).slice(0, 600)) { // v4 guard: at most 600 keys
         if (/^[\w.]{1,80}$/.test(k) && typeof v === 'string' && v.trim()) texts[k] = v.slice(0, 2000);
       }
       let founders = null;
       if (Array.isArray(b.founders)) {
+        // v4 guard: wiki only as „lang/Title“ (the lang part becomes a hostname on the phones)
         founders = b.founders.slice(0, 12)
-          .map((f) => ({ name: String(f?.name || '').trim().slice(0, 40), wiki: String(f?.wiki || '').trim().slice(0, 120), story: String(f?.story || '').trim().slice(0, 200), photo: /^https:\/\//.test(f?.photo || '') ? String(f.photo).slice(0, 500) : '' }))
+          .map((f) => ({ name: String(f?.name || '').trim().slice(0, 40), wiki: /^[a-z-]{2,12}\/[^/?#\s]{1,110}$/.test(String(f?.wiki || '').trim()) ? String(f.wiki).trim() : '', story: String(f?.story || '').trim().slice(0, 200), photo: /^https:\/\//.test(f?.photo || '') ? String(f.photo).slice(0, 500) : '' }))
           .filter((f) => f.name);
         if (!founders.length) founders = null;
       }
