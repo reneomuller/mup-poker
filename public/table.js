@@ -122,7 +122,7 @@
   const team = (s, id) => (s.teams || []).find((t) => t.id === id) || { id, name: '', color: '#888' };
   const on = (s, k) => !!(s.features && s.features[k]);
   const rem = () => Math.min(innerWidth / 100, innerHeight / 56.25);
-  window.TBL = { $, esc, typo, fmtM, pct, num1, mult, mult2, vnow, nb, setText, setHTML, toggle, fit, tween, team, on, rem, sleep, stage, screens: [], state: () => S };
+  window.TBL = { $, esc, typo, fmtM, pct, num1, mult, mult2, vnow, blockMult, nb, setText, setHTML, toggle, fit, tween, team, on, rem, sleep, stage, screens: [], state: () => S };
 
   function playUrl() { return location.origin + '/play'; }
   function qrSvg(text) {
@@ -238,6 +238,7 @@
       const d = s.reveal.delta || {};
       const potPt = center($('pot'));
       const blk = s.reveal.block || s.block;
+      if (window.TBL.marketClose) await window.TBL.marketClose(s, blk); // v4 tape: „Burza uzavřena“ first
       for (const t of s.teams) {
         const x = d[t.id] || 0, m = blockMult(s, t.id, blk);
         const hasM = m != null && Math.abs(m - 1) > 0.004;
@@ -606,7 +607,7 @@
     if (svg._key === key) return;
     svg._key = key;
     svg.setAttribute('viewBox', `0 0 ${W} ${Ht}`);
-    const fs = 1.45 * u, fsName = 1.6 * u;
+    const fs = Math.max(1.45 * u, innerHeight * 0.022), fsName = Math.max(1.6 * u, innerHeight * 0.022);
     const all = H.flatMap((h) => Object.values(h.V));
     const max = Math.max(1, ...all) * 1.1;
     let nameW = 0;
@@ -686,10 +687,10 @@
     keyedList($('rank'), items, 5.6, ({ t }, i) => {
       const p = prev?.[t.id];
       const ch = v3 ? chgOf(t) * 100 : p ? ((t.V - p) / p) * 100 : 0;
-      const chs = (v3 || p) && Math.abs(ch) >= 0.05 ? `<small class="${ch >= 0 ? 'up' : 'down'}">${ch >= 0 ? '▲' : '▼'} ${pct(Math.abs(ch), false)}</small>` : `<small class="muted">${esc(tx('table.board.same'))}</small>`;
+      const chs = (v3 || p) && Math.abs(ch) >= 0.05 ? `<small class="${ch >= 0 ? 'up' : 'down'}">${esc(chgTxt(ch / 100))}</small>` : `<small class="muted">${esc(tx('table.board.same'))}</small>`;
       const m = pending(s) ? (t.mult ?? null) : settled ? blockMult(s, t.id) : null;
       const ms = m != null && Math.abs(m - 1) > 0.004 ? `<small class="mx ${m < 1 ? 'down' : ''}">${esc(mult2(m))}</small>` : '';
-      return `<span class="pos">${i + 1}</span><span class="tn"><span class="dot" style="background:${t.color}"></span><span class="nmx">${esc(t.name)}</span></span><span class="tv"><b>${esc(fmtM(vnow(t)))}</b><span class="tvs">${ms}${chs}</span></span>`;
+      return `${window.TBL.spark ? window.TBL.spark(s, t) : ''}<span class="pos">${i + 1}</span><span class="tn"><span class="dot" style="background:${t.color}"></span><span class="nmx">${esc(t.name)}</span></span><span class="tv"><b>${esc(fmtM(vnow(t)))}</b><span class="tvs">${ms}${chs}</span></span>`;
     });
   }
 
@@ -793,9 +794,10 @@
         box.appendChild(el);
         cloudEls.set(p.id, el);
       }
-      const [x, y] = SLOTS[i % SLOTS.length];
-      el.style.left = x + '%'; el.style.top = y + '%';
+      el._pid = p.id;
+      if (!window.TBL.placeClouds) { const [x, y] = SLOTS[i % SLOTS.length]; el.style.left = x + '%'; el.style.top = y + '%'; }
     });
+    window.TBL.placeClouds?.(pins.map((p) => cloudEls.get(p.id)), SLOTS); // v4: lay the clouds out around the plates
   }
 
   // ---------- awards spotlight ----------
