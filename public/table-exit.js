@@ -62,7 +62,7 @@
     running = true;
     stage = 'reveal';
     const list = sorted(x);
-    el.className = 'exit stage-reveal';
+    el.classList.remove('stage-final'); el.classList.add('stage-reveal');
     el.innerHTML = `<div class="ex-head"><div class="ex-kick">${esc(tx('table.exit.kick'))}</div><h2>${esc(tx('table.exit.title'))}</h2></div><div class="ex-grid">${cardsHTML(s, list)}</div>`;
     await sleep(1400);
     const cards = el.querySelectorAll('.ex-card');
@@ -79,7 +79,7 @@
     const x = s.exit;
     if (!x) return;
     stage = 'final';
-    el.className = 'exit stage-final';
+    el.classList.remove('stage-reveal'); el.classList.add('stage-final');
     el.innerHTML = `<div class="ex-head"><div class="ex-kick">${esc(tx('table.exit.kick'))}</div><h2>${esc(tx('table.exit.title'))}</h2></div>` + finalHTML(s, x, sorted(x));
     el._fk = JSON.stringify([x.ranking, x.teams, x.contrarian, s.teams.map((t) => [t.name, t.color])]);
   }

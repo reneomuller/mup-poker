@@ -166,10 +166,10 @@ body {
 .board .pcard.cur { box-shadow: 0 0 0 .22rem var(--gold-2), 0 0 2.4rem rgba(232,205,134,.55); border-radius: .6rem; }
 /* market cards as community cards */
 .board.market { gap: .9rem; }
-.board .mcard { width: 9.4rem; height: 12.4rem; border-radius: .7rem; perspective: 60rem; }
+.board .mcard { width: 10rem; height: 12.4rem; border-radius: .7rem; perspective: 60rem; }
 .board .mcard .pcard { width: 100%; height: 100%; border-radius: inherit; }
 .board .mcard .face { padding: .7rem .6rem; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; text-align: left; place-items: initial; }
-.board .mcard .mk { font-family: var(--sans); font-size: 1rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #8a6a1f; }
+.board .mcard .mk { font-family: var(--sans); font-size: 1.45rem; font-weight: 800; color: #8a6a1f; white-space: nowrap; }
 .board .mcard .mt { font-family: var(--serif); font-weight: 900; font-size: 1.5rem; line-height: 1.12; margin-top: .3rem; color: #1b1b1b; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; hyphens: auto; }
 .board .mcard.newest .pcard { box-shadow: 0 0 0 .22rem var(--gold-2), 0 0 2rem rgba(232,205,134,.45); }
 .board .mcard.empty .pcard { opacity: .55; }

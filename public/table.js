@@ -9,6 +9,8 @@
     'table.round.flat': 'Flat',
     'table.tranche.locked': 'Tranše',
     'table.market.kick': 'Karta trhu',
+    'table.market.short': 'Trh',
+    'table.market.block': 'Blok {block}',
     'table.board.points': 'Body',
     'table.board.drivers': 'Co hýbe oceněním',
     'table.board.return': 'výnos',
@@ -349,7 +351,7 @@
     const slots = [...shown];
     while (slots.length < 3) slots.push(null);
     board.innerHTML = slots.map((c, i) => c
-      ? `<div class="mcard ${i === shown.length - 1 ? 'newest' : ''}"><div class="pcard up"><div class="back"></div><div class="face"><div class="mk">${esc(tx('table.market.kick'))}</div><div class="mt">${esc(typo(c.title))}</div></div></div></div>`
+      ? `<div class="mcard ${i === shown.length - 1 ? 'newest' : ''}"><div class="pcard up"><div class="back"></div><div class="face"><div class="mk">${esc(c.block ? tx('table.market.block', { block: c.block }) : tx('table.market.short'))}</div><div class="mt">${esc(typo(c.title))}</div></div></div></div>`
       : `<div class="mcard empty"><div class="pcard"><div class="back"></div><div class="face"></div></div></div>`).join('');
   }
 
@@ -418,6 +420,7 @@
     const leader = [...s.teams].sort((a, b) => b.V - a.V)[0]?.id;
     const cap = on(s, 'captable'), rounds = on(s, 'rounds');
     const rx = rjDelta(s);
+    const anyPriced = rounds && Object.values(s.rounds || {}).some((r) => r && r.kind && r.kind !== 'flat');
     s.teams.forEach((t) => {
       const e = seatEls[t.id];
       if (!e) return;
@@ -449,7 +452,8 @@
       if (r) {
         rb.className = 'rnd ' + (r.kind || 'flat');
         setText(rb, r.kind === 'up' ? '▲ ' + tx('table.round.up') + ' ' + pct(r.pct) : r.kind === 'down' ? '▼ ' + tx('table.round.down') + ' ' + pct(r.pct) : tx('table.round.flat'));
-        toggle(rb, 'hidden', r.kind === 'flat' && !['betting', 'closed', 'showdown', 'rj'].includes(s.phase));
+        // flat badges only make sense next to up/down ones
+        toggle(rb, 'hidden', r.kind === 'flat' && !anyPriced);
       }
       if (!busy) {
         tween(e.val, t.V, fmtM, animate ? 900 : 0);
