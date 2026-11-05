@@ -9,6 +9,7 @@ import * as A from './_lib/archive.js';
 import * as W from './_lib/wall.js';
 import * as D from './_lib/demand.js';
 import * as AC from './_lib/access.js';
+import * as SF from './_lib/safe.js';
 
 // Dealer is open (no password) unless DEALER_LOCK=1 and DEALER_PASSWORD are set in Vercel.
 const DEALER_PW = process.env.DEALER_LOCK === '1' ? process.env.DEALER_PASSWORD || 'mup-dealer' : '';
@@ -367,10 +368,10 @@ async function studentAction(b) {
   }
   if (b.op === 'restore') {
     const sid = String(b.sid || '');
-    if (!/^[\w-]{4,24}$/.test(sid) || !/^\d{4}$/.test(String(b.pin || ''))) return fail('Přihlas se znovu.', { relogin: true });
+    if (!/^[\w-]{4,24}$/.test(sid) || SF.badKey(sid) || !/^\d{4}$/.test(String(b.pin || ''))) return fail('Přihlas se znovu.', { relogin: true });
     const sameGame = b.gid === meta.gid || meta.auto;
     if ((meta.removed || []).includes(sid)) return fail('Přihlas se znovu.', { relogin: true });
-    let p = players[sid];
+    let p = SF.own(players, sid); // never Object.prototype (sid "__proto__")
     if (p) {
       if (p.pin && p.pin !== pinHash(sid, b.pin)) return fail('Špatný PIN.', { relogin: true });
       if (!p.pin) { p.pin = pinHash(sid, b.pin); await S.hset('players', sid, p); }
@@ -388,15 +389,24 @@ async function studentAction(b) {
         const cur = blk === meta.block ? slips[sid] : (await S.hgetall('slip:' + blk))[sid];
         const ts = Number(sl.ts) || 0;
         if (cur && (Number(cur.ts) || 0) >= ts) continue;
+        // A phone only brings back what the server lost. A slip the server has changes only while betting is open,
+        // and a sent slip for the current block must pass the same checks as submit (no 5M slips, no edits after close).
+        if (cur && !(blk === meta.block && meta.phase === 'betting')) continue;
+        let out = cleanEntries(sl.out, meta), inn = cleanEntries(sl.in, meta);
+        if (sl.submitted && blk === meta.block) {
+          const v = G.validate(meta, sid, p.team, { out, in: inn });
+          if (!v.ok) continue;
+          out = v.out; inn = v.in;
+        }
         await S.hset('slip:' + blk, sid, {
-          out: cleanEntries(sl.out, meta), in: cleanEntries(sl.in, meta), notes: cleanNotes(sl.notes, meta), submitted: !!sl.submitted, ts: ts || Date.now(),
+          out, in: inn, notes: cleanNotes(sl.notes, meta), submitted: !!sl.submitted, ts: ts || Date.now(),
         });
       }
     }
     invalidate();
     return ok({ sid });
   }
-  const p = players[b.sid];
+  const p = SF.own(players, String(b.sid ?? '')); // own keys only (no "__proto__" player)
   if (!p) return fail('Hráč nenalezen. Přihlas se znovu.', { relogin: true });
   if (!/^\d{4}$/.test(String(b.pin || ''))) return fail('PIN musí mít 4 číslice.');
   if (!p.pin) { p.pin = pinHash(p.id, b.pin); await S.hset('players', p.id, p); invalidate(); }
@@ -500,7 +510,7 @@ async function studentAction(b) {
     const slip = slips[p.id];
     if (!slip?.submitted) return fail('Nejdřív investuj.');
     for (const k of ['in', 'out']) {
-      for (const [t, why] of Object.entries(b[k] || {})) if (slip[k]?.[t]) slip[k][t].why = String(why || '').trim().slice(0, 600);
+      for (const [t, why] of Object.entries(b[k] || {})) if (slip[k] && Object.hasOwn(slip[k], t)) slip[k][t].why = String(why || '').trim().slice(0, 600);
     }
     slip.ts = Date.now();
     await S.hset('slip:' + meta.block, p.id, slip);
@@ -692,7 +702,7 @@ async function dealerAction(b) {
         ids = Object.values(players).filter((p) => !p.ghost && p.team === b.team).map((p) => p.id);
         if (!ids.length) return fail('Tým zatím nemá žádné hráče.');
       } else {
-        const p = players[b.playerId];
+        const p = SF.own(players, String(b.playerId ?? ''));
         if (!p || p.ghost) return fail('Hráč nenalezen.');
         ids = [p.id];
       }
@@ -710,7 +720,7 @@ async function dealerAction(b) {
     }
     case 'award': {
       if (!F.AWARD_KINDS.includes(b.kind)) return fail('Neznámý druh ocenění.');
-      const p = players[b.playerId];
+      const p = SF.own(players, String(b.playerId ?? ''));
       if (!p || p.ghost) return fail('Hráč nenalezen.');
       const id = F.rid(4);
       const note = String(b.note || '').trim().slice(0, 200);
@@ -986,7 +996,7 @@ async function dealerAction(b) {
       return r.error ? fail(r.error) : ok(r);
     }
     case 'resetPin': {
-      const p = players[b.sid];
+      const p = SF.own(players, String(b.sid ?? ''));
       if (!p) return fail('Hráč nenalezen.');
       p.pin = null;
       await S.hset('players', p.id, p);
@@ -994,7 +1004,7 @@ async function dealerAction(b) {
       return ok();
     }
     case 'movePlayer': {
-      const p = players[b.sid];
+      const p = SF.own(players, String(b.sid ?? ''));
       if (!p || !meta.teams.some((t) => t.id === b.team)) return fail('Hráč nebo tým nenalezen.');
       p.team = b.team;
       await S.hset('players', p.id, p);
@@ -1002,7 +1012,7 @@ async function dealerAction(b) {
       return ok();
     }
     case 'removePlayer': {
-      const p = players[b.sid];
+      const p = SF.own(players, String(b.sid ?? ''));
       if (!p) return fail('Hráč nenalezen.');
       if (G.hasHoldings(meta, p.id)) return fail('Hráč už má investice, nejde smazat. Můžeš mu resetovat PIN.');
       await S.hdel('players', p.id);
@@ -1081,7 +1091,7 @@ export default async function handler(req, res) {
         let viewer;
         if (asW) viewer = { role: 'student', p: asW };
         else if (wsid) {
-          const p = players[wsid];
+          const p = SF.own(players, wsid);
           if (!p || !p.pin || p.pin !== pinHash(p.id, String(req.headers['x-pin'] || ''))) return send(res, 401, { ok: false, error: 'Přihlas se znovu.', relogin: true });
           viewer = { role: 'student', p };
         } else if (req.headers['x-dealer'] !== undefined && dealerOk(req)) viewer = { role: 'dealer' }; // header required even on an open dealer
@@ -1094,7 +1104,7 @@ export default async function handler(req, res) {
       out.content = content;
       const sid = req.headers['x-sid'], pin = req.headers['x-pin'];
       if (sid && pin) {
-        const p = players[sid];
+        const p = SF.own(players, sid);
         if (p && p.pin && p.pin === pinHash(p.id, pin)) out.me = meState(meta, p, slips, bd, players, qa, proj);
         else out.meError = p ? 'pin' : 'unknown';
         if (out.me && F.on(meta, 'wall')) out.me.wallRev = W.rev(meta, p.team, tx); // v3 §4: badge, from the tx hash the GET already read
