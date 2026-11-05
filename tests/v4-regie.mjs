@@ -4,7 +4,10 @@
 // nudges (wall task / team message, all teams, flag off), the run-of-show plan (saved, kept on undo, in dumps,
 // restored after a wipe), recent dealer actions + the undo stack, and that hb never reaches the action log.
 import { execSync } from 'node:child_process';
-import { ok, info, section, main, client, startServer, startMock, freshGame, initialSlip, sleep, MODE, MOCK_PORT, PG_URL, OFF } from './_e-lib.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { ok, info, section, main, client, startServer, startMock, freshGame, initialSlip, sleep, MODE, MOCK_PORT, PG_URL, OFF, ROOT } from './_e-lib.mjs';
 
 const PORT = Number(process.env.E_PORT || 3361);
 const TAG = 'tagE' + PORT;
@@ -146,8 +149,10 @@ await main(async () => {
 
   section('recent actions + undo stack');
   p = await pres();
-  ok(p.actions[0]?.op === 'features' && p.actions.some((a) => a.op === 'nudge') && p.actions.some((a) => a.op === 'phase' && a.phase === 'betting'), 'recent dealer actions, newest first');
+  ok(p.actions.length === 5 && p.actions[0]?.op === 'features' && p.actions.some((a) => a.op === 'nudge' && /^Připomínka /.test(a.label)), `last 5 dealer actions, newest first, named (${p.actions.map((a) => a.label).join(' | ')})`);
   ok(!p.actions.some((a) => a.op === 'auth' || a.op === 'hb'), 'no auth / hb in the list');
+  const m0 = await c.meta();
+  ok(Array.isArray(m0.regieLog) && m0.regieLog.length === 5 && m0.regieLog.every((e) => e.op && e.label && e.ts), 'kept as a ring buffer in meta.regieLog ({ op, label, ts }, ≤ 5)');
   ok(p.undoTop === null, 'nothing undoable yet');
   const sd = await c.dealer('showdown');
   ok(sd.ok, 'showdown');
@@ -175,7 +180,7 @@ await main(async () => {
   meta = await c.meta();
   ok(JSON.stringify(meta.regie?.plan) === JSON.stringify(sp.plan) && !meta.settled[meta.block + 'c'], 'undo reverts the showdown but keeps the plan');
   p = await pres();
-  ok(p.actions[0]?.op === 'undo' && p.actions[0].of?.op === 'showdown' && p.undoTop === null, 'the undo entry names what it reverted');
+  ok(!p.actions.some((a) => a.op === 'showdown') && p.undoTop === null && p.actions.length === 5, `undo restores the history from before the showdown (${p.actions.map((a) => a.label).join(' | ')})`);
   const dmp = await c.dump();
   ok(JSON.stringify(dmp.meta.regie?.plan) === JSON.stringify(sp.plan), 'plan is in the dealer dump');
   await wipe();
@@ -195,9 +200,64 @@ await main(async () => {
   ok(!('regie' in (await c.get())) && (await c.get()).features.regie === false, 'public state only shows the flag');
   await c.dealer('features', { set: { regie: true } });
 
+  section('undo after a priced-round repricing names it');
+  await c.dealer('features', { set: { rounds: true } });
+  await c.dealer('phase', { phase: 'lobby' });
+  const rt = await c.dealer('roundTerms', { team: T[0], pre: 1_100_000 });
+  ok(rt.ok, `round terms set (${rt.error || 'ok'})`);
+  ok((await c.dealer('phase', { phase: 'betting', minutes: 5 })).ok, 'open betting → the block is repriced (backup)');
+  p = await pres();
+  ok(p.undoTop?.op === 'phase' && /^Otevřít investování/.test(p.undoTop.label), `undo would revert the repricing („${p.undoTop?.label}“)`);
+  ok((await c.dealer('timer', { minutes: 2 })).ok, 'a later non-undoable action');
+  p = await pres();
+  ok(p.undoTop?.op === 'phase' && p.actions[0]?.op === 'timer', 'the timer does not change what undo reverts');
+  ok((await c.dealer('undo')).ok, 'undo');
+  p = await pres();
+  ok((await c.get()).phase === 'lobby' && !p.actions.some((a) => /^Otevřít investování/.test(a.label) && a.ts > Date.now() - 3000) && p.actions[0]?.label === 'Lobby', `undo reverted the repricing and its log entry (${p.actions.map((a) => a.label).join(' | ')})`);
+  await c.dealer('features', { set: { rounds: false } });
+
   section('teams without members, PIN-less accounts');
   await c.dealer('removePlayer', { sid: S[0].sid }).catch(() => {});
   p = await pres();
   info(`after restore: ${p.players.length} players, empty teams ${p.emptyTeams.length}`);
   ok(Array.isArray(p.emptyTeams) && Array.isArray(p.noPin), 'empty teams + no-PIN lists present');
+
+  section('Redis cost of a dealer action: regie off = on = v3');
+  // a counting mock Upstash + Redis-only servers (no Postgres), one after the other on PORT+2
+  const MP = PORT + 1, MK = PORT + 2;
+  const rmock = await startMock(MK);
+  const REDIS = { UPSTASH_REDIS_REST_URL: `http://localhost:${MK}`, UPSTASH_REDIS_REST_TOKEN: 'test-token' };
+  async function cost(cwd, set) {
+    await rmock.flush();
+    const s = await startServer({ port: MP, tag: 'tagE' + MP, cwd, mode: 'mem', env: REDIS });
+    const cc = client(s.base);
+    try {
+      await cc.dealer('reset', { confirm: 'RESET' });
+      if (set) await cc.dealer('features', { set });
+      const tm = (await cc.get()).teams[0].id;
+      await cc.dealer('timer', { minutes: 2 }); // warm-up
+      const one = async (op, x) => { await rmock.resetStats(); const r = await cc.dealer(op, x); const st = await rmock.stats(); if (!r.ok) ok(false, `${op}: ${r.error}`); return st.total; };
+      const out = { timer: await one('timer', { minutes: 3 }), pitch: await one('phase', { phase: 'pitch', team: tm, minutes: 3 }) };
+      await cc.dealer('phase', { phase: 'betting', minutes: 5 });
+      out.showdown = await one('showdown'); // pushes a backup (undo stack)
+      out.undo = await one('undo');
+      return out;
+    } finally { await s.stop(); }
+  }
+  const offC = await cost(ROOT, { regie: false });
+  const onC = await cost(ROOT, { regie: true });
+  info(`commands per dealer action – regie off ${JSON.stringify(offC)}, on ${JSON.stringify(onC)}`);
+  ok(JSON.stringify(offC) === JSON.stringify(onC), 'regie on costs exactly the same Redis commands as regie off');
+  let base = null;
+  try { base = execSync(`git -C ${ROOT} rev-parse --verify -q v4-base`, { stdio: 'pipe' }).toString().trim(); } catch {}
+  if (base) { // compare with the v3 code this lane started from
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'regie-v3-'));
+    execSync(`git -C ${ROOT} archive ${base} api public dev-server.js package.json | tar -x -C ${dir}`);
+    fs.symlinkSync(path.join(ROOT, 'node_modules'), path.join(dir, 'node_modules'));
+    const v3 = await cost(dir, null);
+    info(`v3 (v4-base ${base.slice(0, 7)}): ${JSON.stringify(v3)}`);
+    ok(Object.keys(v3).every((k) => onC[k] <= v3[k] && offC[k] <= v3[k]), 'no dealer action costs more Redis commands than on v3');
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  await rmock.stop();
 });

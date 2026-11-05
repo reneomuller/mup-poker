@@ -284,6 +284,7 @@ async function backup(meta) {
     while (b.length > 15) b.shift();
     while (b.length > 1 && JSON.stringify(b).length > 900_000) b.shift();
     await S.setJSON('backups', b);
+    PR.noteBackup(); // v4 regie: the next meta save names what undo reverts
   } catch (e) { console.error('backup failed', e?.message); }
 }
 
@@ -581,7 +582,7 @@ async function dealerAction(b) {
   if (b.op === 'restore') return restoreFrom(b.dump);
   const { meta, players, slips, content, tx, qa } = await load(true);
   const blk = meta.block;
-  const save = async () => { meta.rev = (meta.rev || 0) + 1; meta.auto = false; await S.setJSON('meta', meta); invalidate(); };
+  const save = async () => { meta.rev = (meta.rev || 0) + 1; meta.auto = false; PR.logInMeta(meta, b); await S.setJSON('meta', meta); invalidate(); }; // v4 regie: log in the same write
   const gate = GATES[b.op];
   if (gate && !F.on(meta, gate)) return fail(F.OFF);
   const archive = (label) => A.createArchive(label, true, meta, players, content);
@@ -1140,7 +1141,6 @@ export default async function handler(req, res) {
         const { pin, dump, token, ...rest } = b;
         await S.logAction({ ts: Date.now(), op: b.op, actor: student ? b.sid || r.body.sid || '' : 'dealer', ok: !!r.body.ok, error: r.body.ok ? undefined : r.body.error, body: rest, sid: r.body.sid });
       }
-      if (!student && r.body.ok) await PR.track(b); // v4 regie: recent dealer actions + undo stack
       if (!student && r.body.ok) r.body.dump = await makeDump();
       return send(res, r.status, r.body);
     }
