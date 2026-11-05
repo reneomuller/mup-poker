@@ -185,7 +185,8 @@
     const mine = t.id === me.team;
     const chgP = t.chg != null ? t.chg * 100 : null;
     const rank = t.rank ?? S.teams.slice().sort((a, b) => Vn(b) - Vn(a)).findIndex((x) => x.id === t.id) + 1;
-    const founders = t.cap?.founders ?? d?.founders;
+    // own team: the live founders % from myTeam, like the Startupy card and the Tým header (v3-fix b039246)
+    const founders = (mine && me.myTeam?.founders != null ? me.myTeam.founders : null) ?? t.cap?.founders ?? d?.founders;
     const showDemand = live && t.mult != null && S.features?.demand !== false;
     const cards = S.features?.cards ? S.cards || {} : null;
     const c = cards?.[t.id] || {};
