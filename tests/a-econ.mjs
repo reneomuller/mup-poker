@@ -1,11 +1,12 @@
 // Money and valuation features: cap table, drivers, lots / track record, rounds, market cards, tranches,
 // exit, and the invariants (money conservation, exact 300k, ghosts excluded, no NaN, undo).
+// Fixed-price money math (v2). Demand pricing (V3-SPEC §1) is off here and covered by tests/v3-demand.mjs.
 //   BASE=http://localhost:3101/api/game node tests/a-econ.mjs   (fresh server)
 import { client, ok, done, sum, register, firstSlip, badNumbers, noNaNText } from './a-lib.mjs';
 
 const c = client();
 await c.dealer('reset', { confirm: 'RESET', keepPlayers: false });
-await c.dealer('features', { set: { rounds: true, market: true, tranches: true, exit: true } });
+await c.dealer('features', { set: { rounds: true, market: true, tranches: true, exit: true, demand: false } });
 let st = await c.get();
 const T = st.teams.map((t) => t.id);
 const S = await register(c, 12, T);
