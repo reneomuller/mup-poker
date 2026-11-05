@@ -70,7 +70,7 @@ ok(res.every((x) => x.ok), 'all 18 answers, 6 card edits, dealer ops and ghost a
 st = await c.get();
 ok(st.quiz.answered === 18, 'answered = 18 (ghost not counted), got ' + st.quiz.answered);
 ok(T.every((t, i) => st.cards[t].oneLiner === 'One-liner týmu ' + i && st.cards[t].sub === 'Popis ' + i), 'all 6 card edits kept');
-ok(st.timerLabel === 'Kvíz', 'concurrent dealer op kept');
+ok(st.timerLabel === 'Kvíz' && (await c.get('?view=dealer')).dealer.points.filter((e) => e.note === 'Souběh').length === 3, 'both concurrent dealer ops kept');
 const dup = await c.spost({ op: 'quizAnswer', sid: S[0].sid, pin: S[0].pin, choice: 2 });
 ok(!dup.ok && dup.error === 'Odpověď už máš odeslanou.', 'second answer refused');
 const parallelDup = await Promise.all([0, 1, 2].map((ch) => c.spost({ op: 'quizAnswer', sid: S[0].sid, pin: S[0].pin, choice: ch })));
@@ -110,6 +110,11 @@ ok(st.quiz.state === 'board' && st.quiz.leaders.length === Math.min(10, nCorrect
 ok(st.quiz.leaders.every((l, i, a) => i === 0 || a[i - 1].quizPoints >= l.quizPoints), 'board sorted');
 m0 = await c.me(S[0]);
 ok(m0.me.quiz.runPoints === m0.me.quiz.myPoints && m0.me.quiz.rank >= 1, 'me.quiz.runPoints and rank');
+
+// seq guard: a stale quiz click is a no-op
+const seqNow = (await c.get()).quiz.seq;
+r = await c.dealer('quizBoard', { seq: seqNow - 1 });
+ok(r.ok && r.stale && (await c.get()).quiz.state === 'board' && (await c.get()).quiz.seq === seqNow, 'stale seq ignored');
 
 // question 2 (5 s): deadline
 await c.dealer('quizNext');
