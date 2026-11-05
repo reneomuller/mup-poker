@@ -615,7 +615,7 @@
       <div class="inl"><button class="s-btn s-primary" id="rjsave" ${settledR ? 'disabled' : ''}>Uložit smart money</button>
         <button class="s-btn s-ghost" id="rjreveal" ${!settledC || settledR || !sl.submitted ? 'disabled' : ''}>${E('dealer.btn.rj')}</button></div>
       <div class="err" id="rjerr"></div>
-      ${!settledC && !settledR ? '<p class="hint">Odhalit jde až po showdownu třídy.</p>' : ''}`;
+      ${!settledC && !settledR ? `<p class="hint">Odhalit jde až po showdownu třídy.${S.features?.demand !== false && S.block > 1 ? ' Showdown přecení startupy podle poptávky, takže prodeje (výběry) zadejte až po něm – jinak může být výběr najednou větší než podíl.' : ''}</p>` : ''}`;
     watchDirty(el, 'rj');
     const recalc = () => {
       let o = 0, i = 0;
