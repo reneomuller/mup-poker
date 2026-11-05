@@ -30,6 +30,9 @@ MOCK_PORT="${MOCK_PORT:-8089}"
 PG_URL="postgres://postgres:pw@localhost:5432/mup_e"
 LOGDIR="${E_LOGDIR:-/tmp/e-runs}/$(date +%H%M%S)-$$"
 mkdir -p "$LOGDIR"
+# per-suite time limit; macOS has no `timeout` unless coreutils (gtimeout) is installed
+TMO=()
+if command -v timeout >/dev/null; then TMO=(timeout 600); elif command -v gtimeout >/dev/null; then TMO=(gtimeout 600); fi
 unset KV_REST_API_URL KV_REST_API_TOKEN UPSTASH_REDIS_REST_URL UPSTASH_REDIS_REST_TOKEN DATABASE_URL POSTGRES_URL NEON_DATABASE_URL MUP_PG_LOCAL
 
 API_SUITES=(apitest.mjs apitest2.mjs multitest.mjs boardtest.mjs)
@@ -81,10 +84,10 @@ run_one() { # $1 mode, $2 suite, $3 run
   if [ $self = 0 ]; then start_server "$mode" "$slog" || { echo "server failed" > "$log"; }; fi
   local t0=$SECONDS
   case "$suite" in
-    *.py) BASE="http://localhost:$PB" E_MODE="$mode" timeout 600 python3 "tests/$suite" > "$log" 2>&1; rc=$? ;;
+    *.py) BASE="http://localhost:$PB" E_MODE="$mode" ${TMO[@]+"${TMO[@]}"} python3 "tests/$suite" > "$log" 2>&1; rc=$? ;;
     *) BASE="http://localhost:$PB/api/game" E_MODE="$mode" E_PORT=$((PB + 1)) MOCK_PORT="$MOCK_PORT" \
          MOCK_URL="$([ "$mode" = redis ] && echo "http://localhost:$MOCK_PORT")" \
-         timeout 600 node "tests/$suite" "http://localhost:$PB/api/game" > "$log" 2>&1; rc=$? ;;
+         ${TMO[@]+"${TMO[@]}"} node "tests/$suite" "http://localhost:$PB/api/game" > "$log" 2>&1; rc=$? ;;
   esac
   local secs=$((SECONDS - t0))
   [ $self = 0 ] && stop_server

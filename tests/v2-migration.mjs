@@ -10,7 +10,9 @@ import { ok, warnIf, info, section, main, client, startServer, startMock, wipePg
 const PORT = Number(process.env.E_PORT || 3106);
 const TAG = 'tagE' + PORT;
 const mode = MODE === 'redis' ? 'redis' : 'pg';
-const OLD = '/tmp/oldE';
+// OLD_DIR = an existing checkout of v2-base with node_modules (used as is, never deleted);
+// otherwise v2-base is extracted to /tmp/oldE with this checkout's node_modules.
+const OLD = process.env.OLD_DIR || '/tmp/oldE';
 const NAMES = ['Šimon Dvořák', 'Tereza Nováková', 'Jakub Černý', 'Anna Svobodová', 'Matěj Procházka', 'Eliška Kučerová', 'Vojtěch Veselý', 'Karolína Horáková',
   'Ondřej Němec', 'Natálie Marková', 'Filip Pokorný', 'Adéla Pospíšilová', 'Lukáš Hájek', 'Kristýna Jelínková', 'Dominik Král', 'Barbora Růžičková',
   'Tomáš Beneš', 'Veronika Fialová', 'Štěpán Sedláček'];
@@ -18,8 +20,14 @@ const TEAMS = ['Lumio', 'Parkly', 'Tutorix', 'GreenBox', 'Hrajsport', 'Vetly'];
 
 await main(async () => {
   section(`migration in ${mode} mode`);
-  execSync(`rm -rf ${OLD} && mkdir -p ${OLD} && git -C ${ROOT} archive v2-base api dev-server.js public package.json | tar -x -C ${OLD} && ln -sfn /home/claude/mup-poker/node_modules ${OLD}/node_modules`);
-  ok(fs.existsSync(path.join(OLD, 'api/game.js')), 'old v2-base code extracted to /tmp/oldE');
+  if (process.env.OLD_DIR) info(`old code from OLD_DIR=${OLD}`);
+  else {
+    // local branch v2-base, or only the remote-tracking one in a fresh clone / worktree
+    const ref = ['v2-base', 'origin/v2-base'].find((r) => { try { execSync(`git -C ${ROOT} rev-parse -q --verify ${r}^{commit}`, { stdio: 'ignore' }); return true; } catch { return false; } });
+    if (!ref) throw new Error('no v2-base ref (git fetch origin v2-base, or set OLD_DIR)');
+    execSync(`rm -rf ${OLD} && mkdir -p ${OLD} && git -C ${ROOT} archive ${ref} api dev-server.js public package.json | tar -x -C ${OLD} && ln -sfn ${ROOT}/node_modules ${OLD}/node_modules`);
+  }
+  ok(fs.existsSync(path.join(OLD, 'api/game.js')), `old v2-base code in ${OLD}`);
   wipePg();
   let mock = null;
   if (mode === 'redis') mock = await startMock(MOCK_PORT);
