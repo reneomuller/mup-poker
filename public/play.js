@@ -5,7 +5,8 @@
   const $ = (id) => document.getElementById(id);
   const STEP = 10000;
   const DEMO = /[?&]demo=1(&|$)/.test(location.search);
-  const post = (body) => (DEMO && window.PlayDemo ? window.PlayDemo.post(body, MUP.post) : MUP.post(body));
+  const PA = window.PA || { on: false }; // play-access.js: ?as= dealer preview (GETs get as= + x-dealer, POSTs blocked), #login= token
+  const post = (body) => (!PA.on && DEMO && window.PlayDemo ? window.PlayDemo.post(body, MUP.post) : MUP.post(body));
 
   MUP.addTexts({
     'play.nav.invest': 'Investovat',
@@ -30,13 +31,13 @@
     'play.round.hint': 'Před otevřením investování nastavíte pre-money ocenění vašeho kola. Investice bloku proběhnou za tuto cenu.',
   });
 
-  let sid = localStorage.getItem('mup.sid'), pin = localStorage.getItem('mup.pin');
+  let sid = PA.on ? PA.sid : localStorage.getItem('mup.sid'), pin = PA.on ? null : localStorage.getItem('mup.pin');
   let S = null, me = null, meFail = 0, formKey = null, draft = null, loginKey = null, notesKey = null, tab = 'new';
   let view = 'invest', lastPhase = null, firstRender = true;
 
   // The dealer's "Ghost" button opens /play#ghost=<sid>:<pin>
   const gh = /^#ghost=([\w-]+):(\d{4})$/.exec(location.hash);
-  if (gh) {
+  if (gh && !PA.on) {
     sid = gh[1]; pin = gh[2];
     localStorage.setItem('mup.sid', sid); localStorage.setItem('mup.pin', pin);
     localStorage.removeItem('mup.profile');
@@ -47,7 +48,7 @@
   // (no database, new server instance), the phone quietly pushes them back.
   const LS = {
     get(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch { return null; } },
-    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+    set(k, v) { if (PA.on) return; try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
   };
   const slipsKey = () => 'mup.slips.' + sid;
   function rememberSlip(slip) {
@@ -180,6 +181,7 @@
     el.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { haptic.tap(); tab = b.dataset.tab; loginKey = null; showLogin(); }));
     $('lpin').addEventListener('input', () => { $('lpin').value = $('lpin').value.replace(/\D/g, '').slice(0, 4); });
     $('lform').onsubmit = (e) => { e.preventDefault(); doLogin(); };
+    if (PA.loginError) { $('lerr').textContent = PA.loginError; PA.loginError = null; }
   }
   let logging = false;
   async function doLogin() {
@@ -204,6 +206,7 @@
     kick(0);
   }
   function logout() {
+    if (PA.on) return;
     sid = pin = null; localStorage.removeItem('mup.sid'); localStorage.removeItem('mup.pin'); localStorage.removeItem('mup.profile');
     me = null; loginKey = null; formKey = null; notesKey = null; tab = 'old'; firstRender = true;
     pfShown = null; msgSeenTs = null; revealSeq = null; cardDirty = false; roundDraft = null; quizKey = null;
@@ -1296,6 +1299,7 @@
     netState(true);
     if (DEMO && window.PlayDemo) s = window.PlayDemo.patch(s, sid);
     S = s;
+    if (PA.on) { if (!s.me) return PA.noMe(s); PA.update(s); }
     if (s.me) {
       me = s.me; meFail = 0;
       LS.set('mup.profile', { sid, pin, name: me.name, team: me.team, gid: s.gid });
@@ -1343,6 +1347,8 @@
     if (DEMO) {
       await new Promise((res) => { const sc = document.createElement('script'); sc.src = '/play-demo.js'; sc.onload = res; sc.onerror = res; document.head.appendChild(sc); });
     }
+    if (PA.on && PA.stop) return;
+    if (PA.login) { const r = await PA.tokenLogin(); if (r) { sid = r.sid; pin = r.pin; } }
     loadPortraits();
     applyView();
     loop();
