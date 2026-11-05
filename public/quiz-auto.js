@@ -76,6 +76,9 @@
 
   async function advance(isAuto) {
     if (!live() || busy) return;
+    // a double tap / double space lands after the first step already finished: without this it closed the
+    // question that had just opened (0 answers) or skipped the leaderboard
+    if (!isAuto && Date.now() - lastAdv < 1200) return;
     busy = true; lastAdv = Date.now(); render();
     try {
       const r = await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json', ...hdr() }, body: JSON.stringify({ op: 'quizAdvance', seq: q.seq || 0, ...(isAuto ? { auto: true } : {}) }) }).then((x) => x.json());
