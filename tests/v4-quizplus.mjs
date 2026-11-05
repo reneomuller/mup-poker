@@ -170,8 +170,11 @@ await main(async () => {
   ok(ex.ok && ex.questions.length === 3 && ex.title === 'Kvíz plus' && ex.players === 18, 'per-run export: 3 questions, 18 players');
   const [x1, x2, x3] = ex.questions;
   ok(JSON.stringify(x1.counts) === JSON.stringify([6, 6, 0, 0]) && x1.correct === 1 && x1.correctN === 6 && x1.answered === 12 && x1.pctCorrect === 50 && x1.double === true, `Q1 split ${JSON.stringify(x1.counts)}, 50 % correct, ×2`);
-  const fastest1 = S.slice(0, 6).map((s) => [s, run1.answers[s.sid].ms]).sort((a, b) => a[1] - b[1])[0];
-  ok(x1.fastest && x1.fastest.name === fastest1[0].name && x1.fastest.ms === Math.round(fastest1[1]), `Q1 fastest correct = ${x1.fastest?.name}`);
+  // the export rounds to whole ms, so two answers can tie: any student at the minimum counts as fastest
+  const ms1 = (s) => Math.round(run1.answers[s.sid].ms);
+  const minMs1 = Math.min(...S.slice(0, 6).map(ms1));
+  const tied1 = S.slice(0, 6).filter((s) => ms1(s) === minMs1).map((s) => s.name);
+  ok(x1.fastest && tied1.includes(x1.fastest.name) && x1.fastest.ms === minMs1, `Q1 fastest correct = ${x1.fastest?.name} (one of ${tied1.join('/')})`);
   const a1 = Object.entries(run1.answers).filter(([sid]) => sid !== G.sid).map(([, a]) => Math.round(a.ms));
   const avg1 = Math.round(a1.reduce((x, y) => x + y, 0) / a1.length);
   ok(Math.abs(x1.avgMs - avg1) <= 1, `Q1 average ms ${x1.avgMs} ≈ ${avg1}`);
