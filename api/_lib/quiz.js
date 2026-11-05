@@ -21,6 +21,15 @@ export function score(raw, time) {
   return Math.min(1000, Math.max(500, s));
 }
 
+// Answer streak (Kahoot-style, half size): the 2nd correct answer in a row +50, the 3rd +100 … capped at +250.
+export const streakBonus = (streak) => Math.min(250, 50 * Math.max(0, (Number(streak) || 0) - 1));
+// Streaks after the last scored question: { at: idx, by: { sid: n } } (only students who got it right).
+// Questions are scored in order, once each, so this is a pure function of the run's answers so far.
+export function streakOf(z, sid) {
+  const st = z?.streak;
+  return st && z.runId && st.at >= (z.idx ?? -1) - 1 ? st.by?.[sid] || 0 : 0;
+}
+
 export function cleanSet(set) {
   if (!set || typeof set !== 'object') return { error: 'Chybí sada otázek.' };
   const id = set.id === undefined || set.id === '' ? 's' + F.rid(3) : String(set.id).trim();
@@ -53,7 +62,7 @@ const bump = (m, patch) => { Object.assign(m.quiz, patch); m.quiz.seq = (m.quiz.
 export function start(m, setId) {
   const s = m.quizSets.find((x) => x.id === setId);
   if (!s || !s.questions.length) return 'Sada otázek nenalezena.';
-  bump(m, { runId: F.rid(4), setId: s.id, idx: -1, state: 'board', startedAt: null, endsAt: null, scored: [], res: null, startTs: Date.now() });
+  bump(m, { runId: F.rid(4), setId: s.id, idx: -1, state: 'board', startedAt: null, endsAt: null, scored: [], res: null, startTs: Date.now(), streak: null });
   return null;
 }
 
@@ -65,19 +74,29 @@ export function scoreCurrent(m, players, qa) {
   z.scored = z.scored || [];
   if (z.scored.includes(key)) return;
   const counts = q.a.map(() => 0);
-  let answered = 0, fastest = null;
-  for (const [sid, ans] of Object.entries(qa || {})) {
+  // a streak continues only from the question right before this one (wrong / no answer there = reset)
+  const prev = z.streak && z.streak.at === z.idx - 1 ? z.streak.by || {} : {};
+  const by = {};
+  let answered = 0, fastest = null, top = null;
+  // fastest first (stable: ties keep the hash order), so topStreak ties go to the quicker answer
+  const rows = Object.entries(qa || {}).sort((a, b) => (Number(a[1]?.ms) || 0) - (Number(b[1]?.ms) || 0));
+  for (const [sid, ans] of rows) {
     const p = players[sid];
     if (!p || p.ghost || !ans) continue;
     const c = Number(ans.choice);
     if (!(c >= 0 && c < q.a.length)) continue;
     counts[c]++; answered++;
     if (c === q.correct) {
-      F.addPoints(m, sid, score(ans.ms, q.time), 'quiz', `Kvíz: otázka ${z.idx + 1}`, { run: z.runId, qi: z.idx });
+      const streak = (prev[sid] || 0) + 1, base = score(ans.ms, q.time), bonus = streakBonus(streak);
+      by[sid] = streak;
+      const note = `Kvíz: otázka ${z.idx + 1}` + (bonus > 0 ? ` · série ${streak} (+${bonus})` : '');
+      F.addPoints(m, sid, base + bonus, 'quiz', note, { run: z.runId, qi: z.idx, base, bonus });
       if (!fastest || ans.ms < fastest.ms) fastest = { name: p.name, team: p.team, ms: Math.max(0, Math.round(ans.ms)) };
+      if (streak >= 2 && (!top || streak > top.streak)) top = { name: p.name, team: p.team, streak };
     }
   }
-  z.res = { key, counts, answered, fastest };
+  z.streak = { at: z.idx, by };
+  z.res = { key, counts, answered, fastest, topStreak: top };
   z.scored.push(key);
 }
 
@@ -141,7 +160,7 @@ export function publicQuiz(m, players, qa) {
     Object.assign(out, { q: q.q, a: q.a, time: q.time, startedAt: z.startedAt, endsAt: z.endsAt, answered });
   } else if (z.state === 'reveal' && q) {
     const res = z.res || { counts: q.a.map(() => 0), answered: 0, fastest: null };
-    Object.assign(out, { q: q.q, a: q.a, correct: q.correct, counts: res.counts, answered: res.answered, fastest: res.fastest });
+    Object.assign(out, { q: q.q, a: q.a, correct: q.correct, counts: res.counts, answered: res.answered, fastest: res.fastest, topStreak: res.topStreak || null });
   } else if (z.state === 'board' || z.state === 'done') {
     const { tot, run } = runBoard(m, players);
     out.leaders = Object.entries(run)
@@ -164,6 +183,8 @@ export function meQuiz(m, p, players, qa) {
     myChoice: Number.isInteger(mine) ? mine : null,
     myCorrect: z.state === 'reveal' && q ? mine === q.correct : null,
     myPoints: z.state === 'reveal' || z.state === 'board' || z.state === 'done' ? qp?.amt || 0 : 0,
+    myBonus: z.state === 'reveal' || z.state === 'board' || z.state === 'done' ? qp?.bonus || 0 : 0,
+    streak: p.ghost ? 0 : streakOf(z, p.id),
     runPoints,
     rank: p.ghost || !z.runId ? null : 1 + Object.keys(tot).filter((id) => (run[id] || 0) > runPoints).length,
   };

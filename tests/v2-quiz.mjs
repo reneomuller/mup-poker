@@ -88,7 +88,7 @@ await main(async () => {
   warnIf(st.quiz.answered === 15, 'ghost answer counted in quiz.answered');
   const mesQ = await Promise.all(S.map((s) => c.me(s)));
   leak('public + 18 phones', [st, ...mesQ, await c.me(G)]);
-  shape('me.quiz (question)', mesQ[0].me?.quiz, { myChoice: 'number|null', myCorrect: 'null|boolean', myPoints: 'number|null', runPoints: 'number', rank: 'number|null' }, { strict: true });
+  shape('me.quiz (question)', mesQ[0].me?.quiz, { myChoice: 'number|null', myCorrect: 'null|boolean', myPoints: 'number|null', myBonus: 'number', streak: 'number', runPoints: 'number', rank: 'number|null' }, { strict: true });
   ok(mesQ.every((m, i) => m.me.quiz.myChoice === choice0(i)), 'myChoice = the answer sent (first answer kept after a double)');
   checkClean('quiz question state', st, ...mesQ);
 
@@ -96,7 +96,7 @@ await main(async () => {
   ok((await c.dealer('quizReveal')).ok, 'quizReveal');
   st = await c.get();
   seqs.push(st.quiz.seq);
-  shape('quiz (reveal)', st.quiz, { state: 'string', seq: 'number', setTitle: 'string', idx: 'number', total: 'number', serverNow: 'number', q: 'string', a: 'array', correct: 'number', counts: 'array', answered: 'number', fastest: 'object|null' }, { strict: true });
+  shape('quiz (reveal)', st.quiz, { state: 'string', seq: 'number', setTitle: 'string', idx: 'number', total: 'number', serverNow: 'number', q: 'string', a: 'array', correct: 'number', counts: 'array', answered: 'number', fastest: 'object|null', topStreak: 'object|null' }, { strict: true });
   const counts = st.quiz.counts || [];
   const expCounts = [0, 0, 0, 0];
   S.forEach((s, i) => { if (choice0(i) !== null) expCounts[choice0(i)]++; });
@@ -110,7 +110,8 @@ await main(async () => {
   meta = await c.meta();
   const qe = (meta.points || []).filter((e) => e.kind === 'quiz' && e.note === 'Kvíz: otázka 1');
   ok(qe.length === 9, `9 ledger entries for 9 correct students (${qe.length})`);
-  if (qe[0]) shape('points entry', qe[0], { id: 'string', ts: 'number', block: 'number', playerId: 'string', amt: 'number', kind: 'string', note: 'string' }, { strict: true });
+  if (qe[0]) shape('points entry', qe[0], { id: 'string', ts: 'number', block: 'number', playerId: 'string', amt: 'number', kind: 'string', note: 'string', run: 'string', qi: 'number', base: 'number', bonus: 'number' }, { strict: true });
+  ok(qe.every((e) => e.bonus === 0 && e.base === e.amt) && st.quiz.topStreak === null, 'first question: no streak bonus, no topStreak');
   const scoreOk = S.slice(0, 9).every((s) => { const a = run0?.answers?.[s.sid]; const e = qe.find((x) => x.playerId === s.sid); return a && e && e.amt === quizScore(a.ms, 20) && e.amt >= 500 && e.amt <= 1000; });
   ok(scoreOk, 'score = round(1000 × (1 − 0.5 × ms / (time × 1000))), clamped 500…1000');
   ok(!qe.some((e) => e.playerId === G.sid), 'ghost scores nothing');
@@ -153,11 +154,17 @@ await main(async () => {
   await c.dealer('quizReveal');
   meta = await c.meta();
   const d2 = (await c.dget('?view=data')).quizRuns.find((r) => r.idx === 1 && r.setId === 'qz' && r.runId === runId0);
-  const e0 = meta.points.find((e) => e.note === 'Kvíz: otázka 2' && e.playerId === S[0].sid);
-  const e2 = meta.points.find((e) => e.note === 'Kvíz: otázka 2' && e.playerId === S[2].sid);
-  ok(e0 && e0.amt === quizScore(d2.answers[S[0].sid].ms, 5) && e0.amt > 900, `fast answer scores ${e0?.amt}`);
-  ok(e2 && e2.amt === 500, `answer after the time limit is clamped to 500 (${e2?.amt}, ms ${d2?.answers?.[S[2].sid]?.ms})`);
-  ok(!meta.points.some((e) => e.note === 'Kvíz: otázka 2' && e.playerId === S[1].sid), 'refused late answer scores nothing');
+  const q2e = (s) => meta.points.find((e) => e.kind === 'quiz' && e.run === runId0 && e.qi === 1 && e.playerId === s.sid);
+  const e0 = q2e(S[0]), e2 = q2e(S[2]);
+  // S0 and S2 were right on question 1 too: 2nd correct answer in a row → +50
+  ok(e0 && e0.base === quizScore(d2.answers[S[0].sid].ms, 5) && e0.base > 900 && e0.bonus === 50 && e0.amt === e0.base + 50, `fast answer scores ${e0?.base} + streak 50`);
+  ok(e2 && e2.base === 500 && e2.amt === 550, `answer after the time limit is clamped to 500 (+50 streak) (${e2?.amt}, ms ${d2?.answers?.[S[2].sid]?.ms})`);
+  ok(e0?.note === 'Kvíz: otázka 2 · série 2 (+50)', `streak note: „${e0?.note}“`);
+  ok(!q2e(S[1]), 'refused late answer scores nothing');
+  st = await c.get();
+  ok(st.quiz.topStreak && st.quiz.topStreak.streak === 2 && [S[0].name, S[2].name].includes(st.quiz.topStreak.name), 'reveal 2: topStreak ' + JSON.stringify(st.quiz.topStreak));
+  const me2 = await Promise.all([S[0], S[1], S[2]].map((s) => c.me(s)));
+  ok(me2[0].me.quiz.streak === 2 && me2[0].me.quiz.myBonus === 50 && me2[1].me.quiz.streak === 0 && me2[1].me.quiz.myBonus === 0, 'me.quiz.streak / myBonus after question 2');
 
   section('question 3: speed matters');
   await c.dealer('quizBoard');
@@ -169,9 +176,12 @@ await main(async () => {
   ok([...ra, ...rb].every((r) => r.ok), '18 answers in two waves');
   await c.dealer('quizReveal');
   meta = await c.meta();
-  const p3 = (s) => meta.points.find((e) => e.note === 'Kvíz: otázka 3' && e.playerId === s.sid)?.amt || 0;
+  const q3 = meta.points.filter((e) => e.kind === 'quiz' && e.run === runId0 && e.qi === 2);
+  const p3 = (s) => q3.find((e) => e.playerId === s.sid)?.base || 0;
   ok(Math.min(...waveA.map(p3)) > Math.max(...waveB.map(p3)), `every fast answer beats every answer 2 s later (${Math.min(...waveA.map(p3))} > ${Math.max(...waveB.map(p3))})`);
-  ok(meta.points.filter((e) => e.note === 'Kvíz: otázka 3').length === 18, '18 entries, none lost');
+  ok(q3.length === 18, '18 entries, none lost');
+  // streak into question 3: S0, S2 right on 1–3 (+100); S1 refused on 2 and S3–S8 silent on 2 (reset → +0); S9+ wrong on 1 (+0)
+  ok(q3.every((e) => e.bonus === ([S[0].sid, S[2].sid].includes(e.playerId) ? 100 : 0) && e.amt === e.base + e.bonus), 'question 3: +100 for 3 in a row, reset after a wrong / missing answer');
 
   section('done, end, restart');
   await c.dealer('quizNext');
