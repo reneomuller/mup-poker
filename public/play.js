@@ -799,7 +799,7 @@
       const capF = feat('captable') && t.cap ? t.cap.founders : null;
       return `<article class="s-card p-card p-su ${t.id === me.team ? 'mine' : ''}" data-key="su${t.id}" style="--tc:${esc(t.color)}">
         <div class="p-su-h"><span class="p-su-ic">${esc(initials(t.name))}</span><div class="p-su-n"><b>${esc(t.name)}</b>${t.id === me.team ? '<span class="s-badge">Tvůj tým</span>' : ''}</div>
-          <div class="p-su-v"><span class="s-num">${esc(fmtM(t.V))}</span>${r && r.kind ? `<span class="s-badge ${r.kind === 'up' ? 's-ok' : r.kind === 'down' ? 's-bad' : ''}">${esc(ROUND[r.kind] || '')}${r.pct ? ' ' + esc(spct(r.pct)) : ''}</span>` : '<span class="s-label">ocenění</span>'}</div></div>
+          <div class="p-su-v"><span class="s-num">${esc(fmtM(t.V))}</span>${r && r.kind && r.kind !== 'flat' ? `<span class="s-badge ${r.kind === 'up' ? 's-ok' : r.kind === 'down' ? 's-bad' : ''}">${esc(ROUND[r.kind] || '')}${r.pct ? ' ' + esc(spct(r.pct)) : ''}</span>` : '<span class="s-label">ocenění</span>'}</div></div>
         ${c.oneLiner ? `<p class="p-su-one">${esc(c.oneLiner)}</p>` : cards ? '<p class="p-su-one s-faint">Tým zatím nenapsal one-liner.</p>' : ''}
         ${c.sub ? `<p class="p-su-sub">${esc(c.sub)}</p>` : ''}
         ${ms ? `<div class="p-mss">${ms}</div>` : ''}
@@ -900,17 +900,20 @@
   function roundRange() {
     const V = team(me.team).V || 0;
     const r10 = (v) => Math.round(v / 10000) * 10000;
-    return [r10(V * 0.5), r10(V * 2), V];
+    const b = me.roundBounds;
+    return b && b.max ? [b.min, b.max, V] : [r10(V * 0.5), r10(V * 2), V];
   }
+  // a team without terms gets { pre = prev = V, kind 'flat' } from the server: that's "no terms yet"
+  const hasTerms = (r) => !!(r && r.pre && (r.pre !== r.prev || r.kind !== 'flat'));
   function renderRound() {
     const box = $('roundbox');
     const r = S.rounds?.[me.team];
-    const open = ['lobby', 'pitch'].includes(S.phase);
+    const open = me.roundTermsOpen !== undefined ? !!me.roundTermsOpen : ['lobby', 'pitch'].includes(S.phase);
     const [lo, hi, V] = roundRange();
     if (!open) {
       roundDraft = null;
       morph(box, `<div class="p-card-h"><h3 class="s-h3">${E('play.round.title')}</h3><span class="s-badge">${S.phase === 'betting' ? 'Zamčeno' : 'Uzavřeno'}</span></div>
-        ${r && r.pre ? `<div class="p-round"><div><span class="s-label">Pre-money</span><b class="s-num">${esc(fmt(r.pre))}</b></div><span class="s-badge ${r.kind === 'up' ? 's-ok' : r.kind === 'down' ? 's-bad' : ''}">${esc(ROUND[r.kind] || '')} ${esc(spct(r.pct || 0))}</span></div>` : '<p class="p-hint">Podmínky kola nastavíte před otevřením investování v dalším bloku. Bez nich proběhne flat round.</p>'}`);
+        ${hasTerms(r) ? `<div class="p-round"><div><span class="s-label">Pre-money</span><b class="s-num">${esc(fmt(r.pre))}</b></div><span class="s-badge ${r.kind === 'up' ? 's-ok' : r.kind === 'down' ? 's-bad' : ''}">${esc(ROUND[r.kind] || '')} ${esc(spct(r.pct || 0))}</span></div>` : '<p class="p-hint">Podmínky kola nastavíte před otevřením investování v dalším bloku. Bez nich proběhne flat round.</p>'}`);
       return;
     }
     if (!box.querySelector('#rform')) {
@@ -928,7 +931,7 @@
         const [lo2, hi2, V2] = roundRange();
         rng.min = lo2; rng.max = hi2;
         $('rlo').textContent = fmtM(lo2); $('rhi').textContent = fmtM(hi2);
-        const v = roundDraft ?? (S.rounds?.[me.team]?.pre || V2);
+        const v = roundDraft ?? (hasTerms(S.rounds?.[me.team]) ? S.rounds[me.team].pre : V2);
         if (!fromInput && document.activeElement !== inp) inp.value = plain(v);
         rng.value = v;
         rng.style.setProperty('--pct', ((v - lo2) / Math.max(1, hi2 - lo2)) * 100 + '%');
@@ -946,7 +949,7 @@
       $('rsave').onclick = saveRound;
       box._sync = sync;
     }
-    morph($('rcur'), r && r.pre ? `<div class="p-round"><div><span class="s-label">Nastaveno</span><b class="s-num">${esc(fmt(r.pre))}</b></div><span class="s-badge ${r.kind === 'up' ? 's-ok' : r.kind === 'down' ? 's-bad' : ''}">${esc(ROUND[r.kind] || '')} ${esc(spct(r.pct || 0))}</span></div>` : '');
+    morph($('rcur'), hasTerms(r) ? `<div class="p-round"><div><span class="s-label">Nastaveno</span><b class="s-num">${esc(fmt(r.pre))}</b></div><span class="s-badge ${r.kind === 'up' ? 's-ok' : r.kind === 'down' ? 's-bad' : ''}">${esc(ROUND[r.kind] || '')} ${esc(spct(r.pct || 0))}</span></div>` : '');
     box._sync();
   }
   async function saveRound() {
@@ -1041,7 +1044,7 @@
       const L = q.leaders || [];
       body = `${head}
         ${lobby ? `<div class="qz-lobby"><h2 class="s-h1">${E('play.quiz.lobby')}</h2><p>${E('play.quiz.lobbyHint')}</p><div class="qz-dots"><i style="--qc:${QCOL[0]}"></i><i style="--qc:${QCOL[1]}"></i><i style="--qc:${QCOL[2]}"></i><i style="--qc:${QCOL[3]}"></i></div></div>` :
-        `<div class="qz-rank"><span class="s-label">${mode === 'done' ? 'Konečné pořadí' : 'Průběžné pořadí'}</span><div class="qz-rank-v s-num">${mq.rank ? esc(mq.rank) + '.' : '–'}</div><div class="s-muted">${mq.rank ? `místo z ${esc(S.playerCount)}` : 'zatím bez bodů'} · <b class="s-num">${esc(pts(mq.runPoints || 0))}</b></div></div>
+        `<div class="qz-rank"><span class="s-label">${mode === 'done' ? 'Konečné pořadí' : 'Průběžné pořadí'}</span><div class="qz-rank-v s-num">${mq.rank && mq.runPoints > 0 ? esc(mq.rank) + '.' : '–'}</div><div class="s-muted">${mq.rank && mq.runPoints > 0 ? `místo z ${esc(S.playerCount)} · <b class="s-num">${esc(pts(mq.runPoints))}</b>` : 'Zatím bez bodů – další otázka je tvoje šance.'}</div></div>
         ${L.length ? `<div class="qz-board">${L.map((p, i) => `<div class="p-rk ${p.name === me.name && p.team === me.team ? 'me' : ''}" data-key="ql${i}"><span class="p-rk-i">${i + 1}</span><span class="p-rk-n"><b>${esc(p.name)}</b>${teamTag(p.team)}</span><span class="p-rk-v"><b class="s-num">${esc(num(p.quizPoints))}</b></span></div>`).join('')}</div>` : ''}`}
         ${mode === 'done' ? '<button type="button" class="s-btn s-primary s-block qz-close" data-act="quiz-close">Zpět do hry</button>' : ''}`;
     }

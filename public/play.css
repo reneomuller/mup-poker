@@ -434,7 +434,7 @@ body.p-hasdock .p-toast { bottom: calc(var(--p-tab) + var(--p-safe-b) + 166px); 
 .qz-tile span { font-size: 15px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; text-shadow: 0 1px 3px rgba(0, 0, 0, .3); }
 .qz-tiles.locked .qz-tile:not(.pick), .qz-tiles.late .qz-tile { opacity: .28; filter: saturate(.4); }
 .qz-tile.pick { box-shadow: 0 0 0 4px #fff, 0 12px 30px rgba(3, 6, 25, .55); transform: scale(1.015); }
-.qz-sent { position: absolute; top: 12px; right: 12px; font-style: normal; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 5px 9px; border-radius: 999px; background: #fff; color: #0B1030; }
+.qz-sent { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); white-space: nowrap; font-style: normal; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 5px 9px; border-radius: 999px; background: #fff; color: #0B1030; }
 .qz-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; font-size: 14px; color: var(--s-muted); min-height: 22px; }
 .qz-ok { color: var(--s-green); font-weight: 700; }
 .qz-cnt { margin-left: auto; }
