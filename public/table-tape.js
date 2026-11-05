@@ -3,7 +3,9 @@
 (function () {
   const T = window.TBL;
   if (!T) return;
-  const { $, esc, fmtM, mult2, vnow, team, on, rem, sleep, stage } = T;
+  const { $, esc, fmtM, mult2, vnow, team, on, rem, sleep, stage, nb } = T;
+  // a block's share price move in % (what the investors' money did): „▲ 79 %“
+  const move = (m) => { const p = Math.round(Math.abs(m - 1) * 1000) / 10; return (m >= 1 ? '▲ ' : '▼ ') + nb(p.toLocaleString('cs-CZ', { maximumFractionDigits: p >= 10 ? 0 : 1 })) + ' %'; };
   const tx = MUP.t;
   MUP.addTexts({
     'table.tape.label': 'Burza',
@@ -140,7 +142,7 @@
     closeEl.innerHTML = `<div class="mc-band"><div class="mc-kick">${esc(tx('table.close.kick', { block: blk }))}</div>
       <div class="mc-title">${esc(tx('table.close.title'))}</div>
       <ol class="mc-row" data-n="${list.length}">${list.map(({ t, m }, i) => `<li class="mc-t ${m > 1.004 ? 'up' : m < 0.996 ? 'down' : ''}" style="--tc:${t.color};--d:${0.35 + i * 0.12}s">
-        <span class="mc-pos">${i + 1}.</span><span class="mc-n">${esc(t.name)}</span><b class="mc-m">${esc(mult2(m))}</b></li>`).join('')}</ol></div>`;
+        <span class="mc-pos">${i + 1}.</span><span class="mc-n">${esc(t.name)}</span><b class="mc-m">${esc(move(m))}</b></li>`).join('')}</ol></div>`;
     closeEl.classList.remove('hidden', 'out');
     // one long word (CamelCase names) never breaks mid-word: it shrinks a little instead
     closeEl.querySelectorAll('.mc-n').forEach((n) => {

@@ -11,7 +11,8 @@
   const pct = (n, d = 1) => num(n, d) + NB + '%';
   const spct = (n, d = 1) => (n > 0 ? '+' : n < 0 ? '−' : '') + pct(Math.abs(n), d);
   const smoney = (n) => (n > 0 ? '+' : n < 0 ? '−' : '') + fmtM(Math.abs(n));
-  const xmult = (m) => '×' + numF(m, 2);
+  // a block's share price move in % (what the investors' money did): „▲ 63 %“
+  const xmult = (m) => { const p = Math.abs(((Number(m) || 1) - 1) * 100); return (m >= 1 ? '▲' : '▼') + NB + num(p, p < 10 ? 1 : 0) + NB + '%'; };
   const initials = (name) => String(name || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0] || '').join('').toUpperCase();
   const investorWord = (n) => (n === 1 ? 'investor' : n >= 2 && n <= 4 ? 'investoři' : 'investorů');
   const DRIVER = { class: 'Peníze třídy', rj: 'RainbowJet', revalue: 'Přecenění', round: 'Kolo', market: 'Trh', exit: 'Exit', demand: 'Poptávka' };
@@ -237,7 +238,7 @@
   }
 
   function driverNote(x) {
-    if (x.kind === 'demand') { const m = /×\s?([\d,.]+)/.exec(x.note || ''); return m ? `×${m[1]}` : x.note || ''; } // the row label already says „Poptávka“
+    if (x.kind === 'demand') { const m = /×\s?([\d,.]+)/.exec(x.note || ''); return m ? xmult(Number(m[1].replace(',', '.'))) : x.note || ''; } // the row label already says „Poptávka“
     return x.note || '';
   }
 
