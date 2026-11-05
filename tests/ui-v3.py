@@ -195,6 +195,36 @@ def main():
         ok(not x.get('ok') and 'neplatí' in str(x.get('error', '')), 'the link works only once („Odkaz už neplatí…“)')
         shot(pt, 'v3-token-login')
         cont.check('token login')
+
+        # --- live number = post-showdown number (phone Tým header + projector plate) ---
+        for i, s in enumerate(S[2:], 2):
+            o = [t for t in T if t != s['team']]
+            post({'op': 'submit', 'sid': s['sid'], 'pin': s['pin'] if s is not C else ls[1],
+                  'in': {o[i % len(o)]: {'amt': 800000, 'why': ''}, o[(i + 1) % len(o)]: {'amt': 200000, 'why': ''}}})
+        ctb = br.new_context(viewport={'width': 1920, 'height': 1080}, locale='cs-CZ')
+        ptb = ctb.new_page()
+        contb = Console(ptb, 'table')
+        ptb.goto(SITE + '/table')
+        ptb.wait_for_selector(f'[data-seat="{T[0]}"] .val', timeout=10000)
+        pa.wait_for_timeout(4000)
+        live = {t['id']: t['Vnow'] for t in get()['teams']}
+        phone_v = pa.locator('.p-tm-big .p-tw').first.get_attribute('data-v')
+        ok(phone_v is not None and int(phone_v) == round(live[T[0]]), f'phone Tým header shows the live Vnow ({phone_v} vs {live[T[0]]})')
+        plates0 = {t: ptb.inner_text(f'[data-seat="{t}"] .val') for t in T}
+        shot(ptb, 'v3-table-live')
+        dealer('phase', phase='closed')
+        r = dealer('showdown')
+        ok(r.get('ok'), 'showdown')
+        after = {t['id']: t['V'] for t in get()['teams']}
+        ok(all(abs(after[t] - live[t]) <= 1 for t in T), 'API: valuation after showdown = live Vnow before it')
+        ptb.wait_for_timeout(5000)
+        plates1 = {t: ptb.inner_text(f'[data-seat="{t}"] .val') for t in T}
+        ok(plates0 == plates1, f'projector plate numbers unchanged by the showdown ({plates0} → {plates1})')
+        pa.wait_for_timeout(2000)
+        phone_v2 = pa.locator('.p-tm-big .p-tw').first.get_attribute('data-v')
+        ok(phone_v2 is not None and int(phone_v2) == round(after[T[0]]), 'phone Tým header after showdown = V')
+        ok(no_hscroll(ptb), 'table: no horizontal scroll')
+        contb.check('live → showdown')
         br.close()
 
 
