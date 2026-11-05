@@ -87,7 +87,13 @@
     history.replaceState(null, '', location.pathname + location.search);
     if (!L) return null;
     const r = (await MUP.post({ op: 'tokenLogin', sid: L.sid, token: L.token })) || { ok: false, error: 'Něco se pokazilo.' };
-    if (!r.ok || !r.sid || r.pin == null) { PA.loginError = r.error || 'Odkaz už neplatí. Požádej o nový.'; return null; }
+    if (!r.ok || !r.sid || r.pin == null) {
+      PA.loginError = r.error || 'Odkaz už neplatí. Požádej o nový.';
+      // already logged in on this device: the login screen won't show, so say it in a toast
+      let has = false; try { has = !!localStorage.getItem('mup.sid'); } catch {}
+      if (has) { toast(PA.loginError, 'err'); PA.loginError = null; }
+      return null;
+    }
     const pin = String(r.pin).padStart(4, '0');
     try {
       localStorage.setItem('mup.sid', r.sid); localStorage.setItem('mup.pin', pin); localStorage.removeItem('mup.profile');
