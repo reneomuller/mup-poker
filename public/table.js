@@ -4,7 +4,6 @@
   addTexts({
     'table.live': '{amount} v tomto kole',
     'table.cap.founders': 'Zakladatelé',
-    'table.cap.short': 'zakl.',
     'table.round.up': 'Up',
     'table.round.down': 'Down',
     'table.round.flat': 'Flat',
@@ -425,7 +424,7 @@
       const sub = P.querySelector('.sub');
       const c = cap && t.cap;
       setHTML(sub, lv
-        ? esc(tx('table.live', { amount: (lv > 0 ? '+' : '−') + fmtM(Math.abs(lv)) }))
+        ? esc(tx('table.live', { amount: '\u0001' })).replace('\u0001', `<b>${(lv > 0 ? '+' : '−') + esc(fmtM(Math.abs(lv)))}</b>`)
         : c ? `${esc(tx('table.cap.founders'))} <b>${pct(c.founders, false)}</b>`
         : esc(inv > 0 ? tx('table.seat.invested', { amount: fmtM(inv) }) : tx('table.seat.valuation')));
       toggle(sub, 'live', !!lv); toggle(sub, 'neg', lv < 0);
@@ -451,11 +450,13 @@
         renderStack(e.stack, Math.max(0, t.cls + lv), t.rj);
       }
       fit(e.val, 0.75);
-      const rjUp = s.reveal && s.reveal.kind === 'rj' && s.reveal.block === s.block;
       const card = e.spot.querySelector('.rjcards .pcard:last-child');
-      if (!rjUp && !busy) card.classList.remove('up');
-      if (rjUp && !busy && !card.classList.contains('up')) {
-        card.querySelector('.face').innerHTML = rjFace(s.reveal.delta?.[t.id] || 0);
+      const rx = rjDelta(s);
+      if (!rx && !busy) card.classList.remove('up');
+      if (rx && !busy) {
+        const face = rjFace(rx[t.id] || 0);
+        const f = card.querySelector('.face');
+        if (f._h !== face) { f._h = face; f.innerHTML = face; }
         card.classList.add('up');
       }
     });
@@ -469,6 +470,18 @@
       if (light._bg !== bg) { light._bg = bg; light.style.background = bg; }
     }
     toggle(light, 'on', !!p);
+  }
+
+  // RJ cards stay face up for the rest of the block, even after a later market card or tranche
+  const rjMem = {};
+  function rjDelta(s) {
+    if (s.reveal && s.reveal.kind === 'rj' && s.reveal.block === s.block) return (rjMem[s.block] = s.reveal.delta || {});
+    if (s.phase !== 'rj') return null;
+    if (rjMem[s.block]) return rjMem[s.block];
+    const d = {};
+    let any = false;
+    for (const [tid, arr] of Object.entries(s.drivers || {})) for (const x of arr || []) if (x.kind === 'rj' && x.block === s.block) { d[tid] = (d[tid] || 0) + (x.delta || 0); any = true; }
+    return any ? d : null;
   }
 
   function renderTranches(s) {
@@ -532,16 +545,20 @@
       out += `<line x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(242,234,214,.1)"/>`;
       out += `<text x="${padL - u * 0.8}" y="${y(v) + fs * 0.35}" text-anchor="end" fill="rgba(242,234,214,.6)" font-size="${fs}">${esc(fmtM(v).replace(/\s\$$/, '').replace(/ \$$/, ''))}</text>`;
     }
-    // x labels: as many as fit without overlapping
-    const labW = Math.max(...H.map((h) => String(h.label).length)) * fs * 0.55 + u;
-    const room = (W - padL - padR) / Math.max(1, H.length - 1);
-    const every = Math.max(1, Math.ceil(labW / Math.max(1, room)));
-    H.forEach((h, i) => {
-      const last = i === H.length - 1;
-      if (i % every && !last) return;
-      if (!last && H.length - 1 - i < every && i !== 0) return;
-      out += `<text x="${x(i)}" y="${Ht - fs * 0.5}" text-anchor="${H.length > 1 && i === 0 ? 'start' : last && H.length > 1 ? 'end' : 'middle'}" fill="rgba(242,234,214,.65)" font-size="${fs}">${esc(h.label)}</text>`;
-    });
+    // x labels: shortened, kept right-to-left as long as they do not collide
+    const cut = (l) => { l = String(l); return l.length > 18 ? l.slice(0, 17) + '…' : l; };
+    const lw = (l) => cut(l).length * fs * 0.56;
+    let leftEdge = Infinity;
+    const keep = [];
+    for (let i = H.length - 1; i >= 0; i--) {
+      const w = lw(H[i].label), last = i === H.length - 1, firstI = i === 0 && H.length > 1;
+      const anchor = H.length === 1 ? 'middle' : last ? 'end' : firstI ? 'start' : 'middle';
+      const x0 = anchor === 'end' ? x(i) - w : anchor === 'start' ? x(i) : x(i) - w / 2;
+      if (x0 + w + u * 1.2 > leftEdge) continue;
+      keep.push({ i, anchor });
+      leftEdge = x0;
+    }
+    for (const k of keep) out += `<text x="${x(k.i)}" y="${Ht - fs * 0.5}" text-anchor="${k.anchor}" fill="rgba(242,234,214,.65)" font-size="${fs}">${esc(cut(H[k.i].label))}</text>`;
     const ends = [];
     for (const t of s.teams) {
       const pts = H.map((h, i) => [x(i), y(h.V[t.id] ?? 0)]);
@@ -592,8 +609,7 @@
       const p = prev?.[t.id];
       const ch = p ? ((t.V - p) / p) * 100 : 0;
       const chs = p && Math.abs(ch) >= 0.05 ? `<small class="${ch >= 0 ? 'up' : 'down'}">${ch >= 0 ? '▲' : '▼'} ${pct(Math.abs(ch), false)}</small>` : `<small class="muted">${esc(tx('table.board.same'))}</small>`;
-      const fp = on(s, 'captable') && t.cap ? `<small class="fp" title="${esc(tx('table.cap.founders'))}">${esc(tx('table.cap.short'))} ${pct(t.cap.founders, false)}</small>` : '';
-      return `<span class="pos">${i + 1}</span><span class="tn"><span class="dot" style="background:${t.color}"></span><span class="nmx">${esc(t.name)}</span></span><span class="tv"><b>${esc(fmtM(t.V))}</b>${chs}${fp}</span>`;
+      return `<span class="pos">${i + 1}</span><span class="tn"><span class="dot" style="background:${t.color}"></span><span class="nmx">${esc(t.name)}</span></span><span class="tv"><b>${esc(fmtM(t.V))}</b>${chs}</span>`;
     });
   }
 
@@ -609,7 +625,7 @@
       if (!inv._rows) inv.innerHTML = '';
       keyedList(inv, L.map((l) => ({ key: l.name + '|' + l.team, l })), 4.4, ({ l }, i) => {
         const t = team(s, l.team);
-        const ret = track && l.returnPct != null ? `<b class="${l.returnPct >= 0 ? 'up' : 'down'}">${pct(l.returnPct)}</b>` : '';
+        const ret = track && l.returnPct != null ? `<b class="${l.returnPct > 0 ? 'up' : l.returnPct < 0 ? 'down' : 'muted'}">${pct(l.returnPct)}</b>` : '';
         return `<span class="pn"><i>${i + 1}.</i> ${esc(l.name)}</span><span class="pv"><span class="dot" style="background:${t.color}"></span>${esc(fmtM(l.value))}${ret}</span>`;
       });
     }
