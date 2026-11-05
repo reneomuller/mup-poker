@@ -1342,6 +1342,8 @@
 
   setInterval(() => { if (S && me) renderStatus(); }, 500);
   setInterval(() => { if (S && me) tickQuiz(); }, 200);
+  let hbAt = 0; // v4 regie: presence heartbeat every 30 s, only while visible (never in preview / demo)
+  setInterval(() => { if (!document.hidden && !PA.on && !DEMO && sid && pin && me && feat('regie') && Date.now() - hbAt > 29000) { hbAt = Date.now(); MUP.post({ op: 'hb', sid, pin }); } }, 5000);
 
   async function start() {
     if (DEMO) {

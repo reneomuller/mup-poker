@@ -9,6 +9,7 @@ import * as A from './_lib/archive.js';
 import * as W from './_lib/wall.js';
 import * as D from './_lib/demand.js';
 import * as AC from './_lib/access.js';
+import * as PR from './_lib/presence.js'; // v4 regie
 
 // Dealer is open (no password) unless DEALER_LOCK=1 and DEALER_PASSWORD are set in Vercel.
 const DEALER_PW = process.env.DEALER_LOCK === '1' ? process.env.DEALER_PASSWORD || 'mup-dealer' : '';
@@ -759,6 +760,7 @@ async function dealerAction(b) {
     }
 
     case 'auth': return ok();
+    case 'regiePlan': case 'nudge': { const r = await PR.dealerOp(b, meta, players, slips, save); invalidate(); return r; } // v4 regie
     // v3 §4: dealer wall ops on any team (wallPost also with all: true)
     case 'wallPost': case 'wallReply': case 'wallDone': case 'wallDelete': {
       const r = await W.op(b, meta, { role: 'dealer' });
@@ -1068,6 +1070,7 @@ export default async function handler(req, res) {
         dv.walls = await W.dataWalls(meta);
         return send(res, 200, dv);
       }
+      if (view === 'presence') { const r = await PR.view(meta, players, slips, dealerOk(req)); return send(res, r.status, r.body); } // v4 regie
       if (view === 'wall') {
         // v3 §4: a student sees only their own team's wall (x-sid / x-pin); without a sid it is the dealer view
         const wsid = req.headers['x-sid'];
@@ -1121,6 +1124,7 @@ export default async function handler(req, res) {
     }
     if (req.method === 'POST') {
       const b = await readBody(req);
+      if (b.op === 'hb') { const r = await PR.hb(b, pinHash); return send(res, r.status, r.body); } // v4 regie: presence heartbeat, never logged
       const studentOps = ['register', 'login', 'tokenLogin', 'notes', 'submit', 'reasons', 'restore', 'ask', 'vote', 'answer', 'react', 'quizAnswer'];
       let r;
       // card / roundTerms exist for both: with a sid it is a student editing their own team
@@ -1136,6 +1140,7 @@ export default async function handler(req, res) {
         const { pin, dump, token, ...rest } = b;
         await S.logAction({ ts: Date.now(), op: b.op, actor: student ? b.sid || r.body.sid || '' : 'dealer', ok: !!r.body.ok, error: r.body.ok ? undefined : r.body.error, body: rest, sid: r.body.sid });
       }
+      if (!student && r.body.ok) await PR.track(b); // v4 regie: recent dealer actions + undo stack
       if (!student && r.body.ok) r.body.dump = await makeDump();
       return send(res, r.status, r.body);
     }
