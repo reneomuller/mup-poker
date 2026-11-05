@@ -169,7 +169,7 @@ await main(async () => {
   ok(alS.length === 19, `allocations: 19 student rows for block 1 (${alS.length})`);
   ok(al.some((a) => a.playerId === 'rj' && sumAmt(a.in) === 10e6), 'allocations: RJ row with 10M');
   const ghostAl = al.filter((a) => a.playerId === G.sid);
-  warnIf(ghostAl.length === 0, 'ghost allocation row present in data view (spec: ghosts only as flagged rows; allocations have no flag)');
+  ok(ghostAl.every((a) => a.ghost === true), `ghost allocation rows (if any) are flagged ghost: true (${ghostAl.length} row)`);
   if (alS[0]) shape('allocations[0]', alS[0], { block: 'number', playerId: 'string', name: 'string', team: 'string', submitted: 'boolean', ts: 'number', in: 'object', out: 'object', notes: 'object' });
   const allocSame = alS.length === 19 && alS.every((a) => {
     const o = oldDump.slips[1][a.playerId];
