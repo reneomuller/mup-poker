@@ -247,10 +247,12 @@ function callList(meta, players, slips) {
   };
 }
 
-function dealerState(meta, players, slips, bd, tx = {}, qa = {}) {
+function dealerState(meta, players, slips, bd, tx = {}, qa = {}, proj = null) {
   const rows = Object.values(players).filter((p) => !p.ghost).map((p) => ({
     id: p.id, name: p.name, team: p.team, hasPin: !!p.pin,
     portfolio: r0(G.portfolio(meta, p.id)), holdings: G.hasHoldings(meta, p.id), slip: slips[p.id] || null,
+    // v3 §2: the live (projected) portfolio while class trades are pending, for the Hráči tab
+    ...(proj?.pending ? { portfolioNow: r0(G.portfolio(proj.pm, p.id)), returnNow: F.returnPct(G.portfolio(proj.pm, p.id)) } : {}),
   }));
   const st = G.stakes(meta, G.RJ);
   const stakes = {};
@@ -1106,7 +1108,7 @@ export default async function handler(req, res) {
         return send(res, 200, { ok: true, storage: S.storageMode, pgEnv: S.pgEnvKey, log: await S.readLog(Number(url.searchParams.get('limit')) || 5000) });
       }
       if (url.searchParams.get('view') === 'dealer' && dealerOk(req)) {
-        out.dealer = dealerState(meta, players, slips, bd, tx, qa);
+        out.dealer = dealerState(meta, players, slips, bd, tx, qa, proj);
         if (url.searchParams.get('dump') === '1') out.dealer.dump = await makeDump();
         if (url.searchParams.get('all') === '1') {
           const all = {};
