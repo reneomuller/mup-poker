@@ -126,6 +126,9 @@ select.s-input option, select.s-input optgroup { background: var(--s-bg-2); colo
 .seg button { min-height: 34px; padding: 0 14px; border: 0; border-radius: 9px; background: transparent; color: var(--s-muted); font: inherit; font-weight: 700; font-size: 13.5px; cursor: pointer; }
 .seg button.on { background: var(--s-surface-3); color: var(--s-text); box-shadow: inset 0 0 0 1px var(--s-border-2); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.nchip.good { border-color: rgba(63, 207, 142, .55); background: var(--s-green-bg); }
+.nchip.bad { opacity: .6; }
+.nchip .s-faint { font-family: var(--s-mono); font-size: 11px; }
 .nchip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: var(--s-bg-2); border: 1px solid var(--s-border); font-size: 13px; }
 .ok { color: var(--s-green); }
 .no { color: #ffb0b8; }

@@ -134,6 +134,10 @@
     }
     if (d.content && Number(d.content.v || 0) >= Number(b.content?.v || 0)) b.content = d.content;
     if (d.board) b.board = d.board;
+    if (d.tx && typeof d.tx === 'object') {
+      b.tx = b.tx || {};
+      for (const [f, v] of Object.entries(d.tx)) { const c = b.tx[f]; if (!c || (v?.updatedAt || v?.ts || 0) >= (c.updatedAt || c.ts || 0)) b.tx[f] = v; }
+    }
     saveBk(b);
   }
   let restoring = false;
@@ -229,7 +233,7 @@
     const q = S.quiz || {};
     const running = ['question', 'reveal', 'board'].includes(q.state);
     if (op === 'quizStart' && running && !confirm('Kvíz právě běží. Spustit ho znovu od začátku?')) return;
-    if (op === 'quizEnd' && running && (q.idx ?? -1) + 1 < (q.total || 0) && !confirm('Ukončit kvíz ještě před poslední otázkou?')) return;
+    if (op === 'quizEnd' && running && (q.idx ?? -1) + 1 < (q.total || 0) && !confirm('Ukončit kvíz ještě před poslední otázkou? Na plátně zůstane konečné pořadí.')) return;
     const extra = op === 'quizStart' ? { setId: qzSel || quizSets()[0]?.id } : {};
     return act(op, extra);
   }
@@ -245,6 +249,7 @@
       if (q.idx >= 0 && n >= total) return { kick: 'Kvíz · konec otázek', label: 'Ukončit kvíz', run: () => quiz('quizEnd'), quiz: 'qzend' };
       return { kick: 'Kvíz', label: q.idx < 0 ? 'Spustit 1. otázku' : `Další otázka (${n + 1}/${total})`, run: () => quiz('quizNext'), quiz: 'qznext' };
     }
+    if (F('quiz') && q && q.state === 'done') return { kick: 'Kvíz skončil · plátno ukazuje pořadí', label: 'Skrýt kvíz z plátna', run: () => quiz('quizEnd'), quiz: 'qzend' };
     if (s.phase === 'final') return { kick: 'Finále', label: 'Hra je u konce', run: null, step: -1 };
     if (sc && sr) return s.block < s.maxBlock
       ? { kick: `Blok ${s.block} je hotový`, label: tx('dealer.btn.next'), run: doNext, step: 6 }
@@ -539,12 +544,18 @@
 
   // ---------- RJ ----------
   function renderFund() {
-    const f = S.rjFund, rj = D.rj || {};
+    const f = D.rjFund || S.rjFund, rj = D.rj || {};
     const el = gate('rjfund', [f, rj.portfolio, rj.stakes, rj.rules, S.teams.map((t) => [t.id, t.name, t.color, t.rj]), F('tranches')]);
     if (!el) return;
-    const tiles = f
-      ? [['Fond', fmtM(f.capital)], ['Investováno', fmtM(f.invested)], ['V tranších', fmtM(f.locked)], ['K dispozici', fmtM(f.available), 'hi']]
-      : [['Fond', fmtM(S.cfg?.RJ_CAPITAL || 10e6)], ['Hodnota portfolia RJ', fmtM(rj.portfolio)], ['Režim', rj.rules?.mode === 'initial' ? 'první investice' : 'přesuny'], [rj.rules?.mode === 'initial' ? 'Rozdělit' : 'Lze přesunout', fmtM(rj.rules?.mode === 'initial' ? rj.rules?.capital : rj.rules?.cashoutMax), 'hi']];
+    const R = rj.rules || {};
+    const last = R.mode === 'initial' ? ['Teď rozdělit', fmtM(R.capital), 'hi'] : R.mode === 'fund' ? ['K dispozici', fmtM(f?.available ?? R.capital), 'hi'] : ['Lze přesunout (30 %)', fmtM(R.cashoutMax), 'hi'];
+    const tiles = [
+      ['Fond', fmtM(f?.capital ?? (S.cfg?.RJ_CAPITAL || 10e6))],
+      ...(f ? [['Vloženo celkem', fmtM(f.invested)]] : []),
+      ['Hodnota podílů RJ', fmtM(rj.portfolio)],
+      ...(f && F('tranches') ? [['V tranších', fmtM(f.locked)]] : []),
+      last,
+    ];
     const max = Math.max(1, ...S.teams.map((t) => rj.stakes?.[t.id] || 0));
     el.innerHTML = `<div class="ch"><h3>${E('dealer.sec.rj')}</h3><span class="s-label">fond RainbowJet</span></div>
       <div class="tiles">${tiles.map(([k, v, c]) => `<div class="tile ${c || ''}"><span class="s-label">${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}</div>
@@ -609,7 +620,7 @@
   // tranches (feature)
   function renderTranches() {
     if (!show('tranches', F('tranches'))) return;
-    const list = S.tranches || [], f = S.rjFund || {};
+    const list = S.tranches || D.tranches || [], f = D.rjFund || S.rjFund || {};
     const el = gate('tranches', [list, f, S.teams.map((t) => [t.id, t.name, t.color])]);
     if (!el) return;
     const st = { locked: ['zamčeno', 's-warn'], released: ['uvolněno', 's-ok'], cancelled: ['zrušeno', ''] };
@@ -887,15 +898,16 @@
 
   function renderRounds() {
     if (!show('rounds', F('rounds'))) return;
-    const open = ['lobby', 'pitch'].includes(S.phase) && !D.settled[S.block + 'c'];
-    const R = S.rounds || {};
-    const el = gate('rounds', [S.teams.map((t) => [t.id, t.name, t.color, t.V]), R, open, S.block]);
+    const open = ['lobby', 'pitch'].includes(S.phase) && !D.settled[S.block + 'c'] && !D.settled[S.block + 't'];
+    const R = S.rounds || {}, RT = D.roundTerms || {}, locked = !!D.settled[S.block + 't'];
+    const has = (id) => (locked ? !!(D.rounds?.[S.block] || {})[id] : !!RT[`rt:${S.block}:${id}`]);
+    const el = gate('rounds', [S.teams.map((t) => [t.id, t.name, t.color, t.V]), R, RT, locked, open, S.block]);
     if (!el) return;
     const rng = (V) => [Math.round((V * 0.5) / 1e4) * 1e4, Math.round((V * 2) / 1e4) * 1e4];
     el.innerHTML = `<div class="ch"><h3>Kolo financování · blok ${S.block}</h3>${open ? '<span class="s-badge s-ok">podmínky otevřené</span>' : '<span class="s-badge">uzamčeno</span>'}</div>
       <p class="hint">Pre-money, za kterou tým v tomto bloku prodává podíl. Rozsah 50–200 % dnešního ocenění. Po otevření investování se kurz přepočítá a podmínky se zamknou. Bez podmínek = flat round.</p>
       ${S.teams.map((t) => {
-        const r = R[t.id], [lo, hi] = rng(t.V);
+        const r = has(t.id) ? R[t.id] : null, [lo, hi] = rng(t.V);
         return `<div class="rrow" data-t="${t.id}"><div>${tlabel(t.id)}<div class="meta">teď ${esc(fmtM(t.V))} · ${esc(fmtM(lo))}–${esc(fmtM(hi))}</div></div>
           ${r ? `<span class="s-badge ${r.kind === 'up' ? 's-ok' : r.kind === 'down' ? 's-bad' : ''}">${esc(RK[r.kind] || r.kind)} ${esc(signPct(r.pct || 0))}</span>` : '<span class="s-faint sm">bez podmínek</span>'}
           <span class="unit"><input class="s-input sm num" inputmode="decimal" placeholder="${r ? esc(mil(r.pre)) : esc(mil(t.V))}" ${open ? '' : 'disabled'} aria-label="Pre-money ${tname(t.id)} v mil. $"> mil.</span></div>`;
@@ -966,18 +978,23 @@
     const q = S.quiz || { state: 'idle' };
     const { serverNow, ...qk } = q;
     const sets = quizSets();
-    const el = gate('qzlive', [F('quiz'), featKnown(), qk, S.playerCount, sets.map((s) => [s.id, s.title, (s.questions || []).length]), qzSel]);
+    const dq = D.quiz || {};
+    const el = gate('qzlive', [F('quiz'), featKnown(), qk, S.playerCount, sets.map((s) => [s.id, s.title, (s.questions || []).length]), qzSel, dq.answers, dq.question]);
     if (!el) return;
     if (!F('quiz')) { el.innerHTML = `<div class="ch"><h3>Kvíz</h3></div>${offCard('quiz', 'Studenti ho v mobilech neuvidí.')}`; return; }
     if (!qzSel || !sets.some((s) => s.id === qzSel)) qzSel = sets[0]?.id || null;
     const running = ['question', 'reveal', 'board'].includes(q.state);
     const n = (q.idx ?? -1) + 1, total = q.total || 0;
     const ns = nextStep();
-    const rec = running ? ns.quiz : 'qzstart';
+    const rec = running || q.state === 'done' ? ns.quiz : 'qzstart';
     const b = (id, label, extra = '') => `<button class="s-btn qzb ${rec === id ? 's-primary' : 's-ghost'}" id="${id}" ${extra}>${label}</button>`;
-    const set = sets.find((s) => s.title === q.setTitle) || sets.find((s) => s.id === qzSel);
-    const srcQ = set?.questions?.[q.idx];
+    const set = sets.find((s) => s.id === dq.setId) || sets.find((s) => s.title === q.setTitle);
+    const srcQ = dq.question || set?.questions?.[q.idx];
     const correct = q.state === 'reveal' ? q.correct : srcQ && srcQ.q === q.q ? srcQ.correct : null;
+    const answers = (dq.answers || []).filter((a) => !a.ghost);
+    const who = answers.length && (q.state === 'question' || q.state === 'reveal')
+      ? `<div class="lab sec">Odpověděli (${answers.length}) · od nejrychlejšího</div><div class="chips">${answers.map((a) => `<span class="nchip ${q.state === 'reveal' ? (a.choice === correct ? 'good' : 'bad') : ''}">${dot(team(a.team).color)}${esc(a.name)}<span class="s-faint">${'ABCD'[a.choice] || '?'} · ${esc(nb((a.ms / 1000).toLocaleString('cs-CZ', { maximumFractionDigits: 1 })))} s</span></span>`).join('')}</div>`
+      : '';
     const counts = q.counts || [];
     const tiles = (q.a || []).map((x, k) => `<div class="qt a${k} ${correct === k ? 'ok' : ''} ${q.state === 'reveal' && correct !== k ? 'dim' : ''}"><span class="L">${'ABCD'[k]}</span><span class="tx">${esc(x)}</span>${q.state === 'reveal' ? `<b class="cnt">${counts[k] || 0}</b>` : correct === k ? '<span class="s-badge">správně</span>' : ''}</div>`).join('');
     const leaders = q.leaders || [];
@@ -989,7 +1006,7 @@
           ${q.state === 'reveal' && q.fastest ? `<div class="fast">Nejrychlejší správně: <b>${esc(q.fastest.name)}</b> (${tname(q.fastest.team)}) · ${esc(nb((q.fastest.ms / 1000).toLocaleString('cs-CZ', { maximumFractionDigits: 1 })))} s</div>` : ''}</div>
         <div class="qzstat"><div class="big"><b>${ans}</b><span>/${S.playerCount}</span></div><div class="s-muted">odpovědělo</div>
           <div class="s-progress"><i style="width:${S.playerCount ? Math.min(100, (ans / S.playerCount) * 100) : 0}%"></i></div>
-          <div class="cd" id="qztime"></div></div></div>`;
+          <div class="cd" id="qztime"></div></div></div>${who}`;
     } else if (q.state === 'board' || q.state === 'done') {
       body = `<div class="lab sec">${q.state === 'done' ? 'Konečné pořadí kvízu' : n ? `Žebříček po ${n}. otázce` : 'Úvodní obrazovka kvízu – studenti se připravují'}</div>
         ${leaders.length ? `<ol class="rank">${leaders.map((r) => `<li>${dot(team(r.team).color)}<span>${esc(r.name)}</span><b>${plain(r.quizPoints)} b.</b><span class="s-faint">celkem ${plain(r.total)}</span></li>`).join('')}</ol>` : '<p class="hint">Zatím bez bodů.</p>'}`;
@@ -1003,7 +1020,7 @@
         ${b('qznext', q.idx < 0 && running ? 'První otázka' : 'Další otázka', running ? '' : 'disabled')}
         ${b('qzreveal', 'Odhalit odpověď', running ? '' : 'disabled')}
         ${b('qzboard', 'Žebříček', running ? '' : 'disabled')}
-        ${b('qzend', 'Ukončit kvíz', running ? '' : 'disabled')}
+        ${b('qzend', q.state === 'done' ? 'Skrýt z plátna' : 'Ukončit kvíz', running || q.state === 'done' ? '' : 'disabled')}
       </div>${body}`;
     $('qzset').onchange = (e) => { qzSel = e.target.value; store.set('mup.qzset', qzSel); };
     $('qzstart').onclick = () => quiz('quizStart');
@@ -1119,9 +1136,10 @@
   }
 
   // ---------- Body ----------
+  const ledger = () => (D && Array.isArray(D.points) ? D.points : DV && Array.isArray(DV.points) ? DV.points : null);
   const pointsTotals = () => {
     const m = {};
-    for (const e of (DV && DV.points) || []) m[e.playerId] = (m[e.playerId] || 0) + (Number(e.amt) || 0);
+    for (const e of ledger() || []) m[e.playerId] = (m[e.playerId] || 0) + (Number(e.amt) || 0);
     return m;
   };
   const pname = (id) => (D.rows || []).find((r) => r.id === id)?.name || (DV?.players || []).find((p) => p.id === id)?.name || id;
@@ -1145,7 +1163,7 @@
       const [kind, id] = $('ptarget').value.split(':');
       const note = $('pnote').value.trim() || 'Body od RainbowJet';
       const r = await act('pointsAdd', { ...(kind === 'team' ? { team: id } : { playerId: id }), amt, note, kind: 'manual' }, `${amt > 0 ? 'Přidáno' : 'Ubráno'} ${Math.abs(amt)} b. – ${kind === 'team' ? 'tým ' + team(id).name : pname(id)}`);
-      if (r.ok) { $('pnote').value = ''; dirty.ptsadd = false; loadData(); }
+      if (r.ok) { $('pnote').value = ''; dirty.ptsadd = false; }
     };
   }
   function renderPointsTop() {
@@ -1163,7 +1181,7 @@
   const PK = { quiz: 'kvíz', award: 'ocenění', milestone: 'milník', manual: 'ručně' };
   function renderLedger() {
     if (!show('ptsledger', F('points'))) return;
-    const L = DV && Array.isArray(DV.points) ? DV.points : null;
+    const L = ledger();
     const el = gate('ptsledger', [L, (D.rows || []).map((r) => [r.id, r.name, r.team])]);
     if (!el) return;
     el.innerHTML = `<div class="ch"><h3>Záznamy bodů</h3><span class="s-label">${L ? L.length : ''}</span></div>
@@ -1175,7 +1193,7 @@
       const e = L.find((x) => x.id === row.dataset.id);
       if (!confirm(`Odebrat ${e.amt > 0 ? '+' : ''}${e.amt} b. hráči ${pname(e.playerId)}?`)) return;
       const r = await act('pointsRemove', { id: e.id }, 'Záznam odebrán');
-      if (r.ok) loadData();
+      if (r.ok) redraw('ptsledger');
     }));
   }
 
