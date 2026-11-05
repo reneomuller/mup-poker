@@ -60,7 +60,7 @@
     if (D.has('quiz-lobby')) quiz('board', { idx: -1, leaders: [] });
     if (D.has('quiz')) quiz('question', { ...QZ, time: 20, startedAt: t0 + 1000 - 0, endsAt: t0 + 21000, answered: Math.min(14, Math.floor((Date.now() - t0) / 900)) });
     if (D.has('quiz-long')) quiz('question', { q: 'Startup má měsíční opakované tržby 40 000 $, churn 5 % měsíčně a CAC 1 200 $. Který z následujících kroků nejvíc zlepší poměr LTV ku CAC během půl roku?', a: ['Snížit churn na polovinu díky lepšímu onboardingu a pravidelné péči o stávající zákazníky', 'Zdvojnásobit rozpočet na placenou reklamu a doufat, že se CAC časem sám sníží', 'Zavést roční předplatné se slevou, které zákazníky udrží déle a zlepší cash flow', 'Najmout dalšího obchodníka, i když zatím nemáme opakovatelný prodejní proces'], time: 30, startedAt: t0, endsAt: t0 + 30000, answered: 3 });
-    if (D.has('quiz-reveal')) quiz('reveal', { ...QZ, correct: 0, counts: [9, 3, 4, 1], answered: 17, fastest: { name: 'Lukáš Kučera', team: tid(5), ms: 2380 } });
+    if (D.has('quiz-reveal')) quiz('reveal', { ...QZ, correct: 0, counts: [9, 3, 4, 1], answered: 17, fastest: { name: 'Lukáš Kučera', team: tid(5), ms: 2380 }, topStreak: { name: 'Jana Dvořáková', team: tid(2), streak: 4 } });
     if (D.has('quiz-board')) quiz('board', { leaders: NAMES.slice(0, 10).map((n, i) => ({ name: n, team: tid(i), quizPoints: 2900 - i * 210, total: 4100 - i * 300 })) });
     if (D.has('exit') || D.has('exit-final')) {
       if (D.has('exit-final') || after(2000)) {
