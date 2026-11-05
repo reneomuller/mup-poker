@@ -893,7 +893,7 @@
       <div class="p-tm-h"><span class="p-su-ic">${esc(initials(t.name))}</span><div class="p-tm-n"><div class="s-label">Tvůj tým</div><h2 class="s-h2">${esc(m?.name || t.name)}</h2></div>
         ${rank ? `<span class="p-tm-rank"><b class="s-num">#${esc(rank)}</b><small> z${NB}${esc(of)}</small></span>` : ''}</div>
       <div class="p-tm-v"><span class="p-tm-big">${tw('tmV', Vnow)}</span>${chgP != null && Math.abs(chgP) >= 0.05 ? `<span class="p-tm-chg ${chgP > 0 ? 's-up' : 's-down'}">${chgP > 0 ? '▲' : '▼'}${NB}${esc(pct(Math.abs(chgP), Math.abs(chgP) < 10 ? 1 : 0))}</span>` : ''}</div>
-      <div class="p-tm-sub">${live ? '<span class="p-live"><i></i>živě</span><span>ocenění po tomto bloku, jak to teď vypadá</span>' : '<span>ocenění</span>'}</div>
+      <div class="p-tm-sub">${live ? '<span class="p-lv"><i></i>živě</span><span>ocenění po tomto bloku, jak to teď vypadá</span>' : '<span>ocenění</span>'}</div>
       <div class="p-stats p-stats-3">
         <div class="s-stat p-stat"><span class="s-label">Zakladatelé</span><span class="s-v">${founders != null ? esc(pct(founders)) : '–'}</span></div>
         <div class="s-stat p-stat"><span class="s-label">Investoři</span><span class="s-v">${invN != null ? esc(num(invN)) : '–'}</span></div>
@@ -907,7 +907,7 @@
         ${flows.map((f) => {
           const inv = f.investors || [];
           return `<div class="p-fl ${f.settled ? '' : 'now'}" data-key="fl${esc(f.block)}">
-            <div class="p-fl-h"><b>Blok ${esc(f.block)}</b>${f.settled ? '<span class="s-label">uzavřeno</span>' : '<span class="p-live"><i></i>plní se živě</span>'}
+            <div class="p-fl-h"><b>Blok ${esc(f.block)}</b>${f.settled ? '<span class="s-label">uzavřeno</span>' : '<span class="p-lv"><i></i>plní se živě</span>'}
               <span class="p-fl-sum s-num">${f.totalIn ? `<span class="s-up">+${esc(fmtM(f.totalIn))}</span>` : ''}${f.totalOut ? ` <span class="s-down">−${esc(fmtM(f.totalOut))}</span>` : ''}${f.mult != null && f.mult !== 1 ? ` <span class="p-mx ${f.mult > 1 ? 's-up' : 's-down'}">×${esc(num(f.mult, 2))}</span>` : ''}</span></div>
             ${inv.length ? inv.map((v) => {
               const k = `${f.block}:${v.id}`, rj = v.id === 'rj';

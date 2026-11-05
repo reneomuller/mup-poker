@@ -521,8 +521,8 @@ body:not(.p-app) .hero .bill { position: absolute; left: 50%; bottom: 0; transfo
 @keyframes p-twd { 0% { color: var(--s-pink); } 100% { color: inherit; } }
 .p-mx { display: inline-block; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .p-su-v .p-mx { display: block; text-align: right; margin-top: 2px; }
-.p-live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--s-green); letter-spacing: .02em; }
-.p-live > i { width: 8px; height: 8px; border-radius: 50%; background: var(--s-green); animation: p-ring 1.6s ease-out infinite; }
+.p-lv { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--s-green); letter-spacing: .02em; white-space: nowrap; }
+.p-lv > i { width: 8px; height: 8px; border-radius: 50%; background: var(--s-green); animation: p-ring 1.6s ease-out infinite; }
 .p-tm { border-top: 3px solid var(--tc); }
 .p-tm-h { display: flex; align-items: center; gap: 12px; }
 .p-tm-n { flex: 1; min-width: 0; }
