@@ -22,7 +22,7 @@
     'table.driver.exit': 'Exit',
     'table.award.kick': 'Ocenění',
     'table.award.sharpest': 'Nejlepší investor',
-    'table.award.analyst': 'Analytik bloku',
+    'table.award.analyst': 'Nejlepší analytik',
     'table.award.contrarian': 'Proti proudu',
     'table.award.custom': 'Zvláštní ocenění',
   });
