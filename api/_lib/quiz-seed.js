@@ -73,16 +73,16 @@ export const QUIZ_SEED = [
   "why": "Odhad zdola (bottom-up) stojí na reálných číslech: kolik zákazníků umíte oslovit × kolik zaplatí. Proto mu investoři věří víc než „1 % z obřího trhu“."
  },
  {
-  "q": "Pre-money 8 mil. + investice 2 mil. Kolik % drží investor?",
+  "q": "MVP je…",
   "a": [
-   "10 %",
-   "20 %",
-   "25 %",
-   "80 %"
+   "Nejcennější zákazník firmy",
+   "První verze produktu, která ověří, jestli o něj někdo stojí",
+   "Hotový produkt připravený na velký launch",
+   "Prezentace pro investory"
   ],
   "correct": 1,
-  "time": 30,
-  "why": "Post-money = pre-money + investice = 8 + 2 = 10 mil. Investor za 2 mil. dostane 2 / 10 = 20 % firmy."
+  "time": 20,
+  "why": "MVP (Minimum Viable Product) je nejjednodušší verze produktu, se kterou co nejrychleji a nejlevněji ověříte hlavní předpoklad u skutečných zákazníků."
  },
  {
   "q": "Runway je…",
@@ -133,16 +133,16 @@ export const QUIZ_SEED = [
   "why": "Moat (vodní příkop) je trvalá výhoda: síťové efekty, data, značka, patenty nebo vysoké náklady na přechod. Konkurence ji těžko okopíruje."
  },
  {
-  "q": "Down round je kolo…",
+  "q": "Product-market fit znamená, že…",
   "a": [
-   "Bez lead investora",
-   "Které proběhne ještě před seedem",
-   "Za nižší ocenění než to předchozí",
-   "S menší investicí než minule"
+   "Produkt má hotový design i značku",
+   "Firma získala první investici",
+   "Zákazníci produkt chtějí, používají a doporučují dál",
+   "Produkt je levnější než konkurence"
   ],
   "correct": 2,
   "time": 20,
-  "why": "Down round je kolo za nižší ocenění (nižší cenu podílu) než to předchozí. Stávající vlastníci se víc ředí a často se spouští ochrana investorů proti zředění."
+  "why": "Product-market fit nastává, když produkt řeší skutečný problém tak dobře, že ho zákazníci sami chtějí, platí za něj a doporučují – růst pak táhne trh, ne marketing."
  },
  {
   "q": "Co zjistíte z cap table?",
