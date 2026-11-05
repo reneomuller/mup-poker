@@ -1,0 +1,131 @@
+/* ==========================================================================
+   Stand design system — RainbowJet × MUP (phones + admin).
+   Navy base, blue→violet→pink→orange gradient, Archivo / Archivo Expanded / JetBrains Mono.
+   All classes are prefixed "s-" so they never collide with the poker styles in style.css.
+   Load order: /fonts/stand-fonts.css, /stand.css, then the page's own CSS.
+   ========================================================================== */
+:root {
+  --s-bg: #0B1030;
+  --s-bg-2: #0F1538;
+  --s-surface: #141A44;
+  --s-surface-2: #1A2152;
+  --s-surface-3: #212A63;
+  --s-border: #262F66;
+  --s-border-2: #3A4488;
+  --s-text: #F4F5FA;
+  --s-muted: #B8BED6;
+  --s-faint: #7E86A8;
+  --s-label: #9FB4FF;
+  --s-blue: #3586D1;
+  --s-violet: #6754DF;
+  --s-pink: #FF5574;
+  --s-orange: #FF8A47;
+  --s-green: #3FCF8E;
+  --s-green-bg: rgba(63, 207, 142, .12);
+  --s-red: #FF5C6C;
+  --s-red-bg: rgba(255, 92, 108, .12);
+  --s-gold: #F5C451;
+  --s-grad: linear-gradient(90deg, #3586D1 0%, #6754DF 35%, #FF5574 70%, #FF8A47 100%);
+  --s-grad-soft: linear-gradient(135deg, rgba(53,134,209,.22), rgba(103,84,223,.18) 40%, rgba(255,85,116,.14) 75%, rgba(255,138,71,.12));
+  --s-font: 'Archivo', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --s-display: 'Archivo Expanded', 'Archivo', system-ui, sans-serif;
+  --s-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --s-r: 18px;
+  --s-r-sm: 12px;
+  --s-r-xs: 8px;
+  --s-shadow: 0 10px 30px rgba(3, 6, 25, .45);
+  --s-ease: cubic-bezier(.2, .8, .2, 1);
+  --s-safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+/* Base ------------------------------------------------------------------ */
+.s-app, .s-app * { box-sizing: border-box; }
+.s-app {
+  margin: 0; min-height: 100dvh; color: var(--s-text); font-family: var(--s-font); font-size: 16px; line-height: 1.45;
+  background:
+    radial-gradient(ellipse 80% 50% at 0% 0%, rgba(23, 51, 110, .9), transparent 70%),
+    radial-gradient(ellipse 70% 50% at 100% 100%, rgba(74, 30, 62, .85), transparent 70%),
+    var(--s-bg);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
+}
+:where(.s-app) :where(button, input, select, textarea) { font: inherit; color: inherit; }
+.s-app a { color: var(--s-label); }
+
+/* Type -------------------------------------------------------------------- */
+.s-display { font-family: var(--s-display); font-weight: 800; text-transform: uppercase; letter-spacing: .01em; line-height: 1.02; }
+.s-h1 { font-family: var(--s-display); font-weight: 800; font-size: 28px; line-height: 1.05; text-transform: uppercase; margin: 0; }
+.s-h2 { font-size: 20px; font-weight: 700; margin: 0; line-height: 1.2; }
+.s-h3 { font-size: 16px; font-weight: 700; margin: 0; }
+.s-label { font-family: var(--s-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--s-label); }
+.s-muted { color: var(--s-muted); }
+.s-faint { color: var(--s-faint); }
+.s-num { font-variant-numeric: tabular-nums; }
+.s-grad-text { background: var(--s-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.s-up { color: var(--s-green); }
+.s-down { color: var(--s-red); }
+
+/* Surfaces ---------------------------------------------------------------- */
+.s-card { background: var(--s-surface); border: 1px solid var(--s-border); border-radius: var(--s-r); padding: 16px; box-shadow: var(--s-shadow); }
+.s-card + .s-card { margin-top: 12px; }
+.s-card.s-flat { box-shadow: none; }
+.s-card.s-hero { background: var(--s-grad-soft), var(--s-surface); border-color: var(--s-border-2); }
+.s-divider { height: 1px; background: var(--s-border); border: 0; margin: 14px 0; }
+.s-gradbar { height: 4px; border-radius: 4px; background: var(--s-grad); }
+
+/* Buttons ------------------------------------------------------------------ */
+.s-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 20px; border: 0; border-radius: 14px;
+  font-weight: 700; font-size: 16px; cursor: pointer; color: #0B1030; background: var(--s-text); transition: transform .12s var(--s-ease), opacity .2s, box-shadow .2s; user-select: none; }
+.s-btn:active { transform: scale(.97); }
+.s-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+.s-btn.s-primary { color: #fff; background: var(--s-grad); box-shadow: 0 8px 22px rgba(103, 84, 223, .35); }
+.s-btn.s-ghost { background: transparent; color: var(--s-text); border: 1px solid var(--s-border-2); }
+.s-btn.s-danger { background: var(--s-red-bg); color: var(--s-red); border: 1px solid rgba(255, 92, 108, .35); }
+.s-btn.s-sm { min-height: 36px; padding: 0 12px; font-size: 14px; border-radius: 10px; }
+.s-btn.s-block { width: 100%; }
+
+/* Inputs -------------------------------------------------------------------- */
+.s-input { width: 100%; min-height: 48px; padding: 12px 14px; border-radius: var(--s-r-sm); background: var(--s-bg-2); border: 1px solid var(--s-border-2);
+  color: var(--s-text); outline: none; transition: border-color .15s, box-shadow .15s; }
+.s-input:focus { border-color: var(--s-violet); box-shadow: 0 0 0 3px rgba(103, 84, 223, .3); }
+.s-input::placeholder { color: var(--s-faint); }
+textarea.s-input { min-height: 72px; resize: vertical; line-height: 1.4; }
+.s-field { display: grid; gap: 6px; margin-bottom: 12px; }
+
+/* Chips, badges, tabs --------------------------------------------------------- */
+.s-chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  background: var(--s-surface-2); border: 1px solid var(--s-border); color: var(--s-text); cursor: pointer; }
+.s-chip.s-on { background: rgba(103, 84, 223, .25); border-color: var(--s-violet); }
+.s-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 999px; font-family: var(--s-mono); font-size: 10px;
+  letter-spacing: .08em; text-transform: uppercase; background: var(--s-surface-3); color: var(--s-label); }
+.s-badge.s-ok { background: var(--s-green-bg); color: var(--s-green); }
+.s-badge.s-warn { background: rgba(255, 138, 71, .14); color: var(--s-orange); }
+.s-badge.s-bad { background: var(--s-red-bg); color: var(--s-red); }
+.s-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+.s-tabs { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: var(--s-bg-2); border: 1px solid var(--s-border); }
+.s-tabs > button { flex: 1; min-height: 40px; border: 0; border-radius: 10px; background: transparent; color: var(--s-muted); font-weight: 700; font-size: 14px; cursor: pointer; }
+.s-tabs > button.s-on { background: var(--s-surface-3); color: var(--s-text); }
+
+/* Stats & progress ----------------------------------------------------------- */
+.s-stat { display: grid; gap: 2px; }
+.s-stat .s-v { font-family: var(--s-display); font-size: 26px; font-weight: 800; line-height: 1; }
+.s-progress { height: 8px; border-radius: 8px; background: var(--s-bg-2); overflow: hidden; }
+.s-progress > i { display: block; height: 100%; background: var(--s-grad); border-radius: 8px; transition: width .35s var(--s-ease); }
+
+/* Bottom navigation (phones) --------------------------------------------------- */
+.s-tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  padding: 8px 8px calc(8px + var(--s-safe-b)); background: rgba(11, 16, 48, .92); backdrop-filter: blur(14px); border-top: 1px solid var(--s-border); }
+.s-tabbar button { display: grid; justify-items: center; gap: 3px; padding: 6px 0; border: 0; background: none; color: var(--s-faint); font-size: 11px; font-weight: 600; cursor: pointer; }
+.s-tabbar button svg { width: 22px; height: 22px; }
+.s-tabbar button.s-on { color: var(--s-text); }
+
+/* Toast ---------------------------------------------------------------------- */
+.s-toast { position: fixed; left: 50%; bottom: calc(84px + var(--s-safe-b)); transform: translate(-50%, 20px); opacity: 0; z-index: 80;
+  padding: 12px 16px; border-radius: 12px; background: var(--s-surface-3); border: 1px solid var(--s-border-2); box-shadow: var(--s-shadow);
+  font-weight: 600; transition: opacity .25s, transform .25s var(--s-ease); pointer-events: none; max-width: calc(100vw - 32px); }
+.s-toast.s-show { opacity: 1; transform: translate(-50%, 0); }
+
+/* Motion ---------------------------------------------------------------------- */
+@keyframes s-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.s-enter { animation: s-in .35s var(--s-ease) both; }
+@media (prefers-reduced-motion: reduce) { .s-enter { animation: none; } .s-btn, .s-progress > i { transition: none; } }

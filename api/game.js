@@ -2,6 +2,10 @@
 import crypto from 'node:crypto';
 import * as S from './_lib/store.js';
 import * as G from './_lib/game.js';
+import * as F from './_lib/features.js';
+import * as Q from './_lib/quiz.js';
+import * as E from './_lib/economy.js';
+import * as A from './_lib/archive.js';
 
 // Dealer is open (no password) unless DEALER_LOCK=1 and DEALER_PASSWORD are set in Vercel.
 const DEALER_PW = process.env.DEALER_LOCK === '1' ? process.env.DEALER_PASSWORD || 'mup-dealer' : '';
@@ -10,15 +14,56 @@ const dealerOk = (req) => !DEALER_PW || req.headers['x-dealer'] === DEALER_PW;
 
 let cache = { t: 0, data: null };
 
+const freshMeta = (teams, startV) => {
+  const m = F.normalize(G.newMeta(teams, startV));
+  m.v2ArchivedAt = Date.now(); // a brand-new game has nothing from before v2 to archive
+  return m;
+};
+
+// First load after the v2 deploy: archive the game exactly as it was, then mark it (keeping gid and rev).
+// Two instances racing may both archive (duplicates are fine); meta is re-read right before the write.
+let migrating = null, archiveFails = 0;
+async function migrateV2(meta) {
+  if (!migrating) {
+    migrating = (async () => {
+      try {
+        const [players, content] = await Promise.all([S.hgetall('players'), S.getJSON('content')]);
+        await A.createArchive('Stav před v2', true, meta, players, content || { v: '0', texts: {}, founders: null });
+      } catch (e) {
+        // try again on the next load; after three failures carry on without the archive (the data itself is untouched)
+        console.error('v2 archive failed', e?.message);
+        if (++archiveFails < 3) return meta;
+      }
+      const cur = await S.getJSON('meta');
+      if (cur && !cur.v2ArchivedAt) {
+        F.normalize(cur);
+        cur.v2ArchivedAt = Date.now();
+        await S.setJSON('meta', cur);
+      }
+      return cur || meta;
+    })().finally(() => { migrating = null; });
+  }
+  return migrating;
+}
+
 async function load(fresh) {
   if (!fresh && cache.data && Date.now() - cache.t < 700) return cache.data;
   let meta = await S.getJSON('meta');
-  if (!meta) { meta = G.newMeta(); meta.auto = true; await S.setJSON('meta', meta); }
-  else if (!meta.gid) { meta.gid = crypto.randomBytes(5).toString('hex'); meta.rev = meta.rev || 1; meta.removed = meta.removed || []; await S.setJSON('meta', meta); }
-  const [players, slips, content, qs, qv, qr] = await Promise.all([
+  if (!meta) { meta = freshMeta(); meta.auto = true; await S.setJSON('meta', meta); }
+  else {
+    if (!meta.gid) { meta.gid = crypto.randomBytes(5).toString('hex'); meta.rev = meta.rev || 1; meta.removed = meta.removed || []; await S.setJSON('meta', meta); }
+    if (!meta.v2ArchivedAt) meta = await migrateV2(meta);
+  }
+  F.normalize(meta);
+  // v2 adds at most two cheap reads: hash tx (card texts + round terms) and, only while a quiz
+  // question is open or revealed, that question's small answers hash.
+  const qk = Q.answersKey(meta);
+  const needTx = F.on(meta, 'cards') || F.on(meta, 'rounds');
+  const [players, slips, content, qs, qv, qr, tx, qa] = await Promise.all([
     S.hgetall('players'), S.hgetall('slip:' + meta.block), S.getJSON('content'), S.hgetall('qs'), S.hgetall('qv'), S.hgetall('qr'),
+    needTx ? S.hgetall('tx') : {}, qk ? S.hgetall(qk) : {},
   ]);
-  const data = { meta, players, slips, content: content || { v: '0', texts: {}, founders: null }, qs, qv, qr };
+  const data = { meta, players, slips, content: content || { v: '0', texts: {}, founders: null }, qs, qv, qr, tx, qa };
   cache = { t: Date.now(), data };
   return data;
 }
@@ -84,7 +129,7 @@ function myBoard(meta, p, bd) {
 }
 
 // ---------- views ----------
-function publicState(meta, players, slips, bd) {
+function publicState(meta, players, slips, bd, tx = {}, qa = {}) {
   const r = G.raised(meta);
   // money students have sent in this round, shown live on the table before the showdown (RJ stays hidden)
   const live = {};
@@ -95,15 +140,33 @@ function publicState(meta, players, slips, bd) {
       for (const [t, e] of Object.entries(sl.out || {})) live[t] = (live[t] || 0) - (e.amt || 0);
     }
   }
-  const teams = meta.teams.map((t) => ({ ...t, V: r0(G.valuation(meta, t.id)), cls: r0(r[t.id].cls), rj: r0(r[t.id].rj), live: r0(live[t.id] || 0) }));
+  const capOn = F.on(meta, 'captable');
+  const teams = meta.teams.map((t) => ({
+    ...t, V: r0(G.valuation(meta, t.id)), cls: r0(r[t.id].cls), rj: r0(r[t.id].rj), live: r0(live[t.id] || 0),
+    ...(capOn ? { cap: F.capOf(meta, t.id, players) } : {}),
+  }));
   const plist = Object.values(players).filter((p) => !p.ghost).map((p) => ({ id: p.id, name: p.name, team: p.team }));
   const betCount = Object.entries(slips).filter(([k, s]) => k !== G.RJ && players[k] && !players[k].ghost && s?.submitted).length;
   const leaders = plist
     .filter((p) => G.hasHoldings(meta, p.id))
     .map((p) => ({ name: p.name, team: p.team, value: r0(G.portfolio(meta, p.id)) }))
     .sort((a, b) => b.value - a.value)
-    .slice(0, 5);
+    .slice(0, 5)
+    .map((x) => ({ ...x, returnPct: F.returnPct(x.value) }));
+  const v2 = {
+    features: meta.features, reasonLabels: F.REASON_LABELS, milestoneDefs: meta.milestoneDefs,
+    quiz: Q.publicQuiz(meta, players, qa),
+  };
+  if (F.on(meta, 'cards')) v2.cards = F.publicCards(meta, tx);
+  if (F.on(meta, 'drivers')) v2.drivers = F.publicDrivers(meta);
+  if (F.on(meta, 'rounds')) v2.rounds = E.publicRounds(meta, tx);
+  if (F.on(meta, 'market')) v2.market = { flipped: meta.market.flipped };
+  if (F.on(meta, 'tranches')) { v2.tranches = E.publicTranches(meta); v2.rjFund = G.rjFund(meta); }
+  if (F.on(meta, 'track')) { v2.awards = F.publicAwards(meta, players); v2.contrarian = F.contrarian(meta, players); }
+  if (F.on(meta, 'exit') && meta.exit) v2.exit = E.publicExit(meta, players);
+  if (F.on(meta, 'points')) v2.points = F.publicPoints(meta, players);
   return {
+    ...v2,
     now: Date.now(), teams, block: meta.block, maxBlock: G.CFG.MAX_BLOCK, phase: meta.phase,
     presenting: meta.presenting, timerEnd: meta.timerEnd, timerTotal: meta.timerTotal, timerLabel: meta.timerLabel,
     screen: meta.screen, regOpen: meta.regOpen, history: meta.history, reveal: meta.reveal,
@@ -116,17 +179,9 @@ function publicState(meta, players, slips, bd) {
 }
 
 // Every student's portfolio value at each showdown and revaluation (for the stonks chart).
-function recordPf(meta) {
-  const v = {};
-  for (const inv of Object.keys(meta.ledger.H)) {
-    if (inv !== G.RJ && G.hasHoldings(meta, inv)) v[inv] = r0(G.portfolio(meta, inv));
-  }
-  meta.pfHist = meta.pfHist || [];
-  meta.pfHist.push({ ts: Date.now(), v });
-  if (meta.pfHist.length > 250) meta.pfHist.splice(0, meta.pfHist.length - 250);
-}
+const recordPf = F.recordPf;
 
-function meState(meta, p, slips, bd) {
+function meState(meta, p, slips, bd, players = {}, qa = {}) {
   const st = G.stakes(meta, p.id);
   const stakes = {};
   for (const [t, v] of Object.entries(st)) stakes[t] = r0(v);
@@ -136,7 +191,20 @@ function meState(meta, p, slips, bd) {
     start: G.CFG.STUDENT_CAPITAL, series, rules: G.rules(meta, p.id), slip: slips[p.id] || null,
     msgs: ((meta.fb || {})[p.team] || []).slice().reverse(),
     board: myBoard(meta, p, bd), ghost: !!p.ghost,
+    ...meV2(meta, p, players, qa),
   };
+}
+
+function meV2(meta, p, players, qa) {
+  const out = { quiz: Q.meQuiz(meta, p, players, qa) };
+  if (F.on(meta, 'captable')) out.myTeamCap = { ...F.capOf(meta, p.team, players), history: F.capHistory(meta, p.team) };
+  if (F.on(meta, 'track')) out.track = F.myTrack(meta, p, players);
+  if (F.on(meta, 'points')) out.points = F.myPoints(meta, p, players);
+  if (F.on(meta, 'rounds')) {
+    out.roundTermsOpen = !p.ghost && !E.termsOpen(meta);
+    out.roundBounds = E.roundBounds(meta, p.team);
+  }
+  return out;
 }
 
 function callList(meta, players, slips) {
@@ -169,7 +237,7 @@ function callList(meta, players, slips) {
   };
 }
 
-function dealerState(meta, players, slips, bd) {
+function dealerState(meta, players, slips, bd, tx = {}, qa = {}) {
   const rows = Object.values(players).filter((p) => !p.ghost).map((p) => ({
     id: p.id, name: p.name, team: p.team, hasPin: !!p.pin,
     portfolio: r0(G.portfolio(meta, p.id)), holdings: G.hasHoldings(meta, p.id), slip: slips[p.id] || null,
@@ -183,34 +251,36 @@ function dealerState(meta, players, slips, bd) {
     board: boardItems(bd, players, { dealer: true }), qpinId: meta.qpin || null,
     rj: { stakes, portfolio: r0(G.portfolio(meta, G.RJ)), rules: G.rules(meta, G.RJ), slip: slips[G.RJ] || null },
     calls: callList(meta, players, slips),
+    // v2: what only the admin may see (correct answers, the full points ledger, raw awards and terms)
+    quizSets: meta.quizSets, quiz: Q.dealerQuiz(meta, players, qa), points: meta.points,
+    awards: meta.awards, rounds: meta.rounds, roundTerms: Object.fromEntries(Object.entries(tx).filter(([k]) => k.startsWith('rt:'))),
+    rjFund: G.rjFund(meta), tranches: meta.tranches, exit: meta.exit, v2ArchivedAt: meta.v2ArchivedAt || null,
   };
 }
 
 // ---------- actions ----------
 // Private feedback from RainbowJet, visible only to members of that team.
-function addMsg(meta, team, msg) {
-  meta.fb = meta.fb || {};
-  (meta.fb[team] = meta.fb[team] || []).push({ ts: Date.now(), block: meta.block, ...msg });
-}
+const addMsg = E.addMsg;
 
+// Undo stack. Fields that undo keeps from the current meta anyway (quiz, points, …) are not copied, and the
+// whole stack stays under ~900 kB so one Redis value never gets too big. A failed backup never blocks the op.
 async function backup(meta) {
-  const b = (await S.getJSON('backups')) || [];
-  b.push(meta);
-  while (b.length > 15) b.shift();
-  await S.setJSON('backups', b);
+  try {
+    const copy = { ...meta };
+    for (const k of F.KEEP_ON_UNDO) if (k !== 'v2ArchivedAt') delete copy[k];
+    const b = (await S.getJSON('backups')) || [];
+    b.push(copy);
+    while (b.length > 15) b.shift();
+    while (b.length > 1 && JSON.stringify(b).length > 900_000) b.shift();
+    await S.setJSON('backups', b);
+  } catch (e) { console.error('backup failed', e?.message); }
 }
 
 // Full copy of the game for the dealer's laptop. Without a database the server can forget everything
 // (new instance, redeploy); the dealer page keeps this copy and pushes it back with op 'restore'.
 async function makeDump() {
   const { meta, players, content } = await load(true);
-  const slips = {};
-  for (let i = 1; i <= G.CFG.MAX_BLOCK; i++) {
-    const h = await S.hgetall('slip:' + i);
-    if (Object.keys(h).length) slips[i] = h;
-  }
-  const board = { qs: await S.hgetall('qs'), qv: await S.hgetall('qv'), qr: await S.hgetall('qr') };
-  return { meta, players, slips, content, board };
+  return A.buildDump(meta, players, content);
 }
 
 function cleanEntries(x, meta) {
@@ -251,8 +321,17 @@ function setTimer(meta, minutes, label) {
 const fail = (msg, extra) => ({ status: 400, body: { ok: false, error: msg, ...extra } });
 const ok = (extra) => ({ status: 200, body: { ok: true, ...extra } });
 
+// A quiz answer needs only a fresh meta (quiz state); players come from the 700 ms cache unless the
+// player is not in it yet. 20 students answering at once then cost ~2 commands each instead of ~9.
+async function loadForAnswer(sid) {
+  const d = await load(false);
+  if (!d.players[sid]) return load(true);
+  const m = await S.getJSON('meta');
+  return m && m.v2ArchivedAt ? { ...d, meta: F.normalize(m) } : load(true);
+}
+
 async function studentAction(b) {
-  const { meta, players, slips } = await load(true);
+  const { meta, players, slips } = b.op === 'quizAnswer' ? await loadForAnswer(String(b.sid || '')) : await load(true);
   if (b.op === 'register') {
     if (!meta.regOpen) return fail('Registrace je zavřená. Požádej dealera.');
     const name = String(b.name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
@@ -353,6 +432,40 @@ async function studentAction(b) {
     }
   }
 
+  // v2 student ops write only their own hash fields (never meta), so nobody's write can be lost.
+  if (b.op === 'quizAnswer') {
+    if (!F.on(meta, 'quiz')) return fail(F.OFF);
+    const z = meta.quiz, q = Q.current(meta);
+    if (z.state !== 'question' || !q) return fail('Teď neběží žádná otázka.');
+    if ((b.idx !== undefined && Number(b.idx) !== z.idx) || (b.runId && b.runId !== z.runId)) return fail('Otázka se mezitím změnila.');
+    const now = Date.now();
+    if (now > z.endsAt + Q.GRACE_MS) return fail('Čas vypršel.');
+    const choice = Number(b.choice);
+    if (!Number.isInteger(choice) || choice < 0 || choice >= q.a.length) return fail('Vyber odpověď.');
+    const ms = Math.max(0, now - z.startedAt);
+    const added = await S.hsetnx(Q.qaKey(z.runId, z.idx), p.id, { choice, ms, ts: now });
+    if (!added) return fail('Odpověď už máš odeslanou.');
+    invalidate();
+    return ok({ choice, ms });
+  }
+  if (b.op === 'card') {
+    if (!F.on(meta, 'cards')) return fail(F.OFF);
+    if (p.ghost) return fail('Ghost kartu týmu neupravuje.');
+    const cur = (await S.hget('tx', 'card:' + p.team)) || {};
+    const c = F.cleanCardText(b, cur);
+    await S.hset('tx', 'card:' + p.team, { ...c, updatedAt: Date.now(), updatedBy: p.name });
+    invalidate();
+    return ok({ card: c });
+  }
+  if (b.op === 'roundTerms') {
+    if (p.ghost) return fail('Ghost podmínky kola nenastavuje.');
+    const r = E.makeTerms(meta, p.team, b.pre, p.name);
+    if (r.error) return fail(r.error);
+    await S.hset('tx', E.termsKey(meta.block, p.team), r.terms);
+    invalidate();
+    return ok({ terms: r.terms });
+  }
+
   if (b.op === 'notes') {
     // re-read right before writing so a notes autosave never undoes an investment sent a moment earlier
     const slip = (await S.hgetall('slip:' + meta.block))[p.id] || {};
@@ -395,6 +508,11 @@ async function restoreFrom(d) {
   let restored = false;
   if (meta.auto || (d.meta.rev || 0) > (meta.rev || 0)) {
     const nm = { ...d.meta, auto: false };
+    // an old-shaped dump (from before v2) keeps the server's v2 data and never re-triggers the v2 archive
+    for (const k of F.V2_FIELDS) if (nm[k] === undefined && meta[k] !== undefined && !meta.auto) nm[k] = meta[k];
+    nm.v2ArchivedAt = nm.v2ArchivedAt || meta.v2ArchivedAt || Date.now();
+    F.normalize(nm);
+    nm.rev = Math.max(nm.rev || 0, meta.rev || 0);
     await S.setJSON('meta', nm);
     restored = true;
   }
@@ -417,17 +535,207 @@ async function restoreFrom(d) {
     const cur = await S.hgetall(h);
     for (const [f, v] of Object.entries(d.board?.[h] || {})) if (!(f in cur) && v != null) await S.hset(h, f, v);
   }
+  if (d.tx && typeof d.tx === 'object') {
+    const cur = await S.hgetall('tx');
+    for (const [f, v] of Object.entries(d.tx)) {
+      if (!v || typeof v !== 'object' || !/^(card|rt):/.test(f)) continue;
+      const c = cur[f];
+      if (!c || (Number(v.updatedAt || v.ts) || 0) > (Number(c.updatedAt || c.ts) || 0)) await S.hset('tx', f, v);
+    }
+  }
   invalidate();
   return ok({ restored });
 }
 
+// Dealer ops that need a feature switched on (content editing — quiz sets, milestone list — always works).
+const GATES = {
+  card: 'cards', roundTerms: 'rounds', quizStart: 'quiz', quizNext: 'quiz', quizReveal: 'quiz', quizBoard: 'quiz',
+  pointsAdd: 'points', pointsRemove: 'points', award: 'track', awardRemove: 'track', marketCard: 'market',
+  trancheAdd: 'tranches', trancheRelease: 'tranches', trancheCancel: 'tranches', exitSet: 'exit',
+};
+
 async function dealerAction(b) {
   if (b.op === 'restore') return restoreFrom(b.dump);
-  const { meta, players, slips } = await load(true);
+  const { meta, players, slips, content, tx, qa } = await load(true);
   const blk = meta.block;
   const save = async () => { meta.rev = (meta.rev || 0) + 1; meta.auto = false; await S.setJSON('meta', meta); invalidate(); };
+  const gate = GATES[b.op];
+  if (gate && !F.on(meta, gate)) return fail(F.OFF);
+  const archive = (label) => A.createArchive(label, true, meta, players, content);
 
   switch (b.op) {
+    // ---------- v2 ----------
+    case 'features': {
+      for (const [k, v] of Object.entries(b.set || {})) if (k in F.FEATURE_DEFAULTS) meta.features[k] = !!v;
+      await save();
+      return ok({ features: meta.features });
+    }
+    case 'archive': {
+      const id = await A.createArchive(String(b.label || '').trim() || 'Ruční archiv', false, meta, players, content);
+      return ok({ id });
+    }
+    case 'archiveDelete': {
+      if (!b.id) return fail('Archiv nenalezen.');
+      await A.deleteArchive(b.id);
+      return ok();
+    }
+    case 'clearBoard': {
+      await archive('Otázky z tabule');
+      await Promise.all(['qs', 'qv', 'qr'].map((h) => S.del(h)));
+      if (meta.qpin) { meta.qpin = null; await save(); }
+      invalidate();
+      return ok();
+    }
+    case 'card': {
+      if (!meta.teams.some((t) => t.id === b.team)) return fail('Neznámý tým.');
+      if (b.oneLiner !== undefined || b.sub !== undefined) {
+        const cur = tx['card:' + b.team] || {};
+        await S.hset('tx', 'card:' + b.team, { ...F.cleanCardText(b, cur), updatedAt: Date.now(), updatedBy: 'RainbowJet' });
+      }
+      if (b.milestones && typeof b.milestones === 'object') {
+        const c = meta.cards[b.team] || (meta.cards[b.team] = {});
+        const ms = c.milestones || (c.milestones = {});
+        const members = Object.values(players).filter((p) => !p.ghost && p.team === b.team);
+        for (const [k, v] of Object.entries(b.milestones)) {
+          const def = meta.milestoneDefs.find((d) => d.key === k);
+          if (!def) continue;
+          const ref = `ms:${b.team}:${k}`;
+          if (v && !ms[k]) {
+            ms[k] = true;
+            if (F.on(meta, 'points')) for (const p of members) F.addPoints(meta, p.id, 300, 'milestone', 'Milník: ' + def.label, { ref });
+          } else if (!v && ms[k]) {
+            delete ms[k];
+            meta.points = meta.points.filter((e) => e.ref !== ref);
+          }
+        }
+        c.updatedAt = Date.now(); c.updatedBy = 'RainbowJet';
+        await save();
+      }
+      invalidate();
+      return ok();
+    }
+    case 'milestoneDefs': {
+      const defs = F.cleanMilestoneDefs(b.defs);
+      if (!defs) return fail('Milníky jsou neplatné (každý potřebuje klíč a název).');
+      meta.milestoneDefs = defs;
+      await save();
+      return ok();
+    }
+    case 'roundTerms': {
+      const r = E.makeTerms(meta, b.team, b.pre, 'RainbowJet');
+      if (r.error) return fail(r.error);
+      await S.hset('tx', E.termsKey(blk, b.team), r.terms);
+      invalidate();
+      return ok({ terms: r.terms });
+    }
+    case 'quizSave': {
+      const r = Q.cleanSet(b.set);
+      if (r.error) return fail(r.error);
+      const i = meta.quizSets.findIndex((x) => x.id === r.set.id);
+      if (i >= 0) meta.quizSets[i] = r.set; else meta.quizSets.push(r.set);
+      await save();
+      return ok({ id: r.set.id });
+    }
+    case 'quizDelete': {
+      if (meta.quiz.setId === b.id && ['question', 'reveal', 'board'].includes(meta.quiz.state)) return fail('Tahle sada právě běží. Nejdřív kvíz ukonči.');
+      const n = meta.quizSets.length;
+      meta.quizSets = meta.quizSets.filter((x) => x.id !== b.id);
+      if (meta.quizSets.length === n) return fail('Sada otázek nenalezena.');
+      await save();
+      return ok();
+    }
+    case 'quizStart': case 'quizNext': case 'quizReveal': case 'quizBoard': case 'quizEnd': {
+      // optional seq from the admin: a double click (or a second admin) on a state already moved on is a no-op
+      if (b.seq !== undefined && Number(b.seq) !== (meta.quiz.seq || 0)) return ok({ stale: true, quiz: Q.publicQuiz(meta, players, {}) });
+      // the open question's answers, read fresh (never from the GET cache) right before scoring
+      const qk = Q.answersKey(meta);
+      const answers = qk ? await S.hgetall(qk) : {};
+      const err = Q.step(meta, b.op, players, answers, b);
+      if (err) return fail(err);
+      await save();
+      return ok({ quiz: Q.publicQuiz(meta, players, {}) });
+    }
+    case 'pointsAdd': {
+      const amt = Math.round(Number(b.amt));
+      if (!Number.isFinite(amt) || amt === 0 || amt < -5000 || amt > 5000) return fail('Body musí být mezi −5 000 a 5 000 (ne 0).');
+      const kind = F.POINT_KINDS.includes(b.kind) ? b.kind : 'manual';
+      const note = String(b.note || '').trim().slice(0, 120);
+      let ids;
+      if (b.team) {
+        if (!meta.teams.some((t) => t.id === b.team)) return fail('Neznámý tým.');
+        ids = Object.values(players).filter((p) => !p.ghost && p.team === b.team).map((p) => p.id);
+        if (!ids.length) return fail('Tým zatím nemá žádné hráče.');
+      } else {
+        const p = players[b.playerId];
+        if (!p || p.ghost) return fail('Hráč nenalezen.');
+        ids = [p.id];
+      }
+      const group = ids.length > 1 ? F.rid(3) : undefined;
+      for (const id of ids) F.addPoints(meta, id, amt, kind, note, group ? { group } : undefined);
+      await save();
+      return ok({ n: ids.length });
+    }
+    case 'pointsRemove': {
+      const n = meta.points.length;
+      meta.points = meta.points.filter((e) => e.id !== b.id);
+      if (meta.points.length === n) return fail('Záznam nenalezen.');
+      await save();
+      return ok();
+    }
+    case 'award': {
+      if (!F.AWARD_KINDS.includes(b.kind)) return fail('Neznámý druh ocenění.');
+      const p = players[b.playerId];
+      if (!p || p.ghost) return fail('Hráč nenalezen.');
+      const id = F.rid(4);
+      const note = String(b.note || '').trim().slice(0, 200);
+      meta.awards.push({ id, block: blk, kind: b.kind, playerId: p.id, note });
+      if (F.on(meta, 'points')) F.addPoints(meta, p.id, 500, 'award', note || 'Ocenění', { ref: 'aw:' + id });
+      await save();
+      return ok({ id });
+    }
+    case 'awardRemove': {
+      const n = meta.awards.length;
+      meta.awards = meta.awards.filter((a) => a.id !== b.id);
+      if (meta.awards.length === n) return fail('Ocenění nenalezeno.');
+      meta.points = meta.points.filter((e) => e.ref !== 'aw:' + b.id);
+      await save();
+      return ok();
+    }
+    case 'marketCard': {
+      const probe = structuredClone(meta);
+      const err = E.marketCard(probe, b);
+      if (err) return fail(err);
+      await backup(structuredClone(meta));
+      E.marketCard(meta, b);
+      await save();
+      return ok({ id: meta.market.flipped[meta.market.flipped.length - 1].id });
+    }
+    case 'trancheAdd': case 'trancheCancel': {
+      const err = b.op === 'trancheAdd' ? E.trancheAdd(meta, b) : E.trancheCancel(meta, b);
+      if (err) return fail(err);
+      await save();
+      return ok(b.op === 'trancheAdd' ? { id: meta.tranches[meta.tranches.length - 1].id } : {});
+    }
+    case 'trancheRelease': {
+      const probe = structuredClone(meta);
+      const err = E.trancheRelease(probe, b);
+      if (err) return fail(err);
+      await backup(structuredClone(meta));
+      E.trancheRelease(meta, b);
+      await save();
+      return ok();
+    }
+    case 'exitSet': {
+      const r = E.cleanOutcomes(meta, b.outcomes);
+      if (r.error) return fail(r.error);
+      await archive('Před exitem');
+      await backup(structuredClone(meta));
+      E.applyExit(meta, r.outcomes);
+      setTimer(meta, 0);
+      await save();
+      return ok();
+    }
+
     case 'auth': return ok();
 
     case 'ghost': {
@@ -446,6 +754,12 @@ async function dealerAction(b) {
       const allowed = ['lobby', 'pitch', 'betting', 'closed', 'final'];
       if (!allowed.includes(b.phase)) return fail('Neznámá fáze.');
       if ((b.phase === 'betting' || b.phase === 'closed') && meta.settled[blk + 'c']) return fail('Tento blok je už vyhodnocený. Pokračuj dalším blokem.');
+      if (b.phase === 'betting' && F.on(meta, 'rounds') && !E.termsLocked(meta)) {
+        // priced round: the block trades at the agreed pre-money; undo returns to before the repricing
+        const terms = (await S.hgetall('tx'));
+        if (Object.keys(terms).some((k) => k.startsWith(`rt:${blk}:`))) await backup(structuredClone(meta));
+        E.applyRounds(meta, terms);
+      }
       meta.phase = b.phase;
       if (b.phase === 'pitch') meta.presenting = meta.teams.some((t) => t.id === b.team) ? b.team : meta.presenting;
       if (b.phase !== 'pitch') meta.presenting = null;
@@ -464,16 +778,18 @@ async function dealerAction(b) {
       await backup(structuredClone(meta));
       const delta = {}, skipped = [];
       let n = 0;
+      const low = G.lowTeams(meta);
       for (const [sid, s] of Object.entries(slips)) {
         const p = players[sid];
         if (sid === G.RJ || !p || p.ghost || !s?.submitted) continue;
         const v = G.validate(meta, sid, p.team, s);
         if (!v.ok) { skipped.push({ name: p.name, error: v.errors[0] }); continue; }
-        const d = G.apply(meta, sid, v);
+        const d = G.apply(meta, sid, v, low);
         for (const [t, x] of Object.entries(d)) delta[t] = (delta[t] || 0) + x;
         n++;
       }
       for (const t in delta) delta[t] = r0(delta[t]);
+      F.addDrivers(meta, 'class', delta, `Třída v bloku ${blk}`);
       meta.settled[blk + 'c'] = true;
       meta.phase = 'showdown';
       setTimer(meta, 0);
@@ -501,6 +817,9 @@ async function dealerAction(b) {
       await backup(structuredClone(meta));
       const d = G.apply(meta, G.RJ, v);
       for (const t in d) d[t] = r0(d[t]);
+      meta.rjPrincipal = Math.max(0, (meta.rjPrincipal || 0) + v.inTotal - v.outTotal);
+      // the reasons are private messages to each team: the driver keeps them in `why`, public note stays generic
+      F.addDrivers(meta, 'rj', d, 'Smart money RainbowJet', Object.fromEntries(meta.teams.map((t) => [t.id, { why: v.in[t.id]?.why || v.out[t.id]?.why || '' }])));
       for (const t of meta.teams) {
         const i = v.in[t.id], o = v.out[t.id];
         if (i) addMsg(meta, t.id, { kind: 'smart', amt: i.amt, text: i.why });
@@ -527,6 +846,15 @@ async function dealerAction(b) {
       if (hasV) G.revalue(meta, V);
       const delta = {};
       for (const t of meta.teams) delta[t.id] = r0(G.valuation(meta, t.id) - before[t.id]);
+      const reason = b.reason && typeof b.reason === 'object' ? b.reason : {};
+      const dnotes = {}, dextra = {};
+      for (const t of meta.teams) {
+        const rk = F.REASON_LABELS[reason[t.id]] ? reason[t.id] : null;
+        // `why` is a private message to the team, so the public note is the reason label
+        dnotes[t.id] = rk ? F.REASON_LABELS[rk] : 'Přecenění';
+        dextra[t.id] = { ...(rk ? { reason: rk } : {}), why: String(why[t.id] || '').trim().slice(0, 200) };
+      }
+      F.addDrivers(meta, 'revalue', delta, dnotes, dextra);
       for (const t of meta.teams) {
         const text = String(why[t.id] || '').trim().slice(0, 600);
         const moved = V[t.id] !== undefined;
@@ -543,6 +871,7 @@ async function dealerAction(b) {
     }
     case 'nextBlock': {
       if (blk >= G.CFG.MAX_BLOCK) return fail('Toto je poslední blok. Použij Demo Day.');
+      await archive(`Před blokem ${blk + 1}`);
       await backup(structuredClone(meta));
       meta.block = blk + 1;
       meta.phase = 'lobby'; meta.presenting = null; meta.reveal = null; meta.pins = [];
@@ -649,13 +978,20 @@ async function dealerAction(b) {
       if (!prev) return fail('Není co vracet.');
       await S.setJSON('backups', bk);
       prev.rev = (meta.rev || 0) + 1; prev.auto = false; prev.gid = meta.gid;
+      // undo reverts the game (money, valuations, phase); quiz, points, awards, cards and flags stay
+      for (const k of F.KEEP_ON_UNDO) if (meta[k] !== undefined) prev[k] = meta[k];
+      F.normalize(prev);
       await S.setJSON('meta', prev);
       invalidate();
       return ok();
     }
     case 'reset': {
       if (b.confirm !== 'RESET') return fail('Potvrď napsáním RESET.');
-      const fresh = G.newMeta(meta.teams, meta.startV);
+      await archive('Před novou hrou');
+      const fresh = freshMeta(meta.teams, meta.startV);
+      for (const k of ['features', 'quizSets', 'milestoneDefs', 'cards']) fresh[k] = meta[k];
+      fresh.rev = (meta.rev || 0) + 1;
+      await Promise.all(Object.keys(await S.hgetall('tx')).filter((k) => k.startsWith('rt:')).map((k) => S.hdel('tx', k)));
       for (let i = 1; i <= G.CFG.MAX_BLOCK; i++) await S.del('slip:' + i);
       await S.del('backups');
       if (!b.keepPlayers) await S.del('players');
@@ -667,26 +1003,46 @@ async function dealerAction(b) {
   return fail('Neznámá akce.');
 }
 
+// Dealer ops run one at a time per server instance, so two organisers clicking at once never overwrite
+// each other's meta write. (Student ops never write meta.)
+let chain = Promise.resolve();
+function serial(fn) {
+  const run = chain.then(fn, fn);
+  chain = run.catch(() => {});
+  return run;
+}
+
 // ---------- handler ----------
 export default async function handler(req, res) {
   try {
     const url = new URL(req.url, 'http://local');
     if (req.method === 'GET') {
-      const { meta, players, slips, content, qs, qv, qr } = await load(false);
+      const { meta, players, slips, content, qs, qv, qr, tx, qa } = await load(false);
       const bd = { qs, qv, qr };
-      const out = publicState(meta, players, slips, bd);
+      const view = url.searchParams.get('view');
+      if (view === 'archives' || view === 'archive' || view === 'data') {
+        if (!dealerOk(req)) return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
+        if (view === 'archives') return send(res, 200, { ok: true, archives: await A.listArchives() });
+        if (view === 'archive') {
+          const archive = await A.getArchive(url.searchParams.get('id'));
+          return archive ? send(res, 200, { ok: true, archive }) : send(res, 404, { ok: false, error: 'Archiv nenalezen.' });
+        }
+        const fullTx = Object.keys(tx).length || F.on(meta, 'cards') ? tx : await S.hgetall('tx');
+        return send(res, 200, await A.dataView(meta, players, fullTx));
+      }
+      const out = publicState(meta, players, slips, bd, tx, qa);
       out.content = content;
       const sid = req.headers['x-sid'], pin = req.headers['x-pin'];
       if (sid && pin) {
         const p = players[sid];
-        if (p && p.pin && p.pin === pinHash(p.id, pin)) out.me = meState(meta, p, slips, bd);
+        if (p && p.pin && p.pin === pinHash(p.id, pin)) out.me = meState(meta, p, slips, bd, players, qa);
         else out.meError = p ? 'pin' : 'unknown';
       }
       if (url.searchParams.get('view') === 'log' && dealerOk(req)) {
         return send(res, 200, { ok: true, storage: S.storageMode, pgEnv: S.pgEnvKey, log: await S.readLog(Number(url.searchParams.get('limit')) || 5000) });
       }
       if (url.searchParams.get('view') === 'dealer' && dealerOk(req)) {
-        out.dealer = dealerState(meta, players, slips, bd);
+        out.dealer = dealerState(meta, players, slips, bd, tx, qa);
         if (url.searchParams.get('dump') === '1') out.dealer.dump = await makeDump();
         if (url.searchParams.get('all') === '1') {
           const all = {};
@@ -705,13 +1061,15 @@ export default async function handler(req, res) {
     }
     if (req.method === 'POST') {
       const b = await readBody(req);
-      const studentOps = ['register', 'login', 'notes', 'submit', 'reasons', 'restore', 'ask', 'vote', 'answer', 'react'];
+      const studentOps = ['register', 'login', 'notes', 'submit', 'reasons', 'restore', 'ask', 'vote', 'answer', 'react', 'quizAnswer'];
       let r;
-      const student = studentOps.includes(b.op);
+      // card / roundTerms exist for both: with a sid it is a student editing their own team
+      // restore with a `dump` is the dealer's backup push (before v2 it was routed to the phones' restore and never ran)
+      const student = (studentOps.includes(b.op) && !(b.op === 'restore' && b.dump)) || (['card', 'roundTerms'].includes(b.op) && !!b.sid);
       if (student) r = await studentAction(b);
       else {
         if (!dealerOk(req)) return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
-        r = await dealerAction(b);
+        r = await serial(() => dealerAction(b));
       }
       if (b.op !== 'auth') {
         // action log: what every student / the dealer sent, without PINs and big backup blobs

@@ -195,8 +195,11 @@
     applyStatic();
     return true;
   }
+  // Pages and features register their own default texts here instead of editing T above.
+  function addTexts(d) { for (const [k, v] of Object.entries(d || {})) if (!(k in T)) T[k] = v; }
   function applyStatic(root = document) {
-    root.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
+    // [data-t] on investing rows is a team id, not a text key: leave those alone
+    root.querySelectorAll('[data-t]:not([data-k])').forEach((el) => { el.textContent = t(el.dataset.t); });
   }
   const portraits = {};
   function loadPortraits() {
@@ -274,5 +277,5 @@
     s.setAttribute('opacity', frac > 0.02 ? 0.75 : 0);
   }
 
-  window.MUP = { esc, fmt, fmtM, sign, get, post, now, timeLeft, clock, poll, PHASES, FOUNDERS, DEFAULT_FOUNDERS, T, t, setContent, applyStatic, cv: () => cv, loadPortraits, billHTML, glassHTML, setGlass };
+  window.MUP = { esc, fmt, fmtM, sign, get, post, now, timeLeft, clock, poll, PHASES, FOUNDERS, DEFAULT_FOUNDERS, T, t, addTexts, setContent, applyStatic, cv: () => cv, loadPortraits, billHTML, glassHTML, setGlass };
 })();

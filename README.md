@@ -44,3 +44,16 @@ Mistake? **Vrátit poslední krok** undoes the last showdown, reveal, revaluatio
 npm install
 npm run dev   # http://localhost:3000, in-memory data
 ```
+
+## API (v2)
+
+One endpoint, `/api/game`. `GET` = state (`?view=dealer`, `?view=log`, `?view=archives`, `?view=archive&id=…`, `?view=data` for the dealer). `POST { op, … }` = action; students send `sid` + `pin`. The contract is `docs/V2-SPEC.md`; implementation notes:
+
+- New state lives in `meta` (`features`, `cards[t].milestones`, `milestoneDefs`, `drivers`, `rounds`, `market`, `tranches`, `rjPrincipal`, `lots`, `awards`, `quizSets`, `quiz`, `quizLog`, `points`, `exit`, `v2ArchivedAt`); older states get defaults on read (`api/_lib/features.js` → `normalize`). The first load of an old game saves an archive „Stav před v2“ (gid and rev are kept).
+- Student-written data never goes through `meta`: card texts and round terms are fields of hash `tx` (`card:<team>`, `rt:<block>:<team>`), quiz answers are one small hash per question `qa:<runId>:<idx>` (field = sid, written once with HSETNX). A GET reads at most two extra keys: `tx`, and that question's answers only while a question is open or revealed.
+- Archives: hash `arch` (full objects) + hash `archi` (index for `?view=archives`). Auto archives before Další blok, Nová hra, exit, Vyčistit tabuli.
+- Student ops: `quizAnswer { choice, idx? }`, `card { oneLiner, sub }`, `roundTerms { pre }`. Dealer ops: `features`, `archive`, `archiveDelete`, `clearBoard`, `card`, `milestoneDefs`, `roundTerms`, `quizSave`, `quizDelete`, `quizStart`, `quizNext`, `quizReveal`, `quizBoard`, `quizEnd` (second press → `idle`), `pointsAdd`, `pointsRemove`, `award`, `awardRemove`, `marketCard`, `trancheAdd`, `trancheRelease`, `trancheCancel`, `exitSet`; `revalue` takes optional `reason`.
+- `?view=dealer` adds `dealer.quizSets` (with correct answers), `dealer.quiz` (run state + current question + who answered), `dealer.points` (ledger), `dealer.awards`, `dealer.rounds`, `dealer.roundTerms`, `dealer.rjFund`, `dealer.tranches`, `dealer.exit`.
+- `undo` reverts the game (money, valuations, phase, drivers, lots, market, tranches, exit) and keeps quiz, points, awards, cards and flags.
+- Dealer ops run one at a time per instance; quiz ops take an optional `seq` (a stale click is a no-op). `restore` with a `dump` now really reaches the dealer restore (before v2 it was routed to the phones' restore); an old-shaped dump keeps the server's v2 data, `v2ArchivedAt` and a rev that never goes down.
+- Tests: `tests/a-quiz.mjs`, `a-econ.mjs`, `a-flags.mjs` run against a fresh server (`BASE=http://localhost:3101/api/game node tests/a-quiz.mjs`); `a-migrate.mjs` (old server → v2 on Postgres and Redis + Postgres; needs `OLD_DIR` with git `v2-base` and `PG`) and `a-perf.mjs` (Redis commands per GET vs the old server) start their own servers.
