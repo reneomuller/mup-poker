@@ -49,7 +49,8 @@ stop_server() {
   SRV_PID=''
 }
 stop_mock() { [ -n "$MOCK_PID" ] && kill "$MOCK_PID" 2>/dev/null; MOCK_PID=''; sleep 0.1; }
-trap 'stop_server; stop_mock' EXIT INT TERM
+trap 'stop_server; stop_mock' EXIT
+trap 'stop_server; stop_mock; exit 130' INT TERM
 
 store_env() { # $1 = mode
   case "$1" in
