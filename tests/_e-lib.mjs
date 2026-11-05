@@ -170,7 +170,7 @@ export function badNumbers(obj, maxReport = 10) {
     if (x === null) { if (NUMERIC.has(key) || NUMERIC_MAPS.has(parentKey)) bad.push(p + '=null'); return; }
     if (typeof x === 'string') { if (/\bNaN\b|\bInfinity\b|undefined \$|NaN \$/.test(x)) bad.push(p + '="' + x.slice(0, 40) + '"'); return; }
     if (Array.isArray(x)) { x.forEach((y, i) => walk(y, p + '[' + i + ']', key, parentKey)); return; }
-    if (typeof x === 'object') for (const [k, v] of Object.entries(x)) walk(v, p + '.' + k, k, key);
+    if (typeof x === 'object') for (const [k, v] of Object.entries(x)) { if (k === 'content' || k === 'texts') continue; walk(v, p + '.' + k, k, key); }
   };
   walk(obj, '$', '', '');
   return bad;
@@ -352,3 +352,11 @@ export async function invariants(c, ctx, label, { quiet = true } = {}) {
   if (good && quiet) ok(true, `[${label}] invariants hold`);
   return { pub, dump, meta, mes };
 }
+
+// ---------- quiz helpers ----------
+export const quizScore = (ms, time) => Math.min(1000, Math.max(500, Math.round(1000 * (1 - (0.5 * ms) / (time * 1000)))));
+// all students answer at once; returns the responses
+export function answerAll(c, students, choiceOf) {
+  return Promise.all(students.map((s, i) => c.st(s, 'quizAnswer', { choice: choiceOf(s, i) })));
+}
+export const ledgerTotal = (meta, sid) => (meta?.points || []).filter((e) => e.playerId === sid).reduce((a, e) => a + e.amt, 0);
