@@ -35,6 +35,8 @@
   chk.onchange = () => { auto = chk.checked; ls.set(AUTO_KEY, auto ? '1' : '0'); render(); };
 
   const now = () => Date.now() + skew;
+  // v4 quizplus: an explanation („Proč“) on the reveal adds reading time (≈ 35 ms per character, at most +7 s)
+  const hold = () => REVEAL_HOLD + (q && typeof q.why === 'string' ? Math.min(7000, q.why.length * 35) : 0);
   const live = () => q && ['question', 'reveal', 'board'].includes(q.state);
   const lastQ = () => q && (q.idx ?? -1) + 1 >= (q.total || 0);
   function label() {
@@ -53,7 +55,7 @@
       return `Automaticky odhalím za ${s} s · odpovědělo ${q.answered || 0}/${q.expected || 0}`;
     }
     if (q.state === 'reveal') {
-      const s = revealSeen.seq === q.seq ? Math.max(0, Math.ceil((revealSeen.at + REVEAL_HOLD - Date.now()) / 1000)) : 5;
+      const s = revealSeen.seq === q.seq ? Math.max(0, Math.ceil((revealSeen.at + hold() - Date.now()) / 1000)) : Math.ceil(hold() / 1000);
       return `Žebříček za ${s} s`;
     }
     if (q.idx < 0) return 'Úvodní obrazovka – „Spustit 1. otázku“ (mezerník nebo →).';
@@ -97,7 +99,7 @@
     if (q.state === 'question' && ((q.expected > 0 && q.answered >= q.expected) || now() >= (q.endsAt || 0) + GRACE)) { fired = { seq: q.seq, at: Date.now() }; advance(true); }
     else if (q.state === 'reveal') {
       if (revealSeen.seq !== q.seq) revealSeen = { seq: q.seq, at: Date.now() };
-      if (Date.now() - revealSeen.at >= REVEAL_HOLD) { fired = { seq: q.seq, at: Date.now() }; advance(true); }
+      if (Date.now() - revealSeen.at >= hold()) { fired = { seq: q.seq, at: Date.now() }; advance(true); }
     }
   }
 
