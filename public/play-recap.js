@@ -111,7 +111,7 @@
         <div class="rc-mult rc-in ${b.multiple >= 1 ? 'up' : 'down'}">${esc(mult(b.multiple))}</div>
         <p class="rc-sub rc-in">Blok ${esc(b.block)} · ${esc(short(b.amt))} → ${esc(short(b.amt + (b.gain ?? b.amt * (b.multiple - 1))))}</p>
         ${why(b.why)}
-        ${w ? `<div class="rc-worst rc-in"><span class="s-label">Nejhorší tah</span><div>${tchip(w.team, w.teamName)} <b class="s-down">${esc(mult(w.multiple))}</b> <small>Blok ${esc(w.block)} · ${esc(short(w.amt))}</small></div></div>` : ''}` });
+        ${w ? `<div class="rc-worst rc-in"><span class="s-label">Nejhorší tah</span><div>${tchip(w.team, w.teamName)} <b class="${w.multiple >= 1 ? 's-up' : 's-down'}">${esc(mult(w.multiple))}</b> <small>Blok ${esc(w.block)} · ${esc(short(w.amt))}</small></div></div>` : ''}` });
     }
     if (r.trades) {
       const f = r.favourite, bg = r.biggest, c = r.contrarian, dv = r.diversification;
