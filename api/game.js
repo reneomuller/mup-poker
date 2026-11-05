@@ -321,8 +321,17 @@ function setTimer(meta, minutes, label) {
 const fail = (msg, extra) => ({ status: 400, body: { ok: false, error: msg, ...extra } });
 const ok = (extra) => ({ status: 200, body: { ok: true, ...extra } });
 
+// A quiz answer needs only a fresh meta (quiz state); players come from the 700 ms cache unless the
+// player is not in it yet. 20 students answering at once then cost ~2 commands each instead of ~9.
+async function loadForAnswer(sid) {
+  const d = await load(false);
+  if (!d.players[sid]) return load(true);
+  const m = await S.getJSON('meta');
+  return m && m.v2ArchivedAt ? { ...d, meta: F.normalize(m) } : load(true);
+}
+
 async function studentAction(b) {
-  const { meta, players, slips } = await load(true);
+  const { meta, players, slips } = b.op === 'quizAnswer' ? await loadForAnswer(String(b.sid || '')) : await load(true);
   if (b.op === 'register') {
     if (!meta.regOpen) return fail('Registrace je zavřená. Požádej dealera.');
     const name = String(b.name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
