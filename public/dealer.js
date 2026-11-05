@@ -916,7 +916,7 @@
     const defs = S.milestoneDefs || [];
     for (const t of S.teams) {
       const id = 'card-' + t.id, c = (S.cards || {})[t.id] || {};
-      const el = gate(id, [t.name, t.color, c, defs]);
+      const el = gate(id, [t.name, t.color, c, defs, firstMember(t.id)?.id || '']);
       if (!el) continue;
       const blocks = [...new Set(defs.map((d) => d.block))].sort((a, b) => a - b);
       const prevD = el.querySelector('details'), isOpen = prevD ? prevD.open : window.innerWidth >= 900;
@@ -927,7 +927,8 @@
         <textarea class="s-input sm" data-k="sub" maxlength="220" rows="3" placeholder="Pro koho, jaký problém, čím jsou jiní">${esc(c.sub || '')}</textarea>
         <div class="lab">Milníky</div>
         <div class="ms">${blocks.map((b) => `<div class="msb"><span class="s-label">Blok ${esc(b)}</span>${defs.filter((d) => d.block === b).map((d) => `<label class="mchk"><input type="checkbox" data-m="${esc(d.key)}" ${c.milestones?.[d.key] ? 'checked' : ''}><span>${esc(d.label)}</span></label>`).join('')}</div>`).join('') || '<span class="s-faint sm">Žádné milníky.</span>'}</div>
-        <div class="tcf"><span class="s-faint sm" data-st></span><button class="s-btn s-sm s-primary" data-save>Uložit kartu</button></div></div></details>`;
+        <div class="tcf"><span class="s-faint sm" data-st></span><span class="tcfb">${teamPreviewBtn(t.id)}<button class="s-btn s-sm s-primary" data-save>Uložit kartu</button></span></div></div></details>`;
+      wireTeamPreview(el);
       watchDirty(el, id);
       const cnt = () => all(el, '[data-cnt]').forEach((s) => { const f = el.querySelector(`[data-k="${s.dataset.cnt}"]`); s.textContent = `${f.value.length}/${f.maxLength}`; });
       cnt();
@@ -1253,6 +1254,114 @@
     }));
   }
 
+  // ---------- student preview (§10) + login QR (§9) ----------
+  const IC = {
+    eye: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M1.5 10S4.6 4 10 4s8.5 6 8.5 6-3.1 6-8.5 6S1.5 10 1.5 10Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.6" fill="currentColor"/></svg>',
+    qr: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 2.5h6v6h-6zM11.5 2.5h6v6h-6zM2.5 11.5h6v6h-6z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4.8 4.8h1.4v1.4H4.8zM13.8 4.8h1.4v1.4h-1.4zM4.8 13.8h1.4v1.4H4.8zM11.5 11.5h2.5V14h-2.5zM15 15h2.5v2.5H15zM11.5 15.5h2v2h-2zM15.5 11.5h2v2h-2z" fill="currentColor"/></svg>',
+  };
+  const openPreview = (sid) => window.open('/play?as=' + encodeURIComponent(sid), '_blank');
+  // first non-ghost member of a team (D.rows never contains ghosts)
+  const firstMember = (tid) => (D && D.rows || []).find((r) => r.team === tid) || null;
+  function teamPreviewBtn(tid, cls = '') {
+    const m = firstMember(tid);
+    return m
+      ? `<button class="s-btn s-sm s-ghost pbtn ${cls}" data-tprev="${esc(m.id)}" title="Mobil týmu očima hráče ${esc(m.name)} – jen pro čtení">${IC.eye}<span>Náhled týmu</span></button>`
+      : `<span class="tpw" title="Tým zatím nemá žádné hráče"><button class="s-btn s-sm s-ghost pbtn ${cls}" disabled>${IC.eye}<span>Náhled týmu</span></button></span>`;
+  }
+  const wireTeamPreview = (el) => all(el, '[data-tprev]').forEach((b) => (b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); openPreview(b.dataset.tprev); }));
+
+  function qrSvg(text) {
+    try { const q = qrcode(0, 'M'); q.addData(text); q.make(); return q.createSvgTag({ cellSize: 8, margin: 0, scalable: true }); } catch (e) { console.warn('qrcode', e); return ''; }
+  }
+  const mmss = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  let qrm = null;
+  function closeLoginQR() {
+    if (!qrm) return;
+    clearInterval(qrm.t);
+    document.removeEventListener('keydown', qrm.key, true);
+    qrm.el.remove();
+    document.body.classList.remove('qrm-open');
+    const f = qrm.focus;
+    qrm = null;
+    try { f && f.focus(); } catch {}
+  }
+  async function fetchLoginLink(sid) {
+    let r;
+    try { r = await post({ op: 'loginLink', sid }, H()); } catch (e) { r = { ok: false, error: String(e.message || e) }; }
+    if (!r || !r.ok || !r.url) { toast((r && r.error) || 'QR odkaz se nepodařilo vytvořit.', true); return null; }
+    let exp = Number(r.exp) || 0;
+    if (exp && exp < 1e12) exp *= 1000; // seconds → ms
+    if (!exp) exp = Date.now() + 10 * 60e3;
+    return { url: location.origin + r.url, exp };
+  }
+  async function openLoginQR(sid) {
+    const p = (D.rows || []).find((r) => r.id === sid) || (D.ghosts || []).find((g) => g.id === sid) || { id: sid, name: pname(sid) };
+    const link = await fetchLoginLink(sid);
+    if (!link) return;
+    const focus = document.activeElement;
+    closeLoginQR();
+    const el = document.createElement('div');
+    el.className = 'qrm';
+    el.innerHTML = `<div class="qrm-card" role="dialog" aria-modal="true" aria-labelledby="qrmt">
+      <button class="ib qrm-x" data-x aria-label="Zavřít">✕</button>
+      <div class="s-label">Přihlášení bez PINu</div>
+      <h3 id="qrmt">${dot(team(p.team).color)}${esc(p.name || '')}</h3>
+      <div class="s-faint sm">${p.team ? tname(p.team) : ''}</div>
+      <div class="qrm-code" data-code></div>
+      <div class="qrm-exp" data-exp aria-live="polite"></div>
+      <p class="hint">Hráč kód naskenuje telefonem a\u00a0je hned přihlášený. Dostane nový PIN, který mu ukážeme jednou. Kód platí 10\u00a0minut a\u00a0jde použít jen jednou.</p>
+      <div class="qrm-url"><input class="s-input sm" data-url readonly aria-label="Odkaz pro přihlášení"><button class="s-btn s-sm" data-copy>Kopírovat</button></div>
+      <div class="qrm-f"><button class="s-btn s-sm s-ghost" data-renew>Vytvořit nový</button><button class="s-btn s-sm s-ghost" data-x>Zavřít</button></div>
+    </div>`;
+    document.body.appendChild(el);
+    document.body.classList.add('qrm-open');
+    const card = el.querySelector('.qrm-card'), code = el.querySelector('[data-code]'), expEl = el.querySelector('[data-exp]'), urlIn = el.querySelector('[data-url]'), renew = el.querySelector('[data-renew]');
+    qrm = { el, focus, link, t: 0, key: null };
+    const set = (lk) => {
+      qrm.link = lk;
+      code.innerHTML = qrSvg(lk.url) || '<span class="s-down sm">QR se nepodařilo vykreslit – použijte odkaz níže.</span>';
+      urlIn.value = lk.url;
+      tickExp();
+    };
+    const tickExp = () => {
+      if (!qrm) return;
+      const left = qrm.link.exp - Date.now(), dead = left <= 0;
+      card.classList.toggle('dead', dead);
+      expEl.innerHTML = dead ? '<b class="s-down">Platnost vypršela.</b> Vytvořte nový kód.' : `Platí ještě <b>${mmss(left)}</b>`;
+      renew.classList.toggle('s-primary', dead);
+      renew.classList.toggle('s-ghost', !dead);
+    };
+    set(link);
+    qrm.t = setInterval(tickExp, 1000);
+    el.addEventListener('click', (e) => { if (e.target === el || e.target.closest('[data-x]')) closeLoginQR(); });
+    qrm.key = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); closeLoginQR(); return; }
+      if (e.key === 'Tab') { // keep focus inside the dialog
+        const f = all(card, 'button:not([disabled]), input');
+        if (!f.length) return;
+        const first = f[0], last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener('keydown', qrm.key, true);
+    el.querySelector('[data-copy]').onclick = async () => {
+      const u = urlIn.value;
+      let ok = false;
+      try { await navigator.clipboard.writeText(u); ok = true; } catch {}
+      if (!ok) { try { urlIn.select(); ok = document.execCommand('copy'); } catch {} }
+      toast(ok ? 'Odkaz zkopírován' : 'Kopírování se nepovedlo – označte odkaz ručně.', !ok);
+    };
+    urlIn.onfocus = () => urlIn.select();
+    renew.onclick = async () => {
+      renew.disabled = true;
+      const lk = await fetchLoginLink(sid);
+      renew.disabled = false;
+      if (lk && qrm && qrm.el === el) { set(lk); flash('Nový kód vytvořen'); }
+    };
+    el.querySelector('.qrm-x').focus();
+  }
+
   // ---------- Hráči ----------
   let awPlayer = null;
   function renderPlayers() {
@@ -1263,7 +1372,7 @@
     const el = gate('players', [rows.map((r) => [r.id, r.name, r.team, r.hasPin, r.holdings, r.portfolio]), S.teams.map((t) => [t.id, t.name, t.color]), Object.values(dvp).map((p) => [p.id, p.returnPct]), pts, F('points'), F('track'), S.regOpen]);
     if (!el) return;
     el.innerHTML = `<div class="ch"><h3>${E('dealer.sec.players')} (${rows.length})</h3><span class="s-badge ${S.regOpen ? 's-ok' : 's-warn'}">${S.regOpen ? 'registrace otevřená' : 'registrace zavřená'}</span></div>
-      <p class="hint">Zapomenutý PIN: „PIN“ ho smaže a hráč si při dalším přihlášení zvolí nový. Smazat jde jen hráče bez investic.</p>
+      <p class="hint">Zapomenutý PIN: nejrychlejší je „QR“ – hráč ho naskenuje telefonem a\u00a0je zpátky přihlášený (dostane nový PIN). „PIN“ ho jen smaže a\u00a0hráč si při dalším přihlášení zvolí nový. „Náhled“ ukáže jeho mobil jen pro čtení. Smazat jde jen hráče bez investic.</p>
       <div class="ptable">
         <div class="pr head ${F('points') ? 'wp' : ''}"><span>Hráč</span><span>Portfolio</span><span>Výnos</span>${F('points') ? '<span>Body</span>' : ''}<span></span></div>
         ${rows.map((r) => {
@@ -1274,7 +1383,9 @@
             <span class="pv ${ret > 0 ? 's-up' : ret < 0 ? 's-down' : ''}" data-l="Výnos">${ret == null ? '–' : esc(signPct(ret))}</span>
             ${F('points') ? `<span class="pv" data-l="Body">${plain(pts[r.id] || 0)}</span>` : ''}
             <span class="pa"><select class="s-input sm" data-move data-nodirty aria-label="Tým hráče">${S.teams.map((t) => `<option value="${t.id}" ${t.id === r.team ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select>
-              <button class="s-btn s-sm s-ghost" data-reset>PIN</button>
+              <button class="s-btn s-sm s-ghost pbtn" data-prev title="Otevřít mobil hráče jen pro čtení">${IC.eye}<span>Náhled</span></button>
+              <button class="s-btn s-sm s-ghost pbtn" data-qr title="QR kód pro přihlášení bez PINu">${IC.qr}<span>QR</span></button>
+              <button class="s-btn s-sm s-ghost" data-reset title="Smazat PIN – hráč si zvolí nový">PIN</button>
               ${F('track') ? '<button class="s-btn s-sm s-ghost" data-award>Ocenit</button>' : ''}
               ${r.holdings ? '' : '<button class="s-btn s-sm s-danger" data-del title="Smazat hráče">✕</button>'}</span></div>`;
         }).join('') || '<p class="hint">Zatím nikdo není u stolu.</p>'}
@@ -1285,6 +1396,8 @@
         if (!confirm(`Přesunout ${name} do týmu ${team(e.target.value).name}?`)) { e.target.value = rows.find((r) => r.id === id).team; return; }
         act('movePlayer', { sid: id, team: e.target.value }, 'Přesunuto');
       };
+      row.querySelector('[data-prev]').onclick = () => openPreview(id);
+      row.querySelector('[data-qr]').onclick = () => openLoginQR(id);
       row.querySelector('[data-reset]').onclick = () => confirm(`Resetovat PIN hráči ${name}? Při dalším přihlášení si zvolí nový.`) && act('resetPin', { sid: id }, 'PIN resetován');
       const del = row.querySelector('[data-del]');
       if (del) del.onclick = () => confirm(`Smazat hráče ${name}?`) && act('removePlayer', { sid: id }, 'Smazáno');
@@ -1581,13 +1694,19 @@
     const box = $('wchips');
     if (!box || !S) return;
     const chips = [{ id: 'all', name: 'Všechny týmy', color: '' }, ...S.teams];
-    const sig = JSON.stringify([wallTeam, chips.map((t) => [t.id, t.name, t.color, t.id === 'all' ? wallUnreadTotal() : wallUnread(t.id)])]);
+    const sig = JSON.stringify([wallTeam, chips.map((t) => [t.id, t.name, t.color, t.id === 'all' ? wallUnreadTotal() : wallUnread(t.id)]), wallTeam !== 'all' ? firstMember(wallTeam)?.id || '' : '']);
     if (sig === wallSig) return;
     wallSig = sig;
     box.innerHTML = chips.map((t) => {
       const n = t.id === 'all' ? 0 : wallUnread(t.id);
       return `<button class="wchip${t.id === wallTeam ? ' on' : ''}" data-wteam="${esc(t.id)}" role="tab" aria-selected="${t.id === wallTeam}"${t.color ? ` style="--tc:${esc(t.color)}"` : ''}>${t.color ? dot(t.color) : '<span class="wall-ic" aria-hidden="true">▦</span>'}<span>${esc(t.name)}</span>${n ? `<span class="wn" title="Nové od posledního otevření">${n}</span>` : ''}</button>`;
     }).join('');
+    const pv = $('wpv');
+    if (pv) {
+      pv.hidden = wallTeam === 'all';
+      pv.innerHTML = wallTeam === 'all' ? '' : teamPreviewBtn(wallTeam);
+      wireTeamPreview(pv);
+    }
     all(box, '[data-wteam]').forEach((b) => (b.onclick = () => {
       wallTeam = b.dataset.wteam;
       store.set('mup.wallTeam', wallTeam);
