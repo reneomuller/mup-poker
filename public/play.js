@@ -90,6 +90,8 @@
   // v3 live numbers: projected (…Now) fields while class trades are pending, v2 fields as a fallback
   const Vn = (t) => (t && (t.Vnow ?? t.V)) || 0;
   const PF = () => me.portfolioNow ?? me.portfolio;
+  // live return (v3 §2: portfolio numbers during investing use portfolioNow); server returnPct is the settled one
+  const RET = (tr) => (me.portfolioNow != null && me.start ? Math.round(((me.portfolioNow - me.start) / me.start) * 1000) / 10 : tr.returnPct);
   const INV = () => !!(me.invested || Object.values(me.stakesNow || {}).some((v) => v > 0));
   const SK = (id) => ((me.stakesNow || me.stakes || {})[id] || 0);
   const pendingLive = () => (S.phase === 'betting' || S.phase === 'closed') && S.teams.some((t) => t.Vnow != null && t.Vnow !== t.V);
@@ -771,7 +773,7 @@
     }).join('');
     const tr = feat('track') && me.track;
     const trackHTML = tr ? `<div class="p-stats">
-        <div class="s-stat p-stat"><span class="s-label">Návratnost</span><span class="s-v ${tr.returnPct >= 0 ? 's-up' : 's-down'}">${esc(spct(tr.returnPct))}</span></div>
+        <div class="s-stat p-stat"><span class="s-label">Návratnost</span><span class="s-v ${RET(tr) >= 0 ? 's-up' : 's-down'}">${esc(spct(RET(tr)))}</span></div>
         <div class="s-stat p-stat"><span class="s-label">Pořadí</span><span class="s-v">${(me.rankNow ?? tr.rank) ? esc((me.rankNow ?? tr.rank) + '.') : '–'}<small> z ${esc(tr.of || S.playerCount)}</small></span></div>
       </div>` : '';
     morph($('portfolio'), head + trackHTML + `<div class="s-card p-card"><div class="p-card-h"><h3 class="s-h3">Podíly ve startupech</h3><span class="s-label">${others.filter((t) => SK(t.id) > 0).length} z ${others.length}</span></div>${rows}</div>`);
@@ -977,7 +979,7 @@
     let h = `<div class="s-card p-card p-me" style="--tc:${esc(t.color)}">
       <div class="p-me-h"><span class="p-ava p-ava-lg" style="--tc:${esc(t.color)}">${esc(initials(me.name))}</span><div><h2 class="s-h2">${esc(me.name)}</h2><div class="p-team">${dot(t.color)}<span>${esc(t.name)}</span>${me.ghost ? ' <span class="s-badge s-warn">Ghost</span>' : ''}</div></div></div>
       ${tr ? `<div class="p-stats p-stats-3">
-        <div class="s-stat p-stat"><span class="s-label">Návratnost</span><span class="s-v ${tr.returnPct >= 0 ? 's-up' : 's-down'}">${esc(spct(tr.returnPct))}</span></div>
+        <div class="s-stat p-stat"><span class="s-label">Návratnost</span><span class="s-v ${RET(tr) >= 0 ? 's-up' : 's-down'}">${esc(spct(RET(tr)))}</span></div>
         <div class="s-stat p-stat"><span class="s-label">Pořadí</span><span class="s-v">${(me.rankNow ?? tr.rank) ? esc((me.rankNow ?? tr.rank) + '.') : '–'}<small> z ${esc(tr.of || '–')}</small></span></div>
         <div class="s-stat p-stat"><span class="s-label">Nejlepší tah</span><span class="s-v p-best">${tr.bestCall ? `${esc(mult(tr.bestCall.multiple))}` : '–'}</span>${tr.bestCall ? `<span class="p-best-t">${teamTag(tr.bestCall.team)}</span>` : ''}</div>
       </div>` : me.invested ? `<div class="p-stats p-stats-3">
