@@ -554,3 +554,10 @@ body:not(.p-app) .hero .bill { position: absolute; left: 50%; bottom: 0; transfo
 .p-iv-more { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 700; color: var(--s-pink); }
 .p-wallcard { overflow: visible; }
 #wallbox:empty::before { content: "Nástěnka se načítá…"; display: block; font-size: 14px; color: var(--s-muted); padding: 6px 0; }
+
+/* quiz answer streak (v3) */
+.qz-stk { align-self: center; display: inline-flex; align-items: center; gap: 6px; margin: 0 auto 8px; padding: 5px 12px; border-radius: 999px; background: rgba(255, 138, 71, .16); border: 1px solid rgba(255, 138, 71, .45); color: #FFC59E; font-size: 14px; font-weight: 700; }
+.qz-fl { display: inline-block; animation: qz-fl 1.1s ease-in-out infinite; }
+@keyframes qz-fl { 50% { transform: scale(1.18) rotate(-6deg); } }
+.qz-bonus { color: #FFB27A; font-size: .8em; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .qz-fl { animation: none; } }

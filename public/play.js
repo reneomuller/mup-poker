@@ -1174,12 +1174,14 @@
     const left = q.endsAt ? q.endsAt - MUP.now() : 0;
     const head = `<div class="qz-top"><span class="s-label">Kvíz${q.setTitle ? ' · ' + esc(q.setTitle) : ''}</span><span class="s-label">${q.idx >= 0 ? `Otázka ${q.idx + 1} z ${q.total}` : ''}</span></div>`;
     let body = '';
+    const streak = mq.streak ?? 0, bonus = mq.myBonus ?? 0;
     if (mode === 'question') {
       const n = (q.a || []).length;
       const locked = myChoice !== null && myChoice !== undefined;
       const late = !locked && left <= -1500;
       const st = local?.st || (locked ? 'sent' : '');
       body = `${head}
+        ${streak >= 2 ? `<div class="qz-stk"><span class="qz-fl" aria-hidden="true">🔥</span>Série${NB}${esc(streak)} · další správná +${esc(num(Math.min(250, 50 * streak)))}</div>` : ''}
         <div class="qz-q"><div class="qz-ring" id="qzring"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" class="bg"/><circle cx="22" cy="22" r="19" class="fg" id="qzfg"/></svg><b id="qzsec" class="s-num"></b></div><p>${esc(q.q || '')}</p></div>
         <div class="qz-tiles n${n} ${locked ? 'locked' : ''} ${late ? 'late' : ''}">${(q.a || []).map((a, i) => `<button type="button" class="qz-tile ${myChoice === i ? 'pick' : ''}" data-quiz="${i}" style="--qc:${QCOL[i]}" ${locked || late ? 'data-off="1"' : ''}><b>${LET[i]}</b><span>${esc(a)}</span>${myChoice === i ? `<em class="qz-sent">${st === 'sending' ? 'Odesílám…' : '✓ ' + E('play.quiz.sent')}</em>` : ''}</button>`).join('')}</div>
         <div class="qz-foot"><span>${locked ? `<b class="qz-ok">✓ ${E('play.quiz.sent')}</b> · ${E('play.quiz.wait')}` : late ? 'Čas vypršel.' : local?.st === 'err' ? `<b class="s-down">${esc(local.msg || 'Nepodařilo se odeslat, zkus to znovu.')}</b>` : 'Vyber jednu odpověď. Změnit ji už nepůjde.'}</span><span class="qz-cnt s-faint">${q.answered != null ? `odpovědělo ${esc(q.answered)}` : ''}</span></div>`;
@@ -1187,7 +1189,7 @@
       const right = mq.myCorrect === true, none = myChoice === null || myChoice === undefined;
       body = `${head}
         <div class="qz-res ${right ? 'ok' : 'bad'}"><div class="qz-res-ic">${right ? '✓' : none ? '–' : '✕'}</div><h2>${right ? 'Správně!' : none ? 'Bez odpovědi' : 'Tentokrát ne'}</h2>
-          <div class="qz-res-p s-num">${right ? '+' + esc(pts(mq.myPoints || 0)) : '0 bodů'}</div></div>
+          <div class="qz-res-p s-num">${right ? '+' + esc(bonus > 0 ? num(mq.myPoints || 0) : pts(mq.myPoints || 0)) : '0 bodů'}${right && bonus > 0 ? `<span class="qz-bonus"> · série${NB}${esc(streak)} 🔥 +${esc(num(bonus))}</span>` : ''}</div></div>
         <p class="qz-qs">${esc(q.q || '')}</p>
         <div class="qz-list">${(q.a || []).map((a, i) => `<div class="qz-li ${i === q.correct ? 'right' : ''} ${i === myChoice ? 'mine' : ''}" style="--qc:${QCOL[i]}"><b>${LET[i]}</b><span>${esc(a)}</span><em class="s-num">${q.counts ? esc(q.counts[i] || 0) : ''}</em>${i === q.correct ? '<i>✓</i>' : i === myChoice ? '<i>✕</i>' : ''}</div>`).join('')}</div>
         <div class="qz-foot"><span>${q.fastest ? `Nejrychlejší: <b>${esc(q.fastest.name)}</b> · ${esc(num(q.fastest.ms / 1000, 1))}${NB}s` : ''}</span><span class="qz-cnt">V kvízu máš <b class="s-num">${esc(pts(mq.runPoints || 0))}</b></span></div>`;

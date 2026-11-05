@@ -58,7 +58,7 @@
       s.rjFund = { capital: 10000000, invested: 6000000, locked: 750000, available: 3250000 };
     }
     if (!s.points) s.points = { leaders: [], teams: {} };
-    if (quizMode && !s.quiz) {
+    if (quizMode && (!s.quiz || s.quiz.state === 'idle')) {
       const now = s.now || Date.now();
       const base = { seq: 7, setTitle: 'Blok 2 – slovník', idx: quizMode === 'lobby' ? -1 : 1, total: 10, serverNow: now };
       if (quizMode === 'question') s.quiz = { ...base, state: 'question', q: QUIZ.q, a: QUIZ.a, time: QUIZ.time, startedAt: t0, endsAt: t0 + QUIZ.time * 1000, answered: 7 + (quizChoice != null ? 1 : 0) };
@@ -117,9 +117,9 @@
       if (!me.points) me.points = { total: 2290, rank: 3, of: 19, recent: [
         { id: 'p1', ts: t0 - 6e5, block: 2, playerId: me.id, amt: 850, kind: 'quiz', note: 'Kvíz: otázka 1' }, { id: 'p2', ts: t0 - 9e5, block: 2, playerId: me.id, amt: 300, kind: 'milestone', note: 'Milník: Byznys model v2' },
         { id: 'p3', ts: t0 - 4e6, block: 1, playerId: me.id, amt: 500, kind: 'award', note: 'Nejlepší analytik' }, { id: 'p4', ts: t0 - 5e6, block: 1, playerId: me.id, amt: 640, kind: 'quiz', note: 'Kvíz: otázka 4' } ] };
-      if (s.quiz && !me.quiz) {
+      if (s.quiz && (quizMode || !me.quiz)) {
         const q = s.quiz;
-        me.quiz = { myChoice: q.state === 'question' ? quizChoice : q.state === 'reveal' ? 3 : null, myCorrect: q.state === 'reveal' ? true : null, myPoints: q.state === 'reveal' ? 812 : 0, runPoints: 1690, rank: 2 };
+        me.quiz = { myChoice: q.state === 'question' ? quizChoice : q.state === 'reveal' ? 3 : null, myCorrect: q.state === 'reveal' ? true : null, myPoints: q.state === 'reveal' ? 812 : 0, runPoints: 1690, rank: 2, streak: q.state === 'reveal' ? 3 : 2, myBonus: q.state === 'reveal' ? 100 : 0 };
       }
       if (on('msgs') && !(me.msgs || []).some((m) => m.kind === 'market')) {
         me.msgs = [{ ts: t0 - 1e5, block: s.block, kind: 'tranche', amt: 500000, cond: 'MVP na veřejné adrese' }, { ts: t0 - 2e5, block: s.block, kind: 'market', title: 'Boom AI nástrojů', text: 'Studenti masově přecházejí na AI pomocníky.', pct: 30 }, ...(me.msgs || [])];
