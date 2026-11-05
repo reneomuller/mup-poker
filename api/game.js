@@ -9,6 +9,7 @@ import * as A from './_lib/archive.js';
 import * as W from './_lib/wall.js';
 import * as D from './_lib/demand.js';
 import * as AC from './_lib/access.js';
+import * as SV from './_lib/startup-view.js';
 
 // Dealer is open (no password) unless DEALER_LOCK=1 and DEALER_PASSWORD are set in Vercel.
 const DEALER_PW = process.env.DEALER_LOCK === '1' ? process.env.DEALER_PASSWORD || 'mup-dealer' : '';
@@ -1083,6 +1084,7 @@ export default async function handler(req, res) {
         const r = await W.view(meta, viewer, url.searchParams.get('team'));
         return send(res, r.status, r.body);
       }
+      if (view === 'startup') { const r = SV.view(req, url, { meta, players, slips, pinHash }); return send(res, r.status, r.body); } // v4 startup detail sheet
       const proj = D.project(meta, slips, players);
       const out = publicState(meta, players, slips, bd, tx, qa, proj);
       out.content = content;

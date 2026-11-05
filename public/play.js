@@ -1289,6 +1289,7 @@
     document.body.classList.toggle('p-bet', S.phase === 'betting');
     renderHeader(); renderStatus(); renderExit(); renderHero(); renderMsgs(); renderNotes(); renderMain(); renderDock();
     renderPortfolio(); renderCap(); renderStartups(); renderTeam(); renderProfile(); renderBoard(); renderQuiz(); renderDots(); renderReveal();
+    window.PlayStartup?.render(); // v4 startup detail sheet
     syncWall(); runTweens();
   }
 
@@ -1353,5 +1354,6 @@
     applyView();
     loop();
   }
+  window.PlayStartup?.init({ state: () => ({ S, me, view }), go, get: (q) => get(auth(), q), tw, runTweens, readOnly: () => !!PA.on }); // v4 startup detail sheet
   start();
 })();

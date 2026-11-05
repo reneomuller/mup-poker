@@ -9,6 +9,7 @@ export const FEATURE_DEFAULTS = {
   rounds: false, market: false, tranches: false, exit: false,
   wall: true,
   demand: true,
+  startupPage: true, // v4: startup detail sheet on the phone (+ GET ?view=startup)
 };
 export const OFF = 'Tato funkce je vypnutá.';
 export const REASON_LABELS = { milestone: 'Splněný milník', traction: 'Trakce', team: 'Tým', risk: 'Riziko', market: 'Trh', other: 'Jiné' };
