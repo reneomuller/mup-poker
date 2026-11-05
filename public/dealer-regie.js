@@ -123,8 +123,12 @@
     const now = rows.find((r) => r.s === 'now') || null;
     if (now && now.st.k === 'quiz' && !ticks.includes(now.st.id)) { l.ticks = [...ticks, now.st.id]; saveLocal(l); }
     let sug = now && ['pitch', 'quiz'].includes(now.st.k) ? now : rows.find((r) => r.i > last && r.s === 'todo') || null;
+    // review: a live quiz wins over the other „now“ step (a quiz during open investing, or in a block the plan has
+    // no quiz step for) – else „Další krok ▶“ / N offered „Zavřít investování“ in the middle of the quiz
+    const qlive = quizLive() ? rows.find((r) => r.s === 'now' && r.st.k === 'quiz') || { st: { id: 'qlive' + M().S.block, k: 'quiz', b: M().S.block }, i: -1, s: 'now' } : null;
+    if (qlive) { sug = qlive; if (qlive.i >= 0 && !ticks.includes(qlive.st.id)) { l.ticks = [...ticks, qlive.st.id]; saveLocal(l); } } // ticked like a quiz that is „now“
     if (!sug && now) sug = now;
-    const cur = now || sug;
+    const cur = qlive || now || sug;
     // when did the current step start? (first time this session saw it as current; kept in localStorage)
     if (cur && !l.started[cur.st.id]) { l.started[cur.st.id] = Date.now(); saveLocal(l); }
     const startedAt = cur ? l.started[cur.st.id] : null;
