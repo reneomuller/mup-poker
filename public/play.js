@@ -1338,7 +1338,8 @@
     loopT = setTimeout(loop, ms);
   }
   function kick(d = 150) { clearTimeout(loopT); loopT = setTimeout(loop, d); }
-  if (window.PN) PN.kick = kick; // v4 guard (play-net.js): retry button / reconnect re-polls at once
+  // v4 guard (play-net.js): the retry button re-polls at once; back online, a flushed queue re-polls and the wall reloads
+  if (window.PN) { PN.kick = kick; PN.onSync = (sent) => { if (sent) kick(0); try { if (wallW) wallW.refresh(); } catch {} }; }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) kick(0); });
   window.addEventListener('online', () => kick(0));
 

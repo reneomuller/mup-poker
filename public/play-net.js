@@ -16,6 +16,10 @@
   const OPS = { submit: 'submit', notes: 'notes', reasons: 'reasons', quizAnswer: 'quiz', wallPost: '', wallReply: '' };
   const QK = 'mup.netq', KEEP = 10 * 60 * 1000, MAXQ = 30; // a queued write is given up after 10 min
   const QUEUED = 'Jsi offline – odešlu to, až se spojení vrátí.';
+  // a queued wall post / reply counts as sent for the wall UI (it clears the composer, so nobody posts it
+  // twice); the others report the queue honestly, so the phone never keeps a local copy the server may refuse
+  const LATER = { wallPost: 1, wallReply: 1 };
+  const queuedReply = (x, msg) => (LATER[x.body.op] ? { ok: true, queued: true } : { ok: false, net: true, queued: true, error: msg });
   let flag = true, fails = 0, down = false, quiz = null, flushing = null, okT = null;
   const waiters = new Map(); // rid -> resolve of the post() waiting for it
 
@@ -85,8 +89,9 @@
     fails = 0;
     if (down) {
       down = false;
-      if (queue.length) flush().then(() => { if (!down && !queue.length) flashOk(); });
-      else flashOk();
+      const sent = queue.length > 0;
+      const done = () => { if (down || queue.length) return; flashOk(); try { if (PN.onSync) PN.onSync(sent); } catch {} };
+      if (sent) flush().then(done); else done();
     } else if (queue.length && !flushing) flush();
     render();
   }
@@ -131,13 +136,13 @@
         }
         const r = await origPost(item.body);
         if (r && r.pending) { // the first copy is still running on the server: ask again in a moment
-          for (const x of queue) settle(x.rid, { ok: false, net: true, queued: true, error: 'Odesílám…' });
+          for (const x of queue) settle(x.rid, queuedReply(x, 'Odesílám…'));
           setTimeout(flush, 1500);
           return;
         }
         if (r && r.net) { // still offline: keep it
           fails = Math.max(fails, 1); offline();
-          for (const x of queue) settle(x.rid, { ok: false, net: true, queued: true, error: QUEUED });
+          for (const x of queue) settle(x.rid, queuedReply(x, QUEUED));
           return;
         }
         fails = 0;
@@ -179,7 +184,8 @@
   const PN = window.PN = {
     // poll interval: normal when online, exponential backoff (2 s … 15 s) while offline
     delay(ms) { return flag && down ? Math.min(15000, 2000 * Math.pow(2, Math.max(0, fails - 2))) + Math.round(Math.random() * 400) : ms; },
-    kick: null, // play.js sets its poll kick here
+    kick: null, // play.js: its poll kick (retry button, back online)
+    onSync: null, // play.js: called when the connection is back and the queue is empty (arg: something was sent)
     pending: () => queue.length,
     get offline() { return down; },
   };
