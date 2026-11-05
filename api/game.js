@@ -1026,6 +1026,7 @@ async function dealerAction(b) {
       await archive('Před novou hrou');
       const fresh = freshMeta(meta.teams, meta.startV);
       for (const k of ['features', 'quizSets', 'milestoneDefs', 'cards']) fresh[k] = meta[k];
+      if (meta.wallTpl) fresh.wallTpl = meta.wallTpl; // v4 wallplus: templates are course-level, like quiz sets
       fresh.rev = (meta.rev || 0) + 1;
       await Promise.all(Object.keys(await S.hgetall('tx')).filter((k) => k.startsWith('rt:')).map((k) => S.hdel('tx', k)));
       for (let i = 1; i <= G.CFG.MAX_BLOCK; i++) await S.del('slip:' + i);

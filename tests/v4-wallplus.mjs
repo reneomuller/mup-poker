@@ -271,5 +271,15 @@ await main(async () => {
   await c.dealer('features', { set: { wallplus: true } });
   ok(find(await wall(A[0]), po.id).due === null && find(await wall(A[0]), po.id).assign === null, 'details sent while off were ignored');
   ok(rx(find(await wall(A[1]), q.id), 'heart').n === 4, 'switched on again: reactions intact');
+
+  section('templates are course-level: undo and reset keep them');
+  const nT = (await dwall(T[0])).templates.length;
+  ok(nT === 29, `29 templates before (${nT})`);
+  await c.dealer('nextBlock');
+  await c.dealer('wallTplSave', { kind: 'q', text: 'Šablona po bloku' });
+  ok((await c.dealer('undo')).ok && (await dwall(T[0])).templates.length === nT + 1, 'undo keeps a template saved after the backup');
+  await c.dealer('reset', { confirm: 'RESET', keepPlayers: true });
+  const rz = await c.dget('?view=wall&team=all');
+  ok(rz.templates.length === nT + 1 && T.every((t) => rz.walls[t].length === 0), 'reset clears the walls but keeps the templates');
   await srv.stop();
 });
