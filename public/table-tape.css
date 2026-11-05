@@ -16,6 +16,7 @@ body.tapeon .stage { bottom: var(--tape-h); }
 .tp-lab b { font-size: .72em; font-weight: 900; letter-spacing: .2em; text-transform: uppercase; line-height: 1.05; }
 .tp-lab span { font-size: .68em; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; line-height: 1.1; display: inline-flex; align-items: center; gap: .4em; }
 .tp-lab span::before { content: ''; width: .6em; height: .6em; border-radius: 50%; background: #c0262f; animation: live 1.4s ease-in-out infinite; }
+.tape.closed .tp-lab span::before { animation: none; background: #5c5220; border-radius: .1em; }
 .tp-win { position: relative; flex: 1; min-width: 0; overflow: hidden;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 2.5%, #000 97%, transparent); mask-image: linear-gradient(90deg, transparent, #000 2.5%, #000 97%, transparent); }
 .tp-empty { position: absolute; left: 2rem; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: .85em; font-style: italic; white-space: nowrap; }

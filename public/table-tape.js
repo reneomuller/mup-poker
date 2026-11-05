@@ -8,6 +8,7 @@
   MUP.addTexts({
     'table.tape.label': 'Burza',
     'table.tape.live': 'živě',
+    'table.tape.closed': 'zavřeno',
     'table.tape.empty': 'Čekáme na první obchod…',
     'table.tape.someone': 'Investor',
     'table.close.title': 'Burza uzavřena',
@@ -96,7 +97,8 @@
     if (s.block !== tapeBlock) { tapeBlock = s.block; clearTape(); }
     if (!show) { if (!pending(s)) clearTape(); return; }
     T.setText(bar.querySelector('.tp-lab b'), tx('table.tape.label'));
-    T.setText(bar.querySelector('.tp-lab span'), tx('table.tape.live'));
+    T.setText(bar.querySelector('.tp-lab span'), tx(s.phase === 'closed' ? 'table.tape.closed' : 'table.tape.live'));
+    T.toggle(bar, 'closed', s.phase === 'closed');
     const rows = s.tape || [];
     const keys = new Set(rows.map(keyOf));
     for (const it of items) it.live = keys.has(it.key);
