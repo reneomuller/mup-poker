@@ -1,0 +1,77 @@
+/* /play on a laptop (V3 spec §11). Only ≥ 1024 px; the phone layout below stays as in play.css. */
+@media (min-width: 1024px) {
+  .p-app { --p-side: 216px; --p-wide: 1100px; }
+  html, body.p-app { overflow-x: hidden; }
+
+  /* ---- the bottom tab bar becomes a left sidebar (same [data-nav] buttons) ---- */
+  body.p-ingame .p-tabbar, .p-tabbar {
+    top: 0; bottom: 0; left: 0; right: auto; width: var(--p-side);
+    grid-auto-flow: row; grid-auto-columns: auto; grid-auto-rows: max-content; align-content: start; gap: 4px;
+    padding: calc(84px + var(--p-safe-t, 0px)) 12px 20px; border-top: 0; border-right: 1px solid var(--s-border);
+  }
+  .p-preview .p-tabbar { padding-top: calc(84px + var(--pa-h, 0px)); }
+  .p-tabbar button {
+    grid-template-columns: 24px minmax(0, 1fr) auto; grid-template-rows: auto; justify-items: start; align-items: center; gap: 12px;
+    min-height: 46px; padding: 0 14px; border-radius: 12px; font-size: 15px; text-align: left;
+  }
+  .p-tabbar button::before { top: 0; left: 0; width: 100%; height: 100%; margin-left: 0; border-radius: 12px; }
+  .p-tabbar button:hover { color: var(--s-text); background: var(--s-surface-2); }
+  .p-tabbar button:focus-visible { outline: 2px solid var(--s-text); outline-offset: 2px; }
+  .p-tabbar button .p-dotnew { position: static; margin-left: auto; }
+  body.p-kb .p-tabbar { display: grid; }
+
+  /* everything in the game shifts right of the sidebar */
+  #game { padding-left: var(--p-side); }
+  .p-top { padding-left: 28px; padding-right: 28px; }
+  .p-top > * { max-width: var(--p-wide); }
+  .p-views { max-width: calc(var(--p-wide) + 56px); padding: 20px 28px 48px; }
+  body.p-hasdock .p-views { padding-bottom: 200px; }
+  .p-view.on { gap: 14px; }
+
+  /* ---- invest: form and dock usable with a mouse and keyboard ---- */
+  [data-view="invest"] > #main, [data-view="invest"] > #exitbox, [data-view="invest"] > #notes { width: 100%; max-width: 760px; justify-self: center; }
+  .p-dock { left: var(--p-side); bottom: 0; padding: 12px 28px calc(12px + var(--p-safe-b, 0px)); }
+  .p-dock-in { max-width: 760px; }
+  .p-dock-btns .s-btn { min-height: 46px; cursor: pointer; }
+  .p-app .s-btn:not([disabled]) { cursor: pointer; }
+  .p-app .s-btn:focus-visible, .p-app .s-input:focus-visible, .p-app [data-act]:focus-visible { outline: 2px solid var(--s-text); outline-offset: 2px; }
+  .p-app input[type="range"] { cursor: pointer; }
+
+  /* ---- Startupy: cards in a grid ---- */
+  #startups { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; align-items: start; }
+  #startups > :not(.p-su) { grid-column: 1 / -1; }
+  #startups > .p-su + .p-su { margin-top: 0; }
+  .p-mkts { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+
+  /* ---- Portfolio: chart next to the stakes ---- */
+  #portfolio { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+  #portfolio > * { grid-column: 2; margin-top: 0; }
+  #portfolio > .p-pfcard { grid-column: 1; grid-row: 1 / span 6; position: sticky; top: 100px; }
+  #portfolio > .p-empty { grid-column: 1 / -1; }
+  #portfolio > .s-card + .s-card { margin-top: 0; }
+
+  /* ---- Tým: header + chart next to Investoři; a wide wall ---- */
+  [data-view="team"] > div:first-child { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+  [data-view="team"] > div:first-child > * { margin-top: 0; }
+  [data-view="team"] > div:first-child > :nth-child(n + 3) { grid-column: 2; }
+  [data-view="team"] > div:first-child > :first-child, [data-view="team"] > div:first-child > :nth-child(2) { grid-column: 1; }
+  [data-view="team"] [class*="wall"] { grid-column: 1 / -1; }
+
+  /* ---- Profil ---- */
+  [data-view="profile"] > #profile { width: 100%; max-width: 760px; justify-self: center; }
+
+  /* ---- quiz: tiles become a comfortable 2×2 ---- */
+  .qz-in { max-width: 860px; padding-left: 0; padding-right: 0; }
+  .qz-tiles { flex: 0 1 auto; grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(140px, 200px); min-height: 0; gap: 14px; }
+  .qz-tiles.n2 { grid-template-columns: 1fr 1fr; }
+  .qz-tile { cursor: pointer; transition: transform .12s, filter .12s; }
+  .qz-tile:hover:not([disabled]) { filter: brightness(1.08); transform: translateY(-2px); }
+  .qz-tile:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+
+  /* login and loading screens: a centered column */
+  .p-boot { max-width: 760px; }
+}
+
+@media (min-width: 1440px) {
+  .p-app { --p-side: 240px; }
+}
