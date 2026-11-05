@@ -22,14 +22,18 @@ const freshMeta = (teams, startV) => {
 
 // First load after the v2 deploy: archive the game exactly as it was, then mark it (keeping gid and rev).
 // Two instances racing may both archive (duplicates are fine); meta is re-read right before the write.
-let migrating = null;
+let migrating = null, archiveFails = 0;
 async function migrateV2(meta) {
   if (!migrating) {
     migrating = (async () => {
       try {
         const [players, content] = await Promise.all([S.hgetall('players'), S.getJSON('content')]);
         await A.createArchive('Stav před v2', true, meta, players, content || { v: '0', texts: {}, founders: null });
-      } catch (e) { console.error('v2 archive failed', e?.message); }
+      } catch (e) {
+        // try again on the next load; after three failures carry on without the archive (the data itself is untouched)
+        console.error('v2 archive failed', e?.message);
+        if (++archiveFails < 3) return meta;
+      }
       const cur = await S.getJSON('meta');
       if (cur && !cur.v2ArchivedAt) {
         F.normalize(cur);
@@ -258,11 +262,18 @@ function dealerState(meta, players, slips, bd, tx = {}, qa = {}) {
 // Private feedback from RainbowJet, visible only to members of that team.
 const addMsg = E.addMsg;
 
+// Undo stack. Fields that undo keeps from the current meta anyway (quiz, points, …) are not copied, and the
+// whole stack stays under ~900 kB so one Redis value never gets too big. A failed backup never blocks the op.
 async function backup(meta) {
-  const b = (await S.getJSON('backups')) || [];
-  b.push(meta);
-  while (b.length > 15) b.shift();
-  await S.setJSON('backups', b);
+  try {
+    const copy = { ...meta };
+    for (const k of F.KEEP_ON_UNDO) if (k !== 'v2ArchivedAt') delete copy[k];
+    const b = (await S.getJSON('backups')) || [];
+    b.push(copy);
+    while (b.length > 15) b.shift();
+    while (b.length > 1 && JSON.stringify(b).length > 900_000) b.shift();
+    await S.setJSON('backups', b);
+  } catch (e) { console.error('backup failed', e?.message); }
 }
 
 // Full copy of the game for the dealer's laptop. Without a database the server can forget everything
@@ -310,8 +321,17 @@ function setTimer(meta, minutes, label) {
 const fail = (msg, extra) => ({ status: 400, body: { ok: false, error: msg, ...extra } });
 const ok = (extra) => ({ status: 200, body: { ok: true, ...extra } });
 
+// A quiz answer needs only a fresh meta (quiz state); players come from the 700 ms cache unless the
+// player is not in it yet. 20 students answering at once then cost ~2 commands each instead of ~9.
+async function loadForAnswer(sid) {
+  const d = await load(false);
+  if (!d.players[sid]) return load(true);
+  const m = await S.getJSON('meta');
+  return m && m.v2ArchivedAt ? { ...d, meta: F.normalize(m) } : load(true);
+}
+
 async function studentAction(b) {
-  const { meta, players, slips } = await load(true);
+  const { meta, players, slips } = b.op === 'quizAnswer' ? await loadForAnswer(String(b.sid || '')) : await load(true);
   if (b.op === 'register') {
     if (!meta.regOpen) return fail('Registrace je zavřená. Požádej dealera.');
     const name = String(b.name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
@@ -625,6 +645,8 @@ async function dealerAction(b) {
       return ok();
     }
     case 'quizStart': case 'quizNext': case 'quizReveal': case 'quizBoard': case 'quizEnd': {
+      // optional seq from the admin: a double click (or a second admin) on a state already moved on is a no-op
+      if (b.seq !== undefined && Number(b.seq) !== (meta.quiz.seq || 0)) return ok({ stale: true, quiz: Q.publicQuiz(meta, players, {}) });
       // the open question's answers, read fresh (never from the GET cache) right before scoring
       const qk = Q.answersKey(meta);
       const answers = qk ? await S.hgetall(qk) : {};
@@ -981,6 +1003,15 @@ async function dealerAction(b) {
   return fail('Neznámá akce.');
 }
 
+// Dealer ops run one at a time per server instance, so two organisers clicking at once never overwrite
+// each other's meta write. (Student ops never write meta.)
+let chain = Promise.resolve();
+function serial(fn) {
+  const run = chain.then(fn, fn);
+  chain = run.catch(() => {});
+  return run;
+}
+
 // ---------- handler ----------
 export default async function handler(req, res) {
   try {
@@ -1033,11 +1064,12 @@ export default async function handler(req, res) {
       const studentOps = ['register', 'login', 'notes', 'submit', 'reasons', 'restore', 'ask', 'vote', 'answer', 'react', 'quizAnswer'];
       let r;
       // card / roundTerms exist for both: with a sid it is a student editing their own team
-      const student = studentOps.includes(b.op) || (['card', 'roundTerms'].includes(b.op) && !!b.sid);
+      // restore with a `dump` is the dealer's backup push (before v2 it was routed to the phones' restore and never ran)
+      const student = (studentOps.includes(b.op) && !(b.op === 'restore' && b.dump)) || (['card', 'roundTerms'].includes(b.op) && !!b.sid);
       if (student) r = await studentAction(b);
       else {
         if (!dealerOk(req)) return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
-        r = await dealerAction(b);
+        r = await serial(() => dealerAction(b));
       }
       if (b.op !== 'auth') {
         // action log: what every student / the dealer sent, without PINs and big backup blobs
