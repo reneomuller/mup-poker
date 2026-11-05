@@ -11,7 +11,11 @@
 //   t:<stickerId>[.<replyId>] { ts }             tombstone: restoring an older dump never resurrects a deleted sticker/reply
 // Dealer templates live in meta.wallTpl (≤ 30) and are only ever sent to the dealer.
 // No team ever sees another team's wall; a ghost's stickers, replies and reactions are seen only by that ghost and the dealer.
-// meta.wallRev[team] is a cheap per-team counter for the phones' badge (read from meta, so a plain GET costs nothing extra).
+// No team ever sees another team's wall; a ghost's stickers and replies are seen only by that ghost and the dealer.
+// The phones' badge is a cheap per-team counter in hash `tx`, field `wr:<team>` = { n, ts }. tx is already read by
+// every GET (cards / rounds / wall on), so the badge costs nothing extra, and a wall write never rewrites meta:
+// a student's read-modify-write of meta on another server instance could otherwise undo a dealer op saved meanwhile.
+// (meta.wallRev[team], the first v3 design, is still added in for data written by it.)
 import crypto from 'node:crypto';
 import * as S from './store.js';
 import * as F from './features.js';
@@ -32,7 +36,8 @@ const NOT_FOUND = 'Lísteček nenalezen.';
 const DEALER_BY = { role: 'dealer', name: 'MUP' };
 const ID = /^[\w-]{1,24}$/;
 
-export const rev = (meta, team) => Number(meta?.wallRev?.[team]) || 0;
+export const revKey = (team) => 'wr:' + team;
+export const rev = (meta, team, tx) => (Number(meta?.wallRev?.[team]) || 0) + (Number(tx?.[revKey(team)]?.n) || 0);
 const teamIds = (meta) => (meta.teams || []).map((t) => t.id);
 const plusOn = (meta) => F.on(meta, 'wallplus');
 
@@ -43,13 +48,12 @@ function cleanText(t) {
   return { text: s };
 }
 
-// Increment meta.wallRev for these teams on a fresh copy of meta (only that field changes; meta.rev stays).
+// Increment the badge counter of these teams (one field per team in hash tx; meta is never written here).
 async function bump(teams) {
-  const m = await S.getJSON('meta');
-  if (!m) return;
-  if (!m.wallRev || typeof m.wallRev !== 'object') m.wallRev = {};
-  for (const t of teams) m.wallRev[t] = (Number(m.wallRev[t]) || 0) + 1;
-  await S.setJSON('meta', m);
+  await Promise.all(teams.map(async (t) => {
+    const cur = await S.hget('tx', revKey(t));
+    await S.hset('tx', revKey(t), { n: (Number(cur?.n) || 0) + 1, ts: Date.now() });
+  }));
 }
 
 const split = (h) => {
@@ -167,26 +171,26 @@ function groups(walls) {
 
 // GET ?view=wall. Student: own team only (a `team` param naming another team is refused).
 // Dealer: ?team=<id> → that wall, ?team=all → { walls: { <teamId>: [stickers] } }.
-// players (optional) adds the team's members for the v4 assignee picker.
-export async function view(meta, viewer, team, players) {
+// tx: hash `tx` (badge counters, already read by the GET); players (optional) adds the team's members for the v4 assignee picker.
+export async function view(meta, viewer, team, tx = {}, players = null) {
   if (!F.on(meta, 'wall')) return fail(F.OFF);
   const ctx = ctxOf(meta);
   const plus = ctx.plus;
   if (viewer.role === 'student') {
     const own = viewer.p.team;
     if (team && team !== own) return fail(OTHER_TEAM, 403);
-    return ok({ team: own, rev: rev(meta, own), stickers: build(await S.hgetall(key(own)), viewer, ctx), ...(plus && players ? { members: members(players, own, viewer) } : {}) });
+    return ok({ team: own, rev: rev(meta, own, tx), stickers: build(await S.hgetall(key(own)), viewer, ctx), ...(plus && players ? { members: members(players, own, viewer) } : {}) });
   }
   const extra = plus ? { templates: pubTpl(meta) } : {};
   if (team === 'all') {
     const ids = teamIds(meta);
     const hs = await Promise.all(ids.map((t) => S.hgetall(key(t))));
     const walls = {}, revs = {}, mem = {};
-    ids.forEach((t, i) => { walls[t] = build(hs[i], viewer, ctx); revs[t] = rev(meta, t); if (plus && players) mem[t] = members(players, t, viewer); });
+    ids.forEach((t, i) => { walls[t] = build(hs[i], viewer, ctx); revs[t] = rev(meta, t, tx); if (plus && players) mem[t] = members(players, t, viewer); });
     return ok({ walls, revs, ...extra, ...(plus ? { groups: groups(walls), ...(players ? { members: mem } : {}) } : {}) });
   }
   if (!teamIds(meta).includes(team)) return fail('Vyber tým.');
-  return ok({ team, rev: rev(meta, team), stickers: build(await S.hgetall(key(team)), viewer, ctx), ...extra, ...(plus && players ? { members: members(players, team, viewer) } : {}) });
+  return ok({ team, rev: rev(meta, team, tx), stickers: build(await S.hgetall(key(team)), viewer, ctx), ...extra, ...(plus && players ? { members: members(players, team, viewer) } : {}) });
 }
 
 // due: 'HH:MM' (+ dueTs, the client's local time for it) | 'block' (end of the current block) | '' / null (none)
@@ -472,4 +476,6 @@ export async function dataWalls(meta) {
 
 export async function clearWalls(meta) {
   await Promise.all(teamIds(meta).map((t) => S.del(key(t))));
+  const tx = await S.hgetall('tx');
+  await Promise.all(Object.keys(tx).filter((f) => f.startsWith('wr:')).map((f) => S.hdel('tx', f)));
 }

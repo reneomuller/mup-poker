@@ -6,8 +6,9 @@
   const qs = new URLSearchParams(location.search);
   const asSid = (qs.get('as') || '').trim();
   const on = !!asSid;
-  let dealer = '';
-  if (on) { try { dealer = localStorage.getItem('mup.dealer') || ''; } catch {} }
+  // null = this device never logged in on /dealer; '' = logged in on an open dealer (no DEALER_LOCK), which is fine
+  let dealer = '', hasDealer = false;
+  if (on) { try { const v = localStorage.getItem('mup.dealer'); hasDealer = v != null; dealer = v || ''; } catch {} }
   const BLOCK = 'V náhledu nelze nic měnit.';
   const toast = (m, k) => { try { window.PK && PK.toast(esc(m), k); } catch {} };
   const PA = { on, sid: on ? asSid : null, dealer, loginError: null };
@@ -70,10 +71,10 @@
       const html = `<div class="s-card p-card"><h2 class="s-h2">Náhled hráče</h2><p class="s-muted">${esc(msg)}</p><a class="s-btn s-primary s-block" href="/dealer">Otevřít /dealer</a></div>`;
       if (n.dataset.msg !== msg) { n.dataset.msg = msg; n.innerHTML = html; }
     }
-    PA.stop = !dealer;
+    PA.stop = !hasDealer;
     const boot = () => {
       mountBar();
-      if (!dealer) showNote('Náhled je jen pro dealera. Přihlas se nejdřív na /dealer na tomhle zařízení, pak náhled otevři znovu.');
+      if (!hasDealer) showNote('Náhled je jen pro dealera. Přihlas se nejdřív na /dealer na tomhle zařízení, pak náhled otevři znovu.');
       else startLock();
     };
     if (document.body) boot(); else document.addEventListener('DOMContentLoaded', boot);

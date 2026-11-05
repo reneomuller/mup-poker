@@ -14,7 +14,8 @@ export const isDealer = (req) => !DEALER_PW || req.headers['x-dealer'] === DEALE
 
 // dealer op loginLink { sid }: a new token replaces the previous one; only its hash and expiry are stored
 export async function loginLink(players, sid) {
-  const p = players[String(sid || '')];
+  const k = String(sid || '');
+  const p = Object.hasOwn(players, k) ? players[k] : null;
   if (!p) return { error: 'Hráč nenalezen.' };
   const token = crypto.randomBytes(16).toString('base64url');
   const exp = Date.now() + ttl();

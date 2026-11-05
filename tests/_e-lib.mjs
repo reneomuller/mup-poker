@@ -140,7 +140,14 @@ export async function startMock(port = MOCK_PORT) {
   };
 }
 export function wipePg() {
-  execSync(`PGPASSWORD=pw psql -q -h localhost -U postgres -d mup_e -c 'drop table if exists mup_kv, mup_h, mup_log'`, { stdio: 'pipe' });
+  try {
+    execSync(`PGPASSWORD=pw psql -q -h localhost -U postgres -d mup_e -c 'drop table if exists mup_kv, mup_h, mup_log'`, { stdio: 'pipe' });
+  } catch (e) {
+    // no psql on this machine (macOS without the client tools): same statement through the repo's pg module
+    if (!/not found|ENOENT/.test(String(e.stderr || e.message))) throw e;
+    const js = `const {default:pg}=await import('pg');const c=new pg.Client({connectionString:'postgres://postgres:pw@localhost:5432/mup_e'});await c.connect();try{await c.query('drop table if exists mup_kv, mup_h, mup_log')}finally{await c.end()}`;
+    execSync(`node --input-type=module -e ${JSON.stringify(js)}`, { cwd: ROOT, stdio: 'pipe' });
+  }
 }
 export function pgQuery(sql) {
   return execSync(`PGPASSWORD=pw psql -h localhost -U postgres -d mup_e -At -c "${sql.replace(/"/g, '\\"')}"`, { stdio: ['ignore', 'pipe', 'pipe'] }).toString();

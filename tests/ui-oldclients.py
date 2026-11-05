@@ -10,21 +10,27 @@ from playwright.sync_api import sync_playwright  # noqa: E402
 from _ui import ok, warn, info, run, get, post, dealer, me, fresh, initial_slip, wait_until, Console, shot, SITE  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OLD = '/tmp/oldpubE'
+OLD = f'/tmp/oldpubE{PORT}'
+# The pages open in class at deploy time run the code currently in production: origin/main (v2) before the
+# v3 deploy. Override with OLD_REF=<git ref> (e.g. origin/v2-base for the pre-v2 pages).
+OLD_REF = os.environ.get('OLD_REF') or next((r for r in ('origin/main', 'origin/v2-base', 'v2-base')
+                                             if subprocess.run(['git', '-C', ROOT, 'rev-parse', '-q', '--verify', r + '^{commit}'],
+                                                               capture_output=True).returncode == 0), 'origin/main')
 TAG = f'tagE{PORT}'
 
 
 def prepare():
     shutil.rmtree(OLD, ignore_errors=True)
     os.makedirs(OLD)
-    subprocess.run(f'git -C {ROOT} archive v2-base public | tar -x -C {OLD}', shell=True, check=True)
+    subprocess.run(f'set -o pipefail; git -C {ROOT} archive {OLD_REF} public | tar -x -C {OLD}', shell=True, check=True, executable='/bin/bash')
     os.symlink(os.path.join(ROOT, 'api'), os.path.join(OLD, 'api'))
     shutil.copy(os.path.join(ROOT, 'dev-server.js'), os.path.join(OLD, 'dev-server.js'))
     shutil.copy(os.path.join(ROOT, 'package.json'), os.path.join(OLD, 'package.json'))
-    os.symlink('/home/claude/mup-poker/node_modules', os.path.join(OLD, 'node_modules'))
+    os.symlink(os.path.join(ROOT, 'node_modules'), os.path.join(OLD, 'node_modules'))
 
 
 def main():
+    info(f"old pages from {OLD_REF}")
     prepare()
     subprocess.run(['pkill', '-f', f'^node dev-server.js {TAG}$'])
     env = {k: v for k, v in os.environ.items() if not any(x in k for x in ('KV_', 'UPSTASH', 'DATABASE_URL', 'POSTGRES', 'MUP_PG'))}

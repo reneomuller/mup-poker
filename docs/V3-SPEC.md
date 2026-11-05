@@ -67,7 +67,7 @@ Limits: 300 stickers per team, 100 replies per sticker. Ids: short random. Inclu
 **Views.** These are not part of the plain GET, so they add no Redis commands to it:
 - Student `GET /api/game?view=wall` (with x-sid / x-pin) → `{ ok, team, stickers: [ { id, kind, text, by, ts, group?, mine, done, doneBy?, replies: [{ id, text, by, ts, mine }] } ] }`, newest first, open tasks before done ones. A ghost's stickers and replies are visible only to that ghost and the dealer.
 - Dealer `GET ?view=wall&team=<id>` → the same for that team (with `mine` false); `team=all` → `{ ok, walls: { <teamId>: [stickers] } }`.
-- A cheap badge for phones: `meState.wallRev` = a per-team counter kept in `meta.wallRev[team]`, incremented on every wall write. The phone polls `?view=wall` every 4 s while the Tým tab is open, and otherwise only when `wallRev` changes.
+- A cheap badge for phones: `meState.wallRev` = a per-team counter kept in hash `tx`, field `wr:<team>` = `{ n, ts }` (read by every GET already), incremented on every non-ghost wall write. Not in `meta`: a student request must never rewrite meta, or it can undo a dealer op saved on another instance at the same moment. The dealer state carries `wallRev: { <teamId>: n }` for the Nástěnky badges. The phone polls `?view=wall` every 4 s while the Tým tab is open, and otherwise only when `wallRev` changes.
 
 ## 5. Screens
 

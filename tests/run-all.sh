@@ -71,7 +71,10 @@ store_env() { # $1 = mode
     *) echo "" ;;
   esac
 }
-wipe_pg() { PGPASSWORD=pw psql -q -h localhost -U postgres -d mup_e -c 'drop table if exists mup_kv, mup_h, mup_log' >/dev/null 2>&1; }
+wipe_pg() { # psql if installed, else the same statement through the repo's pg module
+  if command -v psql >/dev/null; then PGPASSWORD=pw psql -q -h localhost -U postgres -d mup_e -c 'drop table if exists mup_kv, mup_h, mup_log' >/dev/null 2>&1
+  else node --input-type=module -e "const {default:pg}=await import('pg');const c=new pg.Client({connectionString:'$PG_URL'});await c.connect();try{await c.query('drop table if exists mup_kv, mup_h, mup_log')}finally{await c.end()}" >/dev/null 2>&1; fi
+}
 start_mock() {
   MOCK_PORT=$MOCK_PORT node tests/mock-upstash.mjs > "$LOGDIR/mock.log" 2>&1 &
   MOCK_PID=$!
