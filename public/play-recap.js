@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const NB = ' ';
+  const NB = '\u00a0';
   const num = (n, d = 0) => (Number(n) || 0).toLocaleString('cs-CZ', { maximumFractionDigits: d, minimumFractionDigits: d }).replace(/\s/g, NB);
   const money = (n) => num(Math.round(n || 0)) + NB + '$';
   const short = (n) => (window.MUP && MUP.fmtM ? MUP.fmtM(n) : money(n));
@@ -92,7 +92,7 @@
       ${big(r.value)}
       <div class="rc-ret ${r.returnPct >= 0 ? 'up' : 'down'} rc-in">${esc(pct(r.returnPct))}</div>
       <div class="rc-in">${spark(r.series)}</div>
-      <p class="rc-sub rc-in">${r.gain >= 0 ? `Zisk <b class="s-up">+${esc(short(r.gain))}</b>` : `Ztráta <b class="s-down">−${esc(short(-r.gain))}</b>`} za${NB}celou hru</p>` });
+      <p class="rc-sub rc-in">${r.gain >= 0 ? `Zisk <b class="s-up">+${esc(short(r.gain))}</b>` : `Ztráta <b class="s-down">−${esc(short(-r.gain))}</b>`} ${data.final ? `za${NB}celou hru` : 'zatím'}</p>` });
     if (r.rank) {
       const beat = r.beatPct ?? 0;
       out.push({ id: 'rank', tone: 'b', html: `
