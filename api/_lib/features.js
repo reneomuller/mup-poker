@@ -16,6 +16,7 @@ export const FEATURE_DEFAULTS = {
   regie: true, // v4 regie: run-of-show, class health, presence, nudges, shortcuts on /dealer
   sound: true, // v4 sound lane: quiz/investing jingles on the projector only (phones stay silent)
   guard: true, // v4: PIN brute-force limits (api/_lib/guard.js) + the phone's offline banner / retry queue (public/play-net.js)
+  tape: true, tapeNames: 'initials', // v4 market tape on the projector; tapeNames: 'initials' | 'first' | 'off'
 };
 export const OFF = 'Tato funkce je vypnutá.';
 export const REASON_LABELS = { milestone: 'Splněný milník', traction: 'Trakce', team: 'Tým', risk: 'Riziko', market: 'Trh', other: 'Jiné' };

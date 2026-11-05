@@ -88,6 +88,7 @@
     ['startupPage', 'Detail startupu', 'Klepnutím na startup v\u00a0mobilu se otevře detail: graf ocenění, čísla, karta a proč do něj spolužáci investovali.'],
     ['wallplus', 'Nástěnky+', 'Reakce, připnutí, označená odpověď, termín a řešitel úkolu, šablony a filtry na nástěnkách.'],
     ['regie', 'Režie', 'Plán hodiny s\u00a0dalším krokem, kdo chybí a kdo je připojený, připomínky týmům, klávesové zkratky a historie akcí.'], // v4 regie
+    ['tape', 'Burza na plátně', 'Při investování běží dole na plátně páska obchodů (jména jako iniciály), u\u00a0showdownu „Burza uzavřena“ s\u00a0násobky a v\u00a0pořadí malé grafy ocenění.'],
   ];
   const featKnown = () => !!(S && S.features && typeof S.features === 'object');
   const F = (k) => !!(S && S.features && S.features[k]);
