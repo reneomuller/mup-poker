@@ -1134,6 +1134,7 @@
       lastPhase = S.phase;
     }
     if (firstRender) { applyView(); firstRender = false; }
+    document.body.classList.toggle('p-bet', S.phase === 'betting');
     renderHeader(); renderStatus(); renderExit(); renderHero(); renderMsgs(); renderNotes(); renderMain(); renderDock();
     renderPortfolio(); renderCap(); renderStartups(); renderProfile(); renderBoard(); renderQuiz(); renderDots(); renderReveal();
   }

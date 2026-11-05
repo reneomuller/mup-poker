@@ -509,3 +509,6 @@ body:not(.p-app) .hero .bill { position: absolute; left: 50%; bottom: 0; transfo
   .p-phase { margin-top: 8px; }
 }
 .arow, .p-nrow, .p-slip { scroll-margin: 140px 0 230px; }
+
+/* while investing, the form comes first and the messages go below it */
+.p-bet #main { order: -1; }
