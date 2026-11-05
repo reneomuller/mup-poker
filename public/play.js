@@ -176,7 +176,7 @@
   function logout() {
     sid = pin = null; localStorage.removeItem('mup.sid'); localStorage.removeItem('mup.pin'); localStorage.removeItem('mup.profile');
     me = null; loginKey = null; formKey = null; notesKey = null; tab = 'old'; firstRender = true;
-    pfShown = null; msgSeenTs = null; cardDirty = false; roundDraft = null; quizKey = null;
+    pfShown = null; msgSeenTs = null; revealSeq = null; cardDirty = false; roundDraft = null; quizKey = null;
     for (const k of Object.keys(seen)) delete seen[k];
     resetViews();
     showLogin();
@@ -285,7 +285,7 @@
       <div class="s-label">${S.phase === 'final' ? 'Finále' : `Blok ${S.block} z ${S.maxBlock}`}${S.timerLabel && left ? ` · ${esc(S.timerLabel)}` : ''}</div>
       <h2 class="p-hero-t">${pres ? dot(pres.color) : ''}${esc(t1)}</h2>
       <p class="p-hero-s">${esc(t2)}</p>
-      ${pres && pres.id !== me.team ? `<button type="button" class="s-btn s-ghost s-sm p-hero-btn" data-act="note-jump" data-team="${esc(pres.id)}">Poznámky k ${esc(pres.name)}</button>` : ''}
+      ${pres && pres.id !== me.team ? `<button type="button" class="s-btn s-ghost s-sm p-hero-btn" data-act="note-jump" data-team="${esc(pres.id)}">Psát poznámky k pitchi</button>` : ''}
     </div>`);
   }
 
@@ -756,7 +756,8 @@
     if (hist.length >= 2) {
       const W = 300, H = 90, pl = 4, pr = 4, pt = 10, pb = 18;
       const x = (i) => pl + (i * (W - pl - pr)) / (hist.length - 1);
-      const y = (v) => pt + (1 - v / 100) * (H - pt - pb);
+      const lo = Math.max(0, Math.floor((Math.min(...hist.map((h) => h.founders)) - 8) / 10) * 10);
+      const y = (v) => pt + (1 - (v - lo) / (100 - lo || 1)) * (H - pt - pb);
       const line = hist.map((h, i) => `${x(i).toFixed(1)},${y(h.founders).toFixed(1)}`).join(' ');
       chart = `<svg class="p-dil" viewBox="0 0 ${W} ${H}" aria-label="Ředění zakladatelů">
         <polyline points="${line}" fill="none" stroke="url(#dg)" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
@@ -1100,6 +1101,27 @@
     if (e.target.closest('#logout')) { e.preventDefault(); haptic.tap(); logout(); }
   });
 
+  // ---------- reveals: a short toast when something happens on the projector ----------
+  let revealSeq = null;
+  function renderReveal() {
+    const r = S.reveal;
+    const seq = r ? r.seq : 0;
+    if (revealSeq === null || seq <= revealSeq) { revealSeq = Math.max(revealSeq || 0, seq); return; }
+    revealSeq = seq;
+    const myD = r.delta && r.delta[me.team];
+    const msg = {
+      class: 'Showdown! Peníze třídy jsou na stole.',
+      rj: 'RainbowJet odhalil smart money.',
+      revalue: 'Startupy se přecenily.',
+      market: `Karta trhu: ${r.title || ''}`,
+      tranche: `RainbowJet uvolnil tranši týmu ${team(r.team).name}.`,
+      exit: 'Exit! Hra skončila – podívej se, jak jsi dopadl(a).',
+    }[r.kind];
+    if (!msg) return;
+    toast(`${esc(msg)}${me.invested && r.kind !== 'exit' ? `<br><span class="s-muted">Tvoje portfolio: <b>${esc(fmtM(me.portfolio))}</b></span>` : ''}${myD && r.kind !== 'class' ? `<br><span class="${myD > 0 ? 's-up' : 's-down'}">${esc(team(me.team).name)}: ${esc(smoney(myD))}</span>` : ''}`, 'msg');
+    haptic.ok();
+  }
+
   // ---------- main loop ----------
   function renderAll() {
     if (S.phase !== lastPhase) {
@@ -1109,7 +1131,7 @@
     }
     if (firstRender) { applyView(); firstRender = false; }
     renderHeader(); renderStatus(); renderExit(); renderHero(); renderMsgs(); renderNotes(); renderMain(); renderDock();
-    renderPortfolio(); renderCap(); renderStartups(); renderProfile(); renderBoard(); renderQuiz(); renderDots();
+    renderPortfolio(); renderCap(); renderStartups(); renderProfile(); renderBoard(); renderQuiz(); renderDots(); renderReveal();
   }
 
   async function tick() {

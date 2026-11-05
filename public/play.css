@@ -28,7 +28,7 @@ body.p-noscroll { overflow: hidden; }
   background: #3A1830; border: 1px solid rgba(255, 92, 108, .5); box-shadow: var(--s-shadow); animation: p-drop .18s var(--s-ease) both; }
 .p-net span:nth-child(2) { flex: 1; }
 .p-net-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--s-red); flex: none; animation: p-pulse 1.2s ease-in-out infinite; }
-.p-net button { min-height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, .2); background: rgba(255, 255, 255, .08); font-weight: 700; font-size: 13px; }
+.p-net button { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, .2); background: rgba(255, 255, 255, .08); font-weight: 700; font-size: 13px; }
 @keyframes p-drop { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
 /* ---------- boot skeleton ---------- */
@@ -137,8 +137,8 @@ body.p-hasdock .p-views { padding-bottom: calc(var(--p-tab) + var(--p-safe-b) + 
 .p-hero { --tc: var(--s-violet); position: relative; overflow: hidden; background: var(--s-grad-soft), var(--s-surface); border-color: var(--s-border-2); padding: 18px 16px; }
 .p-hero::before { content: ''; position: absolute; left: 0; top: 0; right: 0; height: 3px; background: var(--s-grad); }
 .p-hero[data-ph="pitch"]::before { background: var(--tc); }
-.p-hero-t { font-family: var(--s-display); font-weight: 800; text-transform: uppercase; font-size: 22px; line-height: 1.08; margin: 8px 0 6px; display: flex; align-items: center; gap: 10px; overflow-wrap: anywhere; }
-.p-hero-t .s-dot { width: 14px; height: 14px; box-shadow: 0 0 0 3px rgba(255,255,255,.12); }
+.p-hero-t { font-family: var(--s-display); font-weight: 800; text-transform: uppercase; font-size: 22px; line-height: 1.08; margin: 8px 0 6px; display: flex; align-items: flex-start; gap: 10px; overflow-wrap: anywhere; }
+.p-hero-t .s-dot { width: 12px; height: 12px; margin-top: .3em; box-shadow: 0 0 0 3px rgba(255,255,255,.12); }
 .p-hero-s { color: var(--s-muted); font-size: 15px; }
 .p-hero-btn { margin-top: 14px; min-height: 44px; }
 
