@@ -8,23 +8,31 @@ const near = (a, b, tol = 1) => Math.abs(a - b) <= tol;
 // Block 1 per-team totals of the production-shaped state (19 slips, 19M): synthetic slips reproduce them.
 const TARGET = [5_670_000, 5_150_000, 2_720_000, 2_370_000, 1_900_000, 1_190_000];
 
-// Greedy, deterministic: each student puts exactly 1M (10k chunks) into the other teams with the largest remaining need.
+// Deterministic: lay the 19M of targets end to end; each student takes one 1M interval of that line,
+// matched (Kuhn) so that no interval touches the student's own team.
 function block1Slips(T, S) {
-  const need = Object.fromEntries(T.map((t, i) => [t, TARGET[i]]));
-  const order = [...S].sort((a, b) => T.indexOf(b.team) - T.indexOf(a.team)); // own-team-heavy teams first
-  const slips = {};
-  for (const s of order) {
-    const inn = {};
-    let left = 1_000_000;
-    while (left > 0) {
-      const t = T.filter((x) => x !== s.team && need[x] > 0).sort((a, b) => need[b] - need[a])[0];
-      if (!t) break;
-      const x = Math.min(10_000, left, need[t]);
-      inn[t] = inn[t] || { amt: 0, why: `Proč ${s.name} → ${t}` };
-      inn[t].amt += x; need[t] -= x; left -= x;
+  const seg = [];
+  let x = 0;
+  T.forEach((t, i) => { seg.push({ t, a: x, b: x + TARGET[i] }); x += TARGET[i]; });
+  const K = S.length, U = 1_000_000;
+  const parts = (k) => seg.map((g) => ({ t: g.t, amt: Math.max(0, Math.min(g.b, (k + 1) * U) - Math.max(g.a, k * U)) })).filter((p) => p.amt > 0);
+  const okFor = (s, k) => parts(k).every((p) => p.t !== s.team);
+  const owner = new Array(K).fill(-1);
+  const tryS = (si, seen) => {
+    for (let k = 0; k < K; k++) {
+      if (seen[k] || !okFor(S[si], k)) continue;
+      seen[k] = true;
+      if (owner[k] < 0 || tryS(owner[k], seen)) { owner[k] = si; return true; }
     }
-    slips[s.sid] = { in: inn };
-  }
+    return false;
+  };
+  for (let si = 0; si < K; si++) tryS(si, []);
+  const slips = {};
+  owner.forEach((si, k) => {
+    if (si < 0) return;
+    const s = S[si];
+    slips[s.sid] = { in: Object.fromEntries(parts(k).map((p) => [p.t, { amt: p.amt, why: `Proč ${s.name} → ${p.t}` }])) };
+  });
   return slips;
 }
 
@@ -140,11 +148,11 @@ await main(async () => {
   ok(Object.keys(pfs).length === 19, 'recordPf after repricing');
 
   section('RJ after demand, rebalance block');
-  const rjIn = { [T[5]]: { amt: 2_000_000, why: 'RJ věří' } };
+  const rjIn = { [T[5]]: { amt: 2_000_000, why: 'RJ věří' }, [T[4]]: { amt: 8_000_000, why: 'RJ' } }; // initial RJ = exactly 10M
   ok((await c.dealer('rjSave', { in: rjIn })).ok && (await c.dealer('rjReveal')).ok, 'RJ invests at the new prices');
   const mtR = (await c.me(S.find((s) => s.team === T[5]))).me.myTeam;
   ok(mtR.flows[0].investors.some((x) => x.id === 'rj' && x.name === 'RainbowJet' && x.in === 2_000_000), 'RJ listed after its reveal');
-  ok(!(await c.me(S.find((s) => s.team === T[4]))).me.myTeam.flows[0].investors.some((x) => x.id === 'rj'), 'RJ not listed for a team it did not touch');
+  ok(!(await c.me(S.find((s) => s.team === T[3]))).me.myTeam.flows[0].investors.some((x) => x.id === 'rj'), 'RJ not listed for a team it did not touch');
   await invariants(c, ctx, 'after RJ');
   ok((await c.dealer('nextBlock')).ok, 'nextBlock');
   await c.dealer('phase', { phase: 'betting' });

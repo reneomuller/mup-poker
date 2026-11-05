@@ -18,6 +18,7 @@ await main(async () => {
   ok((await c.get()).features.market === false, 'switched back');
   await c.dealer('features', { set: { bogus: true } });
   ok(!('bogus' in (await c.get()).features), 'unknown flag ignored');
+  await c.dealer('features', { set: { demand: false } }); // the rest checks v2 fixed-price money
 
   // block 1 played with everything ON so every op has something to act on
   await c.dealer('features', { set: ALL_ON });

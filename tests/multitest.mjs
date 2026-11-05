@@ -4,6 +4,7 @@ const post = async (b, h = {}) => (await fetch(B, { method: 'POST', headers: { '
 const get = async (h = {}, q = '') => (await fetch(B + q, { headers: h })).json();
 let fails = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fails++; };
 await post({ op: 'reset', confirm: 'RESET', keepPlayers: false });
+await post({ op: 'features', set: { demand: false } }); // v2 fixed-price expectations
 let st = await get(); const T = st.teams.map((t) => t.id);
 await post({ op: 'reg', open: true });
 const S = await Promise.all(Array.from({ length: 18 }, (_, i) => post({ op: 'register', name: 'Student ' + (i + 1), team: T[i % 6], pin: '1234' }).then((r) => ({ ...r, team: T[i % 6] }))));
