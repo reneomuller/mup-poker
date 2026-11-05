@@ -549,7 +549,7 @@ async function restoreFrom(d) {
 
 // Dealer ops that need a feature switched on (content editing — quiz sets, milestone list — always works).
 const GATES = {
-  card: 'cards', roundTerms: 'rounds', quizStart: 'quiz', quizNext: 'quiz', quizReveal: 'quiz', quizBoard: 'quiz',
+  card: 'cards', roundTerms: 'rounds', quizStart: 'quiz', quizNext: 'quiz', quizReveal: 'quiz', quizBoard: 'quiz', quizAdvance: 'quiz',
   pointsAdd: 'points', pointsRemove: 'points', award: 'track', awardRemove: 'track', marketCard: 'market',
   trancheAdd: 'tranches', trancheRelease: 'tranches', trancheCancel: 'tranches', exitSet: 'exit',
 };
@@ -644,13 +644,13 @@ async function dealerAction(b) {
       await save();
       return ok();
     }
-    case 'quizStart': case 'quizNext': case 'quizReveal': case 'quizBoard': case 'quizEnd': {
+    case 'quizStart': case 'quizNext': case 'quizReveal': case 'quizBoard': case 'quizEnd': case 'quizAdvance': {
       // optional seq from the admin: a double click (or a second admin) on a state already moved on is a no-op
       if (b.seq !== undefined && Number(b.seq) !== (meta.quiz.seq || 0)) return ok({ stale: true, quiz: Q.publicQuiz(meta, players, {}) });
       // the open question's answers, read fresh (never from the GET cache) right before scoring
       const qk = Q.answersKey(meta);
       const answers = qk ? await S.hgetall(qk) : {};
-      const err = Q.step(meta, b.op, players, answers, b);
+      const err = b.op === 'quizAdvance' ? Q.advance(meta, players, answers, b) : Q.step(meta, b.op, players, answers, b);
       if (err) return fail(err);
       await save();
       return ok({ quiz: Q.publicQuiz(meta, players, {}) });

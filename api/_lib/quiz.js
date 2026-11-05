@@ -141,6 +141,27 @@ export function step(m, op, players, qa, b) {
   return 'Neznámá akce.';
 }
 
+// Kahoot-style single "Next": lobby → question → reveal → board → question … → done.
+// auto (the admin page's timer) may only close a question (time up or everyone answered) and show the board.
+export const expectedOf = (players) => Object.values(players || {}).filter((p) => p && !p.ghost).length;
+export function advance(m, players, qa, b, now = Date.now()) {
+  const z = m.quiz;
+  if (!z.runId || !['question', 'reveal', 'board'].includes(z.state)) return z.state === 'done' ? 'Kvíz skončil.' : 'Kvíz neběží. Nejdřív ho spusť.';
+  const auto = !!b.auto;
+  if (z.state === 'question') {
+    if (auto) {
+      let answered = 0;
+      for (const sid of Object.keys(qa || {})) if (players[sid] && !players[sid].ghost) answered++;
+      const expected = expectedOf(players);
+      if (now < (z.endsAt || 0) + GRACE_MS && !(expected > 0 && answered >= expected)) return 'Ještě běží čas a neodpověděli všichni.';
+    }
+    return step(m, 'quizReveal', players, qa, b);
+  }
+  if (z.state === 'reveal') return step(m, 'quizBoard', players, qa, b);
+  if (auto) return 'Další otázku spouští jen učitel.';
+  return step(m, 'quizNext', players, qa, b);
+}
+
 function runBoard(m, players) {
   const z = m.quiz;
   const tot = F.pointTotals(m, players);
@@ -157,7 +178,7 @@ export function publicQuiz(m, players, qa) {
   if (z.state === 'question' && q) {
     let answered = 0;
     for (const sid of Object.keys(qa || {})) if (players[sid] && !players[sid].ghost) answered++;
-    Object.assign(out, { q: q.q, a: q.a, time: q.time, startedAt: z.startedAt, endsAt: z.endsAt, answered });
+    Object.assign(out, { q: q.q, a: q.a, time: q.time, startedAt: z.startedAt, endsAt: z.endsAt, answered, expected: expectedOf(players) });
   } else if (z.state === 'reveal' && q) {
     const res = z.res || { counts: q.a.map(() => 0), answered: 0, fastest: null };
     Object.assign(out, { q: q.q, a: q.a, correct: q.correct, counts: res.counts, answered: res.answered, fastest: res.fastest, topStreak: res.topStreak || null });

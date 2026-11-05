@@ -71,7 +71,7 @@ await main(async () => {
   ok((await c.dealer('quizNext')).ok, 'quizNext');
   st = await c.get();
   seqs.push(st.quiz.seq);
-  shape('quiz (question)', st.quiz, { state: 'string', seq: 'number', setTitle: 'string', idx: 'number', total: 'number', serverNow: 'number', q: 'string', a: 'array', time: 'number', startedAt: 'number', endsAt: 'number', answered: 'number' }, { strict: true });
+  shape('quiz (question)', st.quiz, { state: 'string', seq: 'number', setTitle: 'string', idx: 'number', total: 'number', serverNow: 'number', q: 'string', a: 'array', time: 'number', startedAt: 'number', endsAt: 'number', answered: 'number', expected: 'number' }, { strict: true });
   ok(st.quiz.state === 'question' && st.quiz.idx === 0 && st.quiz.q === QZ.questions[0].q && st.quiz.a.length === 4 && st.quiz.time === 20, 'question 0 live');
   ok(st.quiz.endsAt - st.quiz.startedAt === 20000, 'endsAt = startedAt + time');
   const gA = await c.st(G, 'quizAnswer', { choice: 2 }); // ghost answers first and right: must never be "fastest" or score
