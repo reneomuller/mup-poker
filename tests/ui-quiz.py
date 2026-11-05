@@ -12,13 +12,15 @@ def main():
         {'q': 'Otázka dvě', 'a': ['A', 'B'], 'correct': 0, 'time': 5}]})
     ok(r.get('ok'), 'quizSave short set')
     ok(dealer('quizStart', setId='uiq').get('ok'), 'quizStart (lobby)')
-    seen, stop = [], threading.Event()
+    seen, seqs, stop = [], [], threading.Event()
 
     def watch():
         while not stop.is_set():
             try:
                 q = get().get('quiz') or {}
                 k = (q.get('state'), q.get('idx'))
+                if isinstance(q.get('seq'), int):
+                    seqs.append(q['seq'])
                 if not seen or seen[-1] != k:
                     seen.append(k)
             except Exception:
@@ -68,7 +70,13 @@ def main():
         info(f'states seen: {seen}')
         want = [('board', -1), ('question', 0), ('reveal', 0), ('board', 0), ('question', 1), ('reveal', 1), ('board', 1), ('done', 1)]
         got = [k for k in seen if k[0] != 'done'] + [k for k in seen if k[0] == 'done'][:1]
-        ok([k[0] for k in got] == [k[0] for k in want] and [k[1] for k in got[:-1]] == [k[1] for k in want[:-1]], 'two tabs: every step exactly once, in order')
+        # The GET is cached for ~700 ms and test students answer instantly, so a short state can go unobserved.
+        # What matters: every observed state comes in plan order, and the server's step counter moved exactly
+        # len(want) - 1 times, so neither tab advanced twice nor skipped a step.
+        it = iter(want)
+        in_order = all(any(k == w for w in it) for k in got)
+        steps = (max(seqs) - min(seqs)) if seqs else -1
+        ok(in_order and steps == len(want) - 1, f'two tabs: every step exactly once, in order (seq moved {steps}, want {len(want) - 1})')
         pts = [x for x in (get('?view=data', {'x-dealer': 'mup-dealer'}).get('points') or []) if x.get('kind') == 'quiz']
         ok(len(pts) == len(S), f'question 2 scored once per correct student ({len(pts)} entries)')
         for pg, con in tabs:
