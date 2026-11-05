@@ -4,6 +4,7 @@ import * as S from './_lib/store.js';
 import * as G from './_lib/game.js';
 import * as F from './_lib/features.js';
 import * as Q from './_lib/quiz.js';
+import * as QP from './_lib/quizplus.js';
 import * as E from './_lib/economy.js';
 import * as A from './_lib/archive.js';
 import * as W from './_lib/wall.js';
@@ -343,7 +344,7 @@ async function loadForAnswer(sid) {
 }
 
 async function studentAction(b) {
-  const { meta, players, slips } = b.op === 'quizAnswer' ? await loadForAnswer(String(b.sid || '')) : await load(true);
+  const { meta, players, slips } = b.op === 'quizAnswer' || b.op === 'quizReady' ? await loadForAnswer(String(b.sid || '')) : await load(true);
   if (b.op === 'register') {
     if (!meta.regOpen) return fail('Registrace je zavřená. Požádej dealera.');
     const name = String(b.name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
@@ -450,6 +451,7 @@ async function studentAction(b) {
   }
 
   // v2 student ops write only their own hash fields (never meta), so nobody's write can be lost.
+  if (b.op === 'quizReady') { const r = await QP.ready(meta, p, S); return r.error ? fail(r.error) : ok({ lobby: r.lobby }); } // v4 quizplus
   if (b.op === 'quizAnswer') {
     if (!F.on(meta, 'quiz')) return fail(F.OFF);
     const z = meta.quiz, q = Q.current(meta);
@@ -1068,6 +1070,12 @@ export default async function handler(req, res) {
         dv.walls = await W.dataWalls(meta);
         return send(res, 200, dv);
       }
+      if (view === 'quizready') return send(res, 200, await QP.readyView(meta, players, S)); // v4 quizplus: lobby counter
+      if (view === 'quizrun') { // v4 quizplus: per-question results of one run (dealer)
+        if (!dealerOk(req)) return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
+        const r = await QP.runView(meta, players, url.searchParams.get('runId'), S);
+        return send(res, r.status || 200, r);
+      }
       if (view === 'wall') {
         // v3 §4: a student sees only their own team's wall (x-sid / x-pin); without a sid it is the dealer view
         const wsid = req.headers['x-sid'];
@@ -1121,7 +1129,7 @@ export default async function handler(req, res) {
     }
     if (req.method === 'POST') {
       const b = await readBody(req);
-      const studentOps = ['register', 'login', 'tokenLogin', 'notes', 'submit', 'reasons', 'restore', 'ask', 'vote', 'answer', 'react', 'quizAnswer'];
+      const studentOps = ['register', 'login', 'tokenLogin', 'notes', 'submit', 'reasons', 'restore', 'ask', 'vote', 'answer', 'react', 'quizAnswer', 'quizReady'];
       let r;
       // card / roundTerms exist for both: with a sid it is a student editing their own team
       // restore with a `dump` is the dealer's backup push (before v2 it was routed to the phones' restore and never ran)

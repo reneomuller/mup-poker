@@ -1205,6 +1205,7 @@
         ${L.length ? `<div class="qz-board">${L.map((p, i) => `<div class="p-rk ${p.name === me.name && p.team === me.team ? 'me' : ''}" data-key="ql${i}"><span class="p-rk-i">${i + 1}</span><span class="p-rk-n"><b>${esc(p.name)}</b>${teamTag(p.team)}</span><span class="p-rk-v"><b class="s-num">${esc(num(p.quizPoints))}</b></span></div>`).join('')}</div>` : ''}`}
         ${mode === 'done' ? '<button type="button" class="s-btn s-primary s-block qz-close" data-act="quiz-close">Zpět do hry</button>' : ''}`;
     }
+    if (window.MupQuizPlus) body = window.MupQuizPlus.phone({ mode, q, mq, me, S, body, ready: pin ? () => send({ op: 'quizReady', sid, pin }) : null }); // v4 quizplus
     const key = mode + '|' + body;
     if (key !== quizKey) { quizKey = key; morph(el, `<div class="qz-in" data-mode="${mode}">${body}</div>`); }
     tickQuiz();
