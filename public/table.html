@@ -5,39 +5,63 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Investiční stůl · RainbowJet × MUP</title>
 <link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/fonts/stand-fonts.css">
 <link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="/table.css">
+<link rel="stylesheet" href="/table-screens.css">
 </head>
 <body>
 <div class="stage" id="stage">
-  <div class="tbl"><div class="felt"><div class="spot-light" id="light"></div><div class="track"></div></div></div>
-  <div class="abs banner"><div class="blk" id="blk">Blok 1 / 5</div><div class="ph" id="ph">Připojte se ke stolu</div></div>
-  <div class="abs board" id="board"></div>
-  <div class="abs pot hidden" id="pot"><div class="pile" id="pile"></div><div class="lab" id="potlab"></div></div>
-  <div class="abs join hidden" id="join"><div class="qr" id="qr"></div><div><div class="t1" data-t="table.join.title">Připojte se ke stolu</div><div class="t2" id="joinurl"></div><div class="t3" data-t="table.join.hint">Naskenujte kód, vyberte svůj tým a zvolte si PIN.</div></div></div>
-  <div class="abs qr-mini hidden" id="qrmini"></div>
-  <div class="abs qr-mini-l hidden" id="qrminil"></div>
-  <div class="abs glasswrap" id="glass"></div>
-  <div class="abs brand" data-t="table.brand">RainbowJet × MUP</div>
+  <div class="tbl" id="tbl">
+    <div class="rail"></div>
+    <div class="felt">
+      <div class="felt-print">RainbowJet × MUP</div>
+      <div class="spot-light" id="light"></div>
+      <div class="track"></div>
+    </div>
+  </div>
+  <div class="banner" id="banner">
+    <div class="kick" id="blk">Blok 1 / 5</div>
+    <div class="ph"><span class="phw" id="ph">Připojte se ke stolu</span></div>
+    <div class="phsub hidden" id="phsub"></div>
+  </div>
+  <div class="board" id="board"></div>
+  <div class="pot hidden" id="pot"><div class="pile" id="pile"></div><div class="lab" id="potlab"></div></div>
+  <div class="join hidden" id="join">
+    <div class="qr" id="qr"></div>
+    <div class="jt"><div class="t1" data-t="table.join.title">Připojte se ke stolu</div><div class="t2" id="joinurl"></div><div class="t3" data-t="table.join.hint">Naskenujte kód, vyberte svůj tým a zvolte si PIN.</div></div>
+  </div>
+  <div class="corner tl glasswrap" id="glass"></div>
+  <div class="corner tr qrbox hidden" id="qrmini"><div class="qrimg" id="qrminiimg"></div><div class="qrl" id="qrminil"></div></div>
+  <div class="brand" id="brand" data-t="table.brand">RainbowJet × MUP</div>
+  <div class="seats" id="seats"></div>
+  <div class="mbig hidden" id="mbig"></div>
   <div class="clouds" id="clouds"></div>
   <div class="qpin hidden" id="qpin"></div>
   <div class="boardscreen" id="boardscreen">
-    <div>
-      <div class="kick" id="bkick">Ocenění startupů</div>
-      <h2 data-t="table.board.title">Jak se mění ocenění</h2>
-      <svg class="chart" id="chart" viewBox="0 0 1000 560" preserveAspectRatio="none"></svg>
+    <div class="bs-head">
+      <div><div class="kick" id="bkick">Ocenění startupů</div><h2 data-t="table.board.title">Jak se mění ocenění</h2></div>
     </div>
-    <div>
-      <div class="kick" data-t="table.board.rankKick">Pořadí</div>
-      <h2 data-t="table.board.rankTitle">Stůl</h2>
-      <ol class="rank" id="rank"></ol>
-      <div class="inv"><div class="kick" data-t="table.board.investors">Nejlepší investoři</div><div id="inv"></div></div>
+    <div class="bs-grid" id="bsgrid">
+      <div class="bs-chart"><svg class="chart" id="chart"></svg></div>
+      <div class="bs-teams"><div class="kick" data-t="table.board.rankKick">Pořadí</div><ol class="rank" id="rank"></ol></div>
+      <div class="bs-people" id="bspeople">
+        <div class="bs-inv"><div class="kick" data-t="table.board.investors">Nejlepší investoři</div><ol class="plist" id="inv"></ol></div>
+        <div class="bs-pts hidden" id="bspts"><div class="kick" data-t="table.board.points">Body</div><ol class="plist" id="pts"></ol></div>
+      </div>
     </div>
+    <div class="ticker hidden" id="ticker"><div class="tk-lab" data-t="table.board.drivers">Co hýbe oceněním</div><div class="tk-win"><div class="tk-strip" id="tkstrip"></div></div></div>
   </div>
-  <div class="credits">Portréty: Wikipedia / Wikimedia Commons</div>
+  <div class="exit hidden" id="exit"></div>
+  <div class="quiz hidden" id="quiz"></div>
+  <div class="spotlight hidden" id="award"></div>
+  <div class="credits" id="credits">Portréty: Wikipedia / Wikimedia Commons</div>
 </div>
 <script src="/vendor/qrcode.js"></script>
 <script src="/common.js"></script>
+<script src="/table-demo.js"></script>
 <script src="/table.js"></script>
+<script src="/table-quiz.js"></script>
+<script src="/table-exit.js"></script>
 </body>
 </html>

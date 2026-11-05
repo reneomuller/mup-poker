@@ -1,0 +1,70 @@
+/* Full-screen layers of the projector: board (stonks), awards spotlight, quiz takeover, exit finale. */
+
+/* ---------- board screen ---------- */
+.boardscreen { position: absolute; inset: 0; z-index: 50; display: flex; flex-direction: column; padding: 2.4rem 3rem 2rem; gap: 1.4rem;
+  background:
+    radial-gradient(ellipse 70% 60% at 30% 20%, rgba(31,106,76,.22), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 90% 100%, rgba(201,162,74,.10), transparent 70%),
+    #070a09;
+  opacity: 0; pointer-events: none; transition: opacity .6s; }
+.boardscreen.on { opacity: 1; pointer-events: auto; }
+.boardscreen .kick { font-size: 1.45rem; letter-spacing: .26em; text-transform: uppercase; color: var(--gold-2); font-weight: 700; margin-bottom: .5rem; }
+.boardscreen h2 { font-family: var(--serif); font-size: 3.4rem; font-weight: 900; line-height: 1.05; }
+.bs-head { display: flex; align-items: flex-end; justify-content: space-between; flex: none; }
+.bs-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 40fr) minmax(0, 25fr) minmax(0, 23fr); gap: 2.6rem; }
+.bs-chart { position: relative; min-height: 0; min-width: 0; }
+.bs-chart .chart { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.chart text { font-family: var(--sans); }
+.bs-teams, .bs-people { min-height: 0; min-width: 0; overflow: hidden; }
+.rank, .plist { list-style: none; position: relative; }
+.rank li, .plist li { position: absolute; left: 0; right: 0; top: 0; transition: transform .8s cubic-bezier(.2,.8,.2,1), opacity .6s; }
+.plist li.empty { position: static; font-size: 1.5rem; }
+.rank li { display: grid; grid-template-columns: 2.8rem minmax(0, 1fr); align-items: center; column-gap: .9rem; height: 5.6rem; border-bottom: .1rem solid rgba(242,234,214,.1); }
+.rank .pos { font-family: var(--serif); font-size: 2.6rem; font-weight: 900; color: var(--gold-2); grid-row: span 2; }
+.rank .tn { font-size: 1.8rem; font-weight: 700; display: flex; align-items: center; gap: .6rem; min-width: 0; line-height: 1.2; white-space: nowrap; align-self: end; }
+.rank .tn .dot { width: 1.1rem; height: 1.1rem; }
+.rank .nmx { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.rank .tv { display: flex; align-items: baseline; gap: .9rem; white-space: nowrap; line-height: 1.15; align-self: start; }
+.rank .tv b { font-family: var(--serif); font-size: 2.1rem; font-weight: 700; }
+.rank .tv small { font-size: 1.45rem; font-weight: 700; }
+.rank .tv small.fp { margin-left: auto; color: var(--muted); font-weight: 600; }
+.bs-inv, .bs-pts { margin-bottom: 1.6rem; }
+.plist li { display: flex; flex-direction: column; justify-content: center; height: 4.4rem; border-bottom: .1rem solid rgba(242,234,214,.08); }
+.plist .pn { font-size: 1.6rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plist .pn i { font-style: normal; color: var(--gold-2); font-family: var(--serif); font-weight: 900; margin-right: .2rem; }
+.plist .pv { font-size: 1.5rem; color: var(--cream); display: flex; align-items: center; gap: .6rem; white-space: nowrap; }
+.plist .pv b { margin-left: auto; font-weight: 800; }
+.plist .dot { width: .9rem; height: .9rem; }
+#pts li { flex-direction: row; align-items: center; justify-content: space-between; height: 2.9rem; gap: 1rem; }
+#pts .pn { display: flex; align-items: center; gap: .5rem; min-width: 0; font-size: 1.55rem; }
+#pts .pp { font-family: var(--serif); font-weight: 900; font-size: 1.8rem; color: var(--gold-2); font-variant-numeric: tabular-nums; }
+.up { color: #8be3b0; } .down { color: #ffb4ba; }
+/* drivers ticker */
+.ticker { flex: none; display: flex; align-items: center; gap: 1.4rem; height: 4rem; border-top: .12rem solid rgba(201,162,74,.35); padding-top: .8rem; }
+.tk-lab { flex: none; font-size: 1.45rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #1d1606; background: var(--gold-2); padding: .2rem .8rem; border-radius: .4rem; }
+.tk-win { flex: 1; min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent); mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent); }
+.tk-strip { display: inline-flex; white-space: nowrap; animation: tick 40s linear infinite; will-change: transform; }
+.tk { font-size: 1.6rem; padding-right: 3.4rem; display: inline-flex; align-items: center; gap: .5rem; }
+.tk .dot { width: .9rem; height: .9rem; }
+.tk b { font-weight: 800; }
+.tk .tkk { color: var(--muted); }
+@keyframes tick { to { transform: translateX(-50%); } }
+
+/* ---------- awards spotlight ---------- */
+.spotlight { position: absolute; inset: 0; z-index: 90; display: grid; place-items: center; background: rgba(4,5,5,.82); animation: fadein .5s both; }
+.spotlight.out { opacity: 0; transition: opacity .5s; }
+.aw-rays { position: absolute; left: 50%; top: 50%; width: 120rem; height: 120rem; margin: -60rem 0 0 -60rem; pointer-events: none;
+  background: repeating-conic-gradient(from 0deg, rgba(232,205,134,.10) 0 6deg, transparent 6deg 18deg); border-radius: 50%;
+  -webkit-mask-image: radial-gradient(circle, #000 0, transparent 60%); mask-image: radial-gradient(circle, #000 0, transparent 60%); animation: spin 40s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.aw-card { position: relative; text-align: center; padding: 3rem 5rem 3.2rem; border-radius: 2rem; max-width: 70rem;
+  background: linear-gradient(180deg, #fbf6e9, #efe4c6); color: #1d1b17; box-shadow: 0 0 0 .4rem var(--gold), 0 2rem 6rem rgba(0,0,0,.7);
+  animation: awin .8s cubic-bezier(.2,1.3,.4,1) both; }
+@keyframes awin { from { opacity: 0; transform: scale(.6) rotate(-3deg); } }
+.aw-kick { font-size: 1.6rem; letter-spacing: .28em; text-transform: uppercase; color: #8a6a1f; font-weight: 800; }
+.aw-kind { font-family: var(--serif); font-size: 3.2rem; font-weight: 900; color: #8a6a1f; margin-top: .6rem; }
+.aw-name { font-family: var(--serif); font-size: 6rem; font-weight: 900; line-height: 1.05; margin-top: .8rem; }
+.aw-team { display: inline-flex; align-items: center; gap: .7rem; font-size: 2rem; font-weight: 700; margin-top: 1rem; }
+.aw-team .dot { width: 1.2rem; height: 1.2rem; }
+.aw-note { font-size: 2rem; line-height: 1.35; margin-top: 1.4rem; color: #3a3630; max-width: 56rem; margin-left: auto; margin-right: auto; }
+@keyframes fadein { from { opacity: 0; } }
