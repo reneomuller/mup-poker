@@ -167,6 +167,7 @@ function publicState(meta, players, slips, bd, tx = {}, qa = {}, proj = D.projec
   if (F.on(meta, 'track')) { v2.awards = F.publicAwards(meta, players); v2.contrarian = F.contrarian(meta, players); }
   if (F.on(meta, 'exit') && meta.exit) v2.exit = E.publicExit(meta, players);
   if (F.on(meta, 'points')) v2.points = F.publicPoints(meta, players);
+  v2.demand = D.publicDemand(meta);
   return {
     ...v2,
     now: Date.now(), teams, block: meta.block, maxBlock: G.CFG.MAX_BLOCK, phase: meta.phase,

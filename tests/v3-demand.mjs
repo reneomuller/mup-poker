@@ -137,6 +137,7 @@ await main(async () => {
   let meta = await c.meta();
   const dm = meta.demand?.[1];
   ok(dm && near(dm.avgIn, 19_000_000 / 6, 1e-6) && T.every((t) => near(dm.mult[t], M[t], 1e-9) && dm.in[t] === tl.i[t] && dm.out[t] === 0), 'meta.demand[1] = { mult, in, out, avgIn }');
+  ok(T.every((t) => near(pub.demand?.[1]?.mult?.[t], M[t], 1e-4)), 'publicState.demand[1].mult (projector reload)');
   const dd = meta.drivers.filter((x) => x.kind === 'demand' && x.block === 1);
   ok(dd.length === 6 && dd.every((x) => near(x.delta, EXP[x.team] - (1_000_000 + tl.i[x.team]), 2)), 'demand drivers: delta = V after − V before repricing');
   ok(/^Poptávka v bloku 1 \(×\d+,\d\d\)$/.test(dd[0].note), `driver label „${dd[0].note}“`);
@@ -193,6 +194,8 @@ await main(async () => {
   section('dump / restore carries meta.demand');
   const dump = await c.dump();
   ok(dump.meta.demand?.[1] && dump.meta.demand?.[2] && dump.meta.flows?.[1], 'dump has meta.demand and meta.flows');
+  const dv = await c.dget('?view=data');
+  ok(dv.ok && dv.demand?.[1]?.mult && dv.demand?.[2]?.avgIn > 0, '?view=data carries demand per block');
   ok((await c.dealer('restore', { dump })).ok, 'restore');
   const m2 = await c.meta();
   ok(JSON.stringify(m2.demand) === JSON.stringify(dump.meta.demand), 'restored meta.demand identical');

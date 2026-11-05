@@ -73,5 +73,5 @@ export async function dataView(meta, players, tx) {
     for (const [sid, a] of Object.entries(ans[i])) if (a && !players[sid]?.ghost) answers[sid] = { choice: a.choice, ms: a.ms };
     return { runId: e.runId, setId: e.setId, idx: e.idx, answers };
   });
-  return { ok: true, generated: Date.now(), teams, players: plist, allocations, points: meta.points, quizRuns };
+  return { ok: true, generated: Date.now(), teams, players: plist, allocations, points: meta.points, quizRuns, demand: meta.demand || {} };
 }

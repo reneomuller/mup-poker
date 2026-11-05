@@ -158,3 +158,13 @@ export function myTeam(meta, p, players, proj, now) {
     founders: S > 0 ? Math.round((G.CFG.FOUNDER_SHARES / S) * 1000) / 10 : 0, investorsNow, history, flows,
   };
 }
+
+// publicState.demand: per settled block only the multiples ({ [block]: { mult: { t: x } } }), so a reloaded
+// projector can still show „×1,63“ on each plate.
+export function publicDemand(meta) {
+  const out = {};
+  for (const [b, d] of Object.entries(meta.demand || {})) {
+    out[b] = { mult: Object.fromEntries(Object.entries(d?.mult || {}).map(([t, x]) => [t, Math.round(x * 1e4) / 1e4])) };
+  }
+  return out;
+}
