@@ -3,7 +3,7 @@
 // 2. undo reverts showdown, market card, tranche release, exit
 // 3. redis mode: flush Redis mid-game (mid-quiz) and nothing is lost
 // 4. phone silent restore after the server forgot everything
-import { ok, info, section, main, client, startServer, startMock, wipePg, sleep, sum, invariants, freshGame, initialSlip, rebalanceSlip, ALL_ON, MODE, MOCK_PORT } from './_e-lib.mjs';
+import { ok, info, canon, section, main, client, startServer, startMock, wipePg, sleep, sum, invariants, freshGame, initialSlip, rebalanceSlip, ALL_ON, MODE, MOCK_PORT } from './_e-lib.mjs';
 
 const PORT = Number(process.env.E_PORT || 3106);
 const TAG = 'tagE' + PORT;
@@ -67,9 +67,9 @@ await main(async () => {
   const D2 = await c.dump();
   const dk = diffKeys(strip(D1.meta), strip(D2.meta));
   ok(dk.length === 0, `every meta field round-trips (${dk.join(', ') || 'all equal'})`);
-  ok(JSON.stringify(D1.players) === JSON.stringify(D2.players), 'players round-trip');
-  ok(JSON.stringify(D1.slips) === JSON.stringify(D2.slips), 'slips round-trip');
-  ok(JSON.stringify(D1.board) === JSON.stringify(D2.board), 'board round-trips');
+  ok(canon(D1.players) === canon(D2.players), 'players round-trip');
+  ok(canon(D1.slips) === canon(D2.slips), 'slips round-trip');
+  ok(canon(D1.board) === canon(D2.board), 'board round-trips');
   ok(JSON.stringify(D1.content?.texts) === JSON.stringify(D2.content?.texts), 'content round-trips');
   const pub2 = await c.get();
   const pick = (p) => JSON.stringify({ teams: p.teams, cards: p.cards, drivers: p.drivers, market: p.market, tranches: p.tranches, rjFund: p.rjFund, awards: p.awards, points: p.points, leaders: p.leaders, features: p.features, milestoneDefs: p.milestoneDefs, history: p.history });
@@ -140,7 +140,9 @@ await main(async () => {
     ok(p2.playerCount === 18 && p2.betCount === 18 && p2.phase === 'betting', `state still there after the flush (${p2.playerCount} players, ${p2.betCount} slips, ${p2.phase})`);
     ok(JSON.stringify(p2.cards) === JSON.stringify(p1.cards) && p2.quiz?.state === 'question', 'cards and the live quiz question survive');
     const d2 = await c.dump();
-    ok(diffKeys(strip(d1.meta), strip(d2.meta)).length === 0 && JSON.stringify(d1.players) === JSON.stringify(d2.players) && JSON.stringify(d1.slips) === JSON.stringify(d2.slips), 'meta, players, slips identical after the flush');
+    const mk = diffKeys(strip(d1.meta), strip(d2.meta));
+    const pk = diffKeys(d1.players, d2.players), sk = Object.keys({ ...d1.slips, ...d2.slips }).filter((b) => canon(d1.slips[b]) !== canon(d2.slips[b]));
+    ok(mk.length + pk.length + sk.length === 0, `meta, players, slips identical after the flush (meta: ${mk.map((k) => k + ' ' + JSON.stringify(d1.meta[k])?.slice(0, 80) + ' → ' + JSON.stringify(d2.meta[k])?.slice(0, 80))}; players: ${pk.length}; slips: ${sk} ${sk.map((b) => diffKeys(d1.slips[b], d2.slips[b]).map((id) => id + ':' + JSON.stringify(d1.slips[b]?.[id])?.slice(0, 120) + ' → ' + JSON.stringify(d2.slips[b]?.[id])?.slice(0, 120)).slice(0, 2))})`);
     const a2 = (await c.dget('?view=archives')).archives || [];
     ok(a2.length === a1.length, `archives still listed (${a2.length}/${a1.length})`);
     const dbl = await c.st(S[0], 'quizAnswer', { choice: 0 });

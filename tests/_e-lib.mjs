@@ -360,3 +360,5 @@ export function answerAll(c, students, choiceOf) {
   return Promise.all(students.map((s, i) => c.st(s, 'quizAnswer', { choice: choiceOf(s, i) })));
 }
 export const ledgerTotal = (meta, sid) => (meta?.points || []).filter((e) => e.playerId === sid).reduce((a, e) => a + e.amt, 0);
+// JSON with object keys sorted (hash refills from Postgres may return fields in another order)
+export const canon = (x) => JSON.stringify(x, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map((kk) => [kk, v[kk]])) : v));

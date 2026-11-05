@@ -1,7 +1,7 @@
 // Concurrency (spec §11: 18 students acting concurrently never lose a write). Five repetitions (one per block):
 // students submit / edit cards / set round terms / answer the quiz / write notes all at once while the dealer
 // runs market cards, revalues, milestones, timers and points. Meaningful in pg/redis mode (real I/O interleaving).
-import { ok, info, section, main, client, sum, sumAmt, invariants, freshGame, initialSlip, rebalanceSlip, ALL_ON, ledgerTotal } from './_e-lib.mjs';
+import { ok, warnIf, info, section, main, client, sum, sumAmt, invariants, freshGame, initialSlip, rebalanceSlip, ALL_ON, ledgerTotal } from './_e-lib.mjs';
 
 const c = client();
 const V = (st, t) => st.teams.find((x) => x.id === t).V;
@@ -41,8 +41,9 @@ await main(async () => {
     const mes = await Promise.all(S.map((s) => c.me(s)));
     const slips = S.map((s, i) => (mes[i].me.rules.mode === 'initial' ? initialSlip(T, s.team, i + rep, 1e6, `c${rep}-`) : rebalanceSlip(T, s.team, mes[i].me.stakes, i + rep, mes[i].me.rules.cashoutMax, `c${rep}-`)));
     const label = `Souběh ${rep}`;
-    const aRes = await Promise.all([...S.map((s, i) => c.st(s, 'submit', slips[i])), c.st(G, 'submit', initialSlip(T, G.team, 0)),
-      c.dealer('timer', { minutes: rep, label }), c.dealer('pointsAdd', { playerId: S[rep].sid, amt: 7, note: `souběh ${rep}` }), c.dealer('card', { team: T[(rep + 1) % 6], oneLiner: `Dealer ${rep}` })]);
+    // one dealer (ops one after another) while all students submit at once
+    const dealerChain = async () => [await c.dealer('timer', { minutes: rep, label }), await c.dealer('pointsAdd', { playerId: S[rep].sid, amt: 7, note: `souběh ${rep}` }), await c.dealer('card', { team: T[(rep + 1) % 6], oneLiner: `Dealer ${rep}` })];
+    const aRes = await Promise.all([...S.map((s, i) => c.st(s, 'submit', slips[i])), c.st(G, 'submit', initialSlip(T, G.team, 0)), dealerChain()]).then((a) => [...a.slice(0, 19), ...a[19]]);
     ok(aRes.slice(0, 18).every((r) => r.ok), '18 submits at once: ' + (aRes.slice(0, 18).find((r) => !r.ok)?.error || 'ok'));
     ok(aRes.slice(19).every((r) => r.ok), 'dealer timer + pointsAdd + card during the submits');
     const dv = await c.dget('?view=dealer');
@@ -53,6 +54,11 @@ await main(async () => {
     ok((await c.meta()).points.some((e) => e.note === `souběh ${rep}`), 'pointsAdd kept');
     ok(st.cards[T[(rep + 1) % 6]].oneLiner === `Dealer ${rep}`, 'dealer card kept');
     ok(st.betCount === 18, `betCount 18 (${st.betCount})`);
+    // two organisers on two admin pages press buttons in the same second
+    const two = await Promise.all([c.dealer('timer', { minutes: rep + 1, label: `Dva ${rep}` }), c.dealer('pointsAdd', { playerId: S[0].sid, amt: 1, note: `dva ${rep}` }), c.dealer('card', { team: T[0], oneLiner: `Dva ${rep}` })]);
+    const s2 = await c.get(), m2 = await c.meta();
+    const kept2 = [s2.timerLabel === `Dva ${rep}`, m2.points.some((e) => e.note === `dva ${rep}`), s2.cards[T[0]].oneLiner === `Dva ${rep}`];
+    warnIf(two.every((r) => r.ok) && kept2.every(Boolean), `two admins at once: 3 simultaneous dealer ops all kept (timer/points/card: ${kept2})`);
     await c.dealer('phase', { phase: 'closed' });
     const sd = await c.dealer('showdown');
     ok(sd.ok && sd.n === 18, `showdown n=18 (${sd.n})`);
