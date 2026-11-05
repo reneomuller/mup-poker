@@ -112,10 +112,10 @@
       const plate = document.createElement('div');
       plate.className = 'plate s' + i;
       plate.dataset.seat = t.id;
-      plate.innerHTML = `<div class="rnd hidden"></div><div class="lead hidden"></div>
-        <div class="nm"><span class="dot"></span><span class="tn"></span></div>
-        <div class="val tnum">—</div><div class="sub"></div>
-        <div class="cap hidden"><div class="capbar"><i class="cf"></i><i class="cc"></i><i class="cr"></i></div><div class="capl"></div></div>
+      plate.innerHTML = `<div class="rnd hidden"></div>
+        <div class="nm"><span class="star hidden">★</span><span class="dot"></span><span class="tn"></span></div>
+        <div class="val tnum">—</div>
+        <div class="cap hidden"><div class="capbar"><i class="cf"></i><i class="cc"></i><i class="cr"></i></div></div><div class="sub"></div>
         <div class="delta"></div><div class="badge"></div>`;
       const spot = document.createElement('div');
       spot.className = 'spot s' + i;
@@ -423,22 +423,20 @@
       if (tn._t !== t.name) { setText(tn, t.name); fit(tn, 0.83); }
       const inv = t.cls + t.rj, lv = t.live || 0;
       const sub = P.querySelector('.sub');
-      setText(sub, lv
-        ? tx('table.live', { amount: (lv > 0 ? '+' : '−') + fmtM(Math.abs(lv)) })
-        : inv > 0 ? tx('table.seat.invested', { amount: fmtM(inv) }) : tx('table.seat.valuation'));
-      const ld = P.querySelector('.lead');
-      toggle(ld, 'hidden', !(inv > 0 && t.id === leader && s.teams.some((x) => x.V !== t.V)));
-      setText(ld, '★ ' + tx('table.seat.leader'));
+      const c = cap && t.cap;
+      setHTML(sub, lv
+        ? esc(tx('table.live', { amount: (lv > 0 ? '+' : '−') + fmtM(Math.abs(lv)) }))
+        : c ? `${esc(tx('table.cap.founders'))} <b>${pct(c.founders, false)}</b>`
+        : esc(inv > 0 ? tx('table.seat.invested', { amount: fmtM(inv) }) : tx('table.seat.valuation')));
       toggle(sub, 'live', !!lv); toggle(sub, 'neg', lv < 0);
+      toggle(P.querySelector('.star'), 'hidden', !(inv > 0 && t.id === leader && s.teams.some((x) => x.V !== t.V)));
       setText(P.querySelector('.badge'), tx('table.badge'));
       toggle(P, 'presenting', s.phase === 'pitch' && s.presenting === t.id);
-      // cap table
-      const c = cap && t.cap;
+      // cap table: founders / class / RJ split under the value
       toggle(P.querySelector('.cap'), 'hidden', !c);
       if (c) {
         const [cf, cc, cr] = P.querySelectorAll('.capbar i');
         cf.style.flexGrow = Math.max(0, c.founders); cc.style.flexGrow = Math.max(0, c.cls); cr.style.flexGrow = Math.max(0, c.rj);
-        setHTML(P.querySelector('.capl'), `${esc(tx('table.cap.founders'))} <b>${pct(c.founders, false)}</b>`);
       }
       // priced round badge
       const rb = P.querySelector('.rnd'), r = rounds && s.rounds?.[t.id];
@@ -446,6 +444,7 @@
       if (r) {
         rb.className = 'rnd ' + (r.kind || 'flat');
         setText(rb, r.kind === 'up' ? '▲ ' + tx('table.round.up') + ' ' + pct(r.pct) : r.kind === 'down' ? '▼ ' + tx('table.round.down') + ' ' + pct(r.pct) : tx('table.round.flat'));
+        toggle(rb, 'hidden', r.kind === 'flat' && !['betting', 'closed', 'showdown', 'rj'].includes(s.phase));
       }
       if (!busy) {
         tween(e.val, t.V, fmtM, animate ? 900 : 0);
