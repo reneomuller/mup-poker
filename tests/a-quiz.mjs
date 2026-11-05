@@ -128,8 +128,8 @@ r = await c.spost({ op: 'quizAnswer', sid: S[1].sid, pin: S[1].pin, choice: 0 })
 ok(!r.ok && r.error === 'Čas vypršel.', 'answer after endsAt + 1.5 s refused: ' + r.error);
 // skip reveal: next still scores the question
 await c.dealer('quizNext');
-const q2 = (await c.get('?view=dealer')).dealer.points.filter((e) => e.note === 'Kvíz: otázka 2');
-ok(q2.length === 1 && q2[0].amt >= 500, 'unrevealed question scored when moving on');
+const q2 = (await c.get('?view=dealer')).dealer.points.filter((e) => e.kind === 'quiz' && e.note.startsWith('Kvíz: otázka 2'));
+ok(q2.length === 1 && q2[0].amt >= 550 && q2[0].bonus === 50 && q2[0].amt === q2[0].base + 50 && q2[0].note === 'Kvíz: otázka 2 · série 2 (+50)', 'unrevealed question scored when moving on (2nd correct in a row: +50 streak bonus)');
 await c.dealer('quizNext');
 st = await c.get();
 ok(st.quiz.state === 'done' && Array.isArray(st.quiz.leaders), 'quizNext after last question → done');
@@ -199,4 +199,99 @@ await c.dealer('quizReveal');
 st = await c.get();
 ok(all.every((x) => x.ok) && st.quiz.counts[0] === 18 && st.quiz.fastest, 'all correct, fastest set');
 ok(badNumbers(st).length === 0 && badNumbers(await c.me(S[0])).length === 0, 'no NaN in quiz views');
+
+// answer streak bonus: min(250, 50 × (streak − 1)); wrong / no answer resets; a new run resets; ghosts never score
+await c.dealer('quizEnd'); await c.dealer('quizEnd');
+r = await c.dealer('quizSave', { set: { id: 'st', title: 'Série', questions: Array.from({ length: 8 }, (_, i) => ({ q: 'Série ' + (i + 1) + '?', a: ['Ano', 'Ne'], correct: 0, time: 30 })) } });
+ok(r.ok, 'streak set saved');
+ok((await c.dealer('quizStart', { setId: 'st' })).ok && (await c.me(S[0])).me.quiz.streak === 0, 'new run: streak 0');
+const plan = { // per question: choice of A (S[0]), B (S[1]), C (S[2]); null = no answer
+  A: [0, 0, 0, 0, 0, 0, 0, 0], B: [0, 0, 1, 0, 0, null, 0, 0], C: [0, null, 0, 0, 1, 0, 0, 0],
+};
+const expStreak = (arr, i) => { let n = 0; for (let k = 0; k <= i; k++) n = arr[k] === 0 ? n + 1 : 0; return n; };
+const who = { A: S[0], B: S[1], C: S[2] };
+let streakOk = true, viewOk = true, ghostOk = true, idemOk = true, topOk = true;
+for (let i = 0; i < 8; i++) {
+  await c.dealer('quizNext');
+  const mq = await c.me(S[0]);
+  if (mq.me.quiz.streak !== expStreak(plan.A, i - 1) || mq.me.quiz.myBonus !== 0) viewOk = false; // during the question: streak after the previous one
+  await Promise.all([
+    ...Object.entries(who).filter(([k]) => plan[k][i] !== null).map(([k, s]) => c.spost({ op: 'quizAnswer', sid: s.sid, pin: s.pin, choice: plan[k][i] })),
+    c.spost({ op: 'quizAnswer', sid: G.sid, pin: G.pin, choice: 0 }),
+  ]);
+  if (i % 2) await c.dealer('quizReveal'); // odd questions: revealed twice (idempotent)
+  const before = JSON.stringify((await c.get('?view=dealer')).dealer.points);
+  await c.dealer('quizReveal');
+  if (i % 2 && JSON.stringify((await c.get('?view=dealer')).dealer.points) !== before) idemOk = false;
+  st = await c.get();
+  const top = Math.max(...Object.keys(who).map((k) => expStreak(plan[k], i)));
+  if (top >= 2 ? !(st.quiz.topStreak && st.quiz.topStreak.streak === top && st.quiz.topStreak.name !== 'Ghost') : st.quiz.topStreak !== null) topOk = false;
+  const dvw = (await c.get('?view=dealer')).dealer;
+  const pts = dvw.points.filter((e) => e.kind === 'quiz' && e.qi === i && e.run === dvw.quiz.runId);
+  for (const [k, s] of Object.entries(who)) {
+    const e = pts.find((x) => x.playerId === s.sid);
+    const sk = expStreak(plan[k], i), bonus = Math.min(250, 50 * Math.max(0, sk - 1));
+    const m = await c.me(s);
+    if (plan[k][i] !== 0) { if (e || m.me.quiz.streak !== 0 || m.me.quiz.myBonus !== 0) streakOk = false; continue; }
+    const note = `Kvíz: otázka ${i + 1}` + (bonus ? ` · série ${sk} (+${bonus})` : '');
+    if (!e || e.bonus !== bonus || e.amt !== e.base + bonus || e.base < 500 || e.base > 1000 || e.note !== note) { streakOk = false; console.log('  streak entry', k, i, JSON.stringify(e), 'expected bonus', bonus, note); }
+    if (m.me.quiz.streak !== sk || m.me.quiz.myBonus !== bonus || m.me.quiz.myPoints !== e?.amt) { viewOk = false; console.log('  me.quiz', k, i, JSON.stringify(m.me.quiz), 'expected', sk, bonus); }
+  }
+  if (pts.some((e) => e.playerId === G.sid) || (await c.me(G)).me.quiz.streak !== 0) ghostOk = false;
+  await c.dealer('quizBoard');
+}
+ok(streakOk, 'streak bonus 0, +50, +100 … capped at +250; wrong and missing answers reset; ledger amt = base + bonus with the „· série S (+B)“ note');
+ok(viewOk, 'me.quiz.streak (after the latest scored question) and me.quiz.myBonus (this question)');
+ok(idemOk, 'repeated reveal keeps the ledger unchanged');
+ok(topOk, 'reveal: topStreak = longest running streak (≥ 2), never the ghost');
+ok(ghostOk, 'ghost: no entries, streak 0');
+const capRow = (await c.get('?view=dealer')).dealer.points.filter((e) => e.kind === 'quiz' && e.playerId === S[0].sid && e.note.startsWith('Kvíz: otázka 8'));
+ok(capRow.length === 1 && capRow[0].bonus === 250 && capRow[0].note.endsWith('· série 8 (+250)'), '8th correct in a row: +250 (cap)');
+await c.dealer('quizEnd');
+await c.dealer('quizStart', { setId: 'st' });
+await c.dealer('quizNext');
+await c.spost({ op: 'quizAnswer', sid: S[0].sid, pin: S[0].pin, choice: 0 });
+await c.dealer('quizReveal');
+const nr = (await c.me(S[0])).me.quiz;
+ok(nr.streak === 1 && nr.myBonus === 0 && nr.myPoints >= 500 && nr.myPoints <= 1000, 'a new run starts the streak again: ' + JSON.stringify(nr));
+
+// quizAdvance: one "Next" for the whole run; seq guard; auto only closes a question / shows the board
+const adv = async (extra = {}) => c.dealer('quizAdvance', { seq: (await c.get()).quiz.seq, ...extra });
+await c.dealer('quizEnd');
+ok((await c.dealer('quizStart', { setId: 't1' })).ok && (await c.get()).quiz.idx === -1, 'advance: lobby');
+r = await adv({ auto: true });
+ok(!r.ok && (await c.get()).quiz.state === 'board', 'auto refused in the lobby: ' + r.error);
+r = await adv();
+st = await c.get();
+ok(r.ok && st.quiz.state === 'question' && st.quiz.idx === 0 && st.quiz.expected === 18, 'lobby → question 1, expected = 18 non-ghost players (' + st.quiz.expected + ')');
+await c.spost({ op: 'quizAnswer', sid: S[0].sid, pin: S[0].pin, choice: 1 });
+r = await adv({ auto: true });
+ok(!r.ok && (await c.get()).quiz.state === 'question', 'auto refused while time runs and not everyone answered: ' + r.error);
+const seqA = (await c.get()).quiz.seq;
+const pair = await Promise.all([c.dealer('quizAdvance', { seq: seqA }), c.dealer('quizAdvance', { seq: seqA })]);
+st = await c.get();
+ok(pair.every((x) => x.ok) && pair.filter((x) => x.stale).length === 1 && st.quiz.state === 'reveal' && st.quiz.idx === 0 && st.quiz.seq === seqA + 1, 'two advances with the same seq move one step (early reveal)');
+ok((await c.dealer('quizAdvance', { seq: seqA })).stale && (await c.get()).quiz.state === 'reveal', 'stale seq: no-op');
+ok((await adv({ auto: true })).ok && (await c.get()).quiz.state === 'board', 'auto: reveal → board');
+r = await adv({ auto: true });
+ok(!r.ok && (await c.get()).quiz.state === 'board', 'auto refused on the board: ' + r.error);
+ok((await adv()).ok && (await c.get()).quiz.idx === 1, 'board → question 2');
+await Promise.all(S.slice(0, 17).map((s) => c.spost({ op: 'quizAnswer', sid: s.sid, pin: s.pin, choice: 0 })));
+r = await adv({ auto: true });
+ok(!r.ok && (await c.get()).quiz.state === 'question', '17/18 answered, time left: auto refused');
+await new Promise((res) => setTimeout(res, 6700)); // 5 s question + 1.5 s grace
+r = await adv({ auto: true });
+ok(r.ok && (await c.get()).quiz.state === 'reveal', 'auto reveal once time is up (+1.5 s grace)');
+await adv(); await adv();
+st = await c.get();
+ok(st.quiz.state === 'question' && st.quiz.idx === 2, 'question 3 (no step skipped)');
+await Promise.all(S.map((s) => c.spost({ op: 'quizAnswer', sid: s.sid, pin: s.pin, choice: 2 })));
+r = await adv({ auto: true });
+ok(r.ok && (await c.get()).quiz.state === 'reveal', 'auto reveal once everyone answered');
+await adv();
+ok((await c.get()).quiz.state === 'board', 'question 3 → reveal → board');
+ok((await adv()).ok && (await c.get()).quiz.state === 'done', 'board after the last question → done');
+ok(!(await adv()).ok, 'advance refused when done');
+const dva = (await c.get('?view=dealer')).dealer;
+ok(dva.points.filter((e) => e.kind === 'quiz' && e.qi === 1 && e.run === dva.quiz.runId).length === 17, 'advance scores the question');
 done('a-quiz');
