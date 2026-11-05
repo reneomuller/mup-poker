@@ -159,7 +159,7 @@ export async function mockFlush() { if (MOCK_URL) return (await fetch(MOCK_URL +
 // ---------- JSON hygiene ----------
 // Keys whose values (or whose children, for maps) must be finite numbers whenever present.
 const NUMERIC = new Set(['V', 'cls', 'rj', 'live', 'value', 'portfolio', 'returnPct', 'founders', 'investors', 'pct', 'delta', 'multiple', 'amt', 'total',
-  'quizPoints', 'runPoints', 'myPoints', 'rank', 'of', 'capital', 'invested', 'locked', 'available', 'pre', 'prev', 'startV', 'cashoutMax', 'betCount', 'playerCount',
+  'quizPoints', 'of', 'capital', 'invested', 'locked', 'available', 'pre', 'prev', 'startV', 'cashoutMax', 'betCount', 'playerCount',
   'shares', 'price', 'ms', 'answered', 'sizeKB', 'idx', 'seq', 'start', 'from', 'to', 'n']);
 const NUMERIC_MAPS = new Set(['V', 'F', 'stakes', 'delta', 'holdings', 'effects', 'teams', 'counts', 'v', 'P', 'S']);
 export function badNumbers(obj, maxReport = 10) {

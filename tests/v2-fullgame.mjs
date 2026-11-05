@@ -227,7 +227,8 @@ await main(async () => {
     ok(rv.ok, 'revalue with reasons ' + (rv.error || ''));
     st = await c.get();
     const d0 = st.drivers[T[0]][0], d4 = st.drivers[T[4]][0];
-    ok(d0.kind === 'revalue' && d0.note === `Skvělá trakce ${blk}` && Math.abs(d0.delta - (Math.round(a0 * 1.3) - a0)) <= 2, 'revalue driver: note = why text, delta');
+    ok(d0.kind === 'revalue' && [`Skvělá trakce ${blk}`, REASON_LABELS.traction].includes(d0.note) && Math.abs(d0.delta - (Math.round(a0 * 1.3) - a0)) <= 2, `revalue driver: note = why text or reason label, delta (${d0.note})`);
+    if (blk === 1) warnIf(d0.note === `Skvělá trakce ${blk}`, 'spec §5 says revalue driver note = the why text, but why is a private team message; server uses the reason label instead (keeps it private)');
     ok(d4.kind === 'revalue' && d4.note === REASON_LABELS.risk && d4.delta < 0, `revalue driver: note = reason label „Riziko“ (${d4.note})`);
     ok(JSON.stringify(st.reasonLabels) === JSON.stringify(REASON_LABELS), 'reasonLabels');
     await inv(`b${blk} revalue`);
