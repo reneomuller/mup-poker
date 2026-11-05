@@ -104,6 +104,21 @@ async function rHgetall(k) {
 // Mirror writes to Postgres without ever breaking the game if Postgres has a hiccup.
 const mirror = async (fn) => { if (!(redis && q)) return; try { await fn(); } catch (e) { console.error('postgres mirror failed', e?.message); } };
 
+// After a Redis flush the first write to a hash would create it with that one field, and
+// hgetall (which falls back to Postgres only for an empty hash) would then miss the rest.
+// So before writing to a hash Redis doesn't have, copy Postgres's fields back in, with HSETNX
+// so a field another request wrote in the meantime is never overwritten. One EXISTS per write.
+async function refillHash(k) {
+  if (!q || Number(await redis.exists(k))) return;
+  let pm = {};
+  try { pm = await pg.hgetall(k); } catch (e) { console.error('postgres read failed', e?.message); return; }
+  const fields = Object.entries(pm);
+  if (!fields.length) return;
+  const p = redis.pipeline();
+  for (const [f, v] of fields) p.hsetnx(k, f, v);
+  await p.exec();
+}
+
 // ---------- one-time copy Redis -> Postgres (and refill Redis from Postgres) per instance ----------
 // v2: arch / archi (archives + their index), tx (team-authored card texts and round terms).
 // Quiz answers live in one small hash per question (qa:<runId>:<idx>); every write is mirrored as it happens.
@@ -174,7 +189,7 @@ export async function del(key) {
 
 export async function hset(key, field, val) {
   const k = P + key, s = JSON.stringify(val);
-  if (redis) { await sync(); await Promise.all([redis.hset(k, { [field]: s }), mirror(() => pg.hsetMany(k, { [field]: s }))]); return; }
+  if (redis) { await sync(); await refillHash(k); await Promise.all([redis.hset(k, { [field]: s }), mirror(() => pg.hsetMany(k, { [field]: s }))]); return; }
   if (q) { await pg.hsetMany(k, { [field]: s }); return; }
   if (!mem.h.has(k)) mem.h.set(k, new Map());
   mem.h.get(k).set(field, s);
@@ -223,6 +238,7 @@ export async function hsetnx(key, field, val) {
   const k = P + key, s = JSON.stringify(val);
   if (redis) {
     await sync();
+    await refillHash(k);
     let added;
     try { added = Number(await redis.hsetnx(k, field, s)) === 1; } catch {
       // a Redis without HSETNX (test mock): check, then write
