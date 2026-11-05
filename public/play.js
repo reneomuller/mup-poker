@@ -1290,6 +1290,7 @@
     renderHeader(); renderStatus(); renderExit(); renderHero(); renderMsgs(); renderNotes(); renderMain(); renderDock();
     renderPortfolio(); renderCap(); renderStartups(); renderTeam(); renderProfile(); renderBoard(); renderQuiz(); renderDots(); renderReveal();
     syncWall(); runTweens();
+    if (window.PlayRecap) PlayRecap.update(S, me, auth()); // v4 recap: Tým card + auto-open at the final
   }
 
   async function tick() {
