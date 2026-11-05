@@ -75,6 +75,8 @@ const pg = {
     await q('INSERT INTO mup_h (k, f, v) SELECT $1, f, v FROM unnest($2::text[], $3::text[]) AS t(f, v) ON CONFLICT (k, f) DO UPDATE SET v = EXCLUDED.v', [k, fs, fs.map((f) => map[f])]);
   },
   async hdel(k, f) { await ensure(); await q('DELETE FROM mup_h WHERE k = $1 AND f = $2', [k, f]); },
+  async hget(k, f) { await ensure(); const r = await q('SELECT v FROM mup_h WHERE k = $1 AND f = $2', [k, f]); return r[0] ? r[0].v : null; },
+  async hsetnx(k, f, v) { await ensure(); const r = await q('INSERT INTO mup_h (k, f, v) VALUES ($1, $2, $3) ON CONFLICT (k, f) DO NOTHING RETURNING f', [k, f, v]); return r.length > 0; },
   async hgetall(k) { await ensure(); const out = {}; for (const r of await q('SELECT f, v FROM mup_h WHERE k = $1', [k])) out[r.f] = r.v; return out; },
   async logMany(lines) {
     if (!lines.length) return;
@@ -103,7 +105,9 @@ async function rHgetall(k) {
 const mirror = async (fn) => { if (!(redis && q)) return; try { await fn(); } catch (e) { console.error('postgres mirror failed', e?.message); } };
 
 // ---------- one-time copy Redis -> Postgres (and refill Redis from Postgres) per instance ----------
-const HASHES = ['players', 'slip:1', 'slip:2', 'slip:3', 'slip:4', 'slip:5', 'qs', 'qv', 'qr'];
+// v2: arch / archi (archives + their index), tx (team-authored card texts and round terms).
+// Quiz answers live in one small hash per question (qa:<runId>:<idx>); every write is mirrored as it happens.
+const HASHES = ['players', 'slip:1', 'slip:2', 'slip:3', 'slip:4', 'slip:5', 'qs', 'qv', 'qr', 'arch', 'archi', 'tx'];
 let synced = null;
 function sync() {
   if (!(redis && q)) return null;
@@ -199,6 +203,43 @@ export async function hgetall(key) {
   const out = {};
   for (const [f, v] of Object.entries(rawMap)) out[f] = parse(v);
   return out;
+}
+
+export async function hget(key, field) {
+  const k = P + key;
+  if (redis) {
+    let v = null;
+    try { v = raw(await redis.hget(k, field)); } catch { v = (await hgetall(key))[field]; return v === undefined ? null : v; }
+    if (v == null && q) { try { v = await pg.hget(k, field); } catch (e) { console.error('postgres read failed', e?.message); } }
+    return parse(v);
+  }
+  if (q) return parse(await pg.hget(k, field));
+  const v = mem.h.get(k)?.get(field);
+  return v == null ? null : JSON.parse(v);
+}
+
+// Write a field only if it is not there yet. Returns true when this call wrote it.
+export async function hsetnx(key, field, val) {
+  const k = P + key, s = JSON.stringify(val);
+  if (redis) {
+    await sync();
+    let added;
+    try { added = Number(await redis.hsetnx(k, field, s)) === 1; } catch {
+      // a Redis without HSETNX (test mock): check, then write
+      const cur = await rHgetall(k);
+      if (field in cur) return false;
+      await redis.hset(k, { [field]: s });
+      added = true;
+    }
+    if (added) await mirror(() => pg.hsetMany(k, { [field]: s }));
+    return added;
+  }
+  if (q) return pg.hsetnx(k, field, s);
+  if (!mem.h.has(k)) mem.h.set(k, new Map());
+  const m = mem.h.get(k);
+  if (m.has(field)) return false;
+  m.set(field, s);
+  return true;
 }
 
 // Append-only action log. Never throws: logging must not break the game.
