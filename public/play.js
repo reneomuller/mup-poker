@@ -89,6 +89,7 @@
   // v3 live numbers: projected (…Now) fields while class trades are pending, v2 fields as a fallback
   const Vn = (t) => (t && (t.Vnow ?? t.V)) || 0;
   const PF = () => me.portfolioNow ?? me.portfolio;
+  const INV = () => !!(me.invested || Object.values(me.stakesNow || {}).some((v) => v > 0));
   const SK = (id) => ((me.stakesNow || me.stakes || {})[id] || 0);
   const pendingLive = () => (S.phase === 'betting' || S.phase === 'closed') && S.teams.some((t) => t.Vnow != null && t.Vnow !== t.V);
   // tweened numbers: render with tw(), runTweens() animates from the last shown value after each render
@@ -262,15 +263,15 @@
     ava.style.setProperty('--tc', t.color);
     morph($('who'), `${esc(me.name)}${me.ghost ? ' <span class="s-badge s-warn">Ghost</span>' : ''}`);
     morph($('myteam'), `${dot(t.color)}<span>${esc(t.name)}</span>`);
-    const v = PF() || (me.invested ? 0 : me.rules.capital || 0);
+    const v = PF() || (INV() ? 0 : me.rules.capital || 0);
     const pf = $('pfv');
     if (pfShown !== null && pfShown !== v) { pf.classList.remove('p-bump'); void pf.offsetWidth; pf.classList.add('p-bump'); }
     pfShown = v;
     pf.dataset.tw = 'hdrpf'; pf.dataset.v = Math.round(v); pf.dataset.f = 'M';
     if (twLast.hdrpf == null) pf.textContent = fmtM(v);
-    const up = me.invested && PF() >= me.start;
-    pf.classList.toggle('s-up', !!(me.invested && up && PF() > me.start));
-    pf.classList.toggle('s-down', !!(me.invested && !up));
+    const up = INV() && PF() >= me.start;
+    pf.classList.toggle('s-up', !!(INV() && up && PF() > me.start));
+    pf.classList.toggle('s-down', !!(INV() && !up));
   }
 
   function phaseTexts() {
@@ -746,7 +747,7 @@
   function renderPortfolio() {
     const others = S.teams.filter((t) => t.id !== me.team);
     let head;
-    if (me.invested) {
+    if (INV()) {
       const pl = PF() - me.start, p = (pl / me.start) * 100, up = pl >= 0;
       const [svg, labels] = sparkHTML();
       head = `<div class="s-card p-card p-pfcard"><div class="p-pfpanel ${up ? 'up' : 'down'}">${svg}
@@ -891,7 +892,7 @@
       <div class="p-tm-h"><span class="p-su-ic">${esc(initials(t.name))}</span><div class="p-tm-n"><div class="s-label">Tvůj tým</div><h2 class="s-h2">${esc(m?.name || t.name)}</h2></div>
         ${rank ? `<span class="p-tm-rank"><b class="s-num">#${esc(rank)}</b><small> z${NB}${esc(of)}</small></span>` : ''}</div>
       <div class="p-tm-v"><span class="p-tm-big">${tw('tmV', Vnow)}</span>${chgP != null && Math.abs(chgP) >= 0.05 ? `<span class="p-tm-chg ${chgP > 0 ? 's-up' : 's-down'}">${chgP > 0 ? '▲' : '▼'}${NB}${esc(pct(Math.abs(chgP), Math.abs(chgP) < 10 ? 1 : 0))}</span>` : ''}</div>
-      <div class="p-tm-sub">${live ? '<span class="p-live"><i></i>živě</span> ' : ''}<span class="s-label">${live ? 'ocenění po tomto bloku, jak to teď vypadá' : 'ocenění'}</span></div>
+      <div class="p-tm-sub">${live ? '<span class="p-live"><i></i>živě</span><span>ocenění po tomto bloku, jak to teď vypadá</span>' : '<span>ocenění</span>'}</div>
       <div class="p-stats p-stats-3">
         <div class="s-stat p-stat"><span class="s-label">Zakladatelé</span><span class="s-v">${founders != null ? esc(pct(founders)) : '–'}</span></div>
         <div class="s-stat p-stat"><span class="s-label">Investoři</span><span class="s-v">${invN != null ? esc(num(invN)) : '–'}</span></div>
