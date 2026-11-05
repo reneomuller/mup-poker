@@ -18,7 +18,7 @@ const c = client();
 await c.dealer('reset', { confirm: 'RESET', keepPlayers: false });
 let st = await c.get();
 const T = st.teams.map((t) => t.id);
-ok(JSON.stringify(st.features) === JSON.stringify({ captable: true, cards: true, drivers: true, track: true, quiz: true, points: true, rounds: false, market: false, tranches: false, exit: false, wall: true, demand: true, startupPage: true, quizplus: true, wallplus: true, recap: true, sound: true }), 'feature defaults');
+ok(JSON.stringify(st.features) === JSON.stringify({ captable: true, cards: true, drivers: true, track: true, quiz: true, points: true, rounds: false, market: false, tranches: false, exit: false, wall: true, demand: true, startupPage: true, quizplus: true, wallplus: true, recap: true, regie: true, sound: true }), 'feature defaults');
 ok(st.reasonLabels.traction === 'Trakce' && st.milestoneDefs.length === 9 && st.milestoneDefs[0].key === 'm1a' && st.milestoneDefs[0].label === 'Potvrzený problém a one-liner', 'reason labels and milestone defaults');
 let r = await c.dealer('features', { set: { market: true, bogus: true, quiz: false } });
 st = await c.get();
