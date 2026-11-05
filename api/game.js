@@ -1057,7 +1057,9 @@ export default async function handler(req, res) {
       const bd = { qs, qv, qr };
       const view = url.searchParams.get('view');
       if (view === 'archives' || view === 'archive' || view === 'data') {
-        if (!dealerOk(req)) return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
+        // v3: the data view carries every team's wall, so (like the wall view) it needs the x-dealer header
+        // even on an open dealer – a plain browser visit to the URL shows nothing
+        if (!dealerOk(req) || (view === 'data' && req.headers['x-dealer'] === undefined)) return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
         if (view === 'archives') return send(res, 200, { ok: true, archives: await A.listArchives() });
         if (view === 'archive') {
           const archive = await A.getArchive(url.searchParams.get('id'));
@@ -1078,7 +1080,7 @@ export default async function handler(req, res) {
           const p = players[wsid];
           if (!p || !p.pin || p.pin !== pinHash(p.id, String(req.headers['x-pin'] || ''))) return send(res, 401, { ok: false, error: 'Přihlas se znovu.', relogin: true });
           viewer = { role: 'student', p };
-        } else if (dealerOk(req)) viewer = { role: 'dealer' };
+        } else if (req.headers['x-dealer'] !== undefined && dealerOk(req)) viewer = { role: 'dealer' }; // header required even on an open dealer
         else return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
         const r = await W.view(meta, viewer, url.searchParams.get('team'));
         return send(res, r.status, r.body);
