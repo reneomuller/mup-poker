@@ -109,7 +109,7 @@
         <div class="s-label rc-in">Nejlepší tah</div>
         <div class="rc-in">${tchip(b.team, b.teamName)}</div>
         <div class="rc-mult rc-in ${b.multiple >= 1 ? 'up' : 'down'}">${esc(mult(b.multiple))}</div>
-        <p class="rc-sub rc-in">Blok ${esc(b.block)} · ${esc(short(b.amt))} → ${esc(short(b.amt * b.multiple))}</p>
+        <p class="rc-sub rc-in">Blok ${esc(b.block)} · ${esc(short(b.amt))} → ${esc(short(b.amt + (b.gain ?? b.amt * (b.multiple - 1))))}</p>
         ${why(b.why)}
         ${w ? `<div class="rc-worst rc-in"><span class="s-label">Nejhorší tah</span><div>${tchip(w.team, w.teamName)} <b class="s-down">${esc(mult(w.multiple))}</b> <small>Blok ${esc(w.block)} · ${esc(short(w.amt))}</small></div></div>` : ''}` });
     }
