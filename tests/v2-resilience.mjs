@@ -160,7 +160,7 @@ await main(async () => {
     await mock.flush();
     ok((await c.dealer('nextBlock')).ok, 'nextBlock after a second flush');
     const a3 = (await c.dget('?view=archives')).archives || [];
-    ok(a3.some((x) => x.label === 'Před blokem 2') && a3.some((x) => x.label === 'Před flushem'), 'old and new archives listed');
+    ok(a3.some((x) => x.label === 'Před blokem 2') && a3.some((x) => x.label === 'Před flushem'), `old and new archives listed (${a3.map((x) => x.label).join(', ')})`);
     const mes = await Promise.all(S.map((s) => c.me(s)));
     ok(mes.every((x) => x.me && x.me.portfolio > 0), 'every phone still logged in with its portfolio');
     await c.dealer('phase', { phase: 'betting' });
