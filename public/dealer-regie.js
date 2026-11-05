@@ -52,9 +52,12 @@
   function plan() {
     const D = M().D, m = D?.dump?.meta;
     if (m) planCache = m.regie && Array.isArray(m.regie.plan) ? m.regie.plan : null;
-    // no saved plan: today's class = the current block and the next one, then exit / Demo Day
-    const S = M().S;
-    return planCache && planCache.length ? planCache : defaultPlan(S.block, Math.min(S.maxBlock, S.block + 1));
+    if (planCache && planCache.length) return planCache;
+    // no saved plan: today's class = the block it started in and the next one, then exit / Demo Day
+    // (pinned per game on this laptop, so the plan does not shift when the block changes)
+    const S = M().S, l = local();
+    if (!(l.from >= 1) || S.block > l.from + 1 || S.block < l.from) { l.from = S.block; saveLocal(l); }
+    return defaultPlan(l.from, Math.min(S.maxBlock, l.from + 1));
   }
 
   // local per-game state: manual ticks and when each step started
@@ -67,15 +70,14 @@
   function status(st, ticks) {
     const S = M().S, D = M().D, blk = S.block, ph = S.phase;
     const sc = !!D.settled[blk + 'c'], sr = !!D.settled[blk + 'r'];
+    // a running quiz is "now"; model() then ticks it, so it counts as done once the quiz is over
+    if (st.k === 'quiz' && quizLive() && (st.b || blk) === blk && ph !== 'final') return 'now';
     if (ticks.includes(st.id)) return 'done';
     if (st.k === 'final') return ph === 'final' ? 'now' : 'todo';
     if (ph === 'final') return 'done';
     if (st.k === 'custom' || st.k === 'exit') return 'todo';
     const b = st.b || blk;
-    if (st.k === 'quiz') {
-      if (quizLive() && b === blk) return 'now';
-      return b < blk ? 'done' : 'todo';
-    }
+    if (st.k === 'quiz') return b < blk ? 'done' : 'todo';
     if (b < blk) return 'done';
     if (b > blk) return 'todo';
     const started = sc || ['betting', 'closed'].includes(ph);
@@ -119,6 +121,7 @@
     let last = -1;
     rows.forEach((r) => { if (r.s !== 'todo') last = r.i; });
     const now = rows.find((r) => r.s === 'now') || null;
+    if (now && now.st.k === 'quiz' && !ticks.includes(now.st.id)) { l.ticks = [...ticks, now.st.id]; saveLocal(l); }
     let sug = now && ['pitch', 'quiz'].includes(now.st.k) ? now : rows.find((r) => r.i > last && r.s === 'todo') || null;
     if (!sug && now) sug = now;
     const cur = now || sug;
