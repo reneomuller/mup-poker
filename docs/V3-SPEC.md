@@ -120,3 +120,27 @@ w.refresh(); w.setTeam(id); w.destroy();
 - Existing suites that assert fixed-price v2 numbers either switch `demand` off at their start (`features { set: { demand: false } }`) or get their expectations updated. The §11 invariants of V2-SPEC must hold with `demand` on.
 - `tests/run-all.sh -m all -A` must be all green, plus `a-perf` (no extra commands per GET).
 - The real production state must still migrate. Restore the production-shaped dump (19 slips in Block 1, showdown pending) and run the showdown: the valuations must match §1 (Zdravotní pomůcky ≈ 11.94M, Billi ≈ 10.00M, Seeto ≈ 3.20M, Zdravotní přehled ≈ 2.52M, AssetLink ≈ 1.74M, Vestity ≈ 0.82M) and the portfolios must range from about 0.76M to 1.79M.
+
+## 8. Quiz: streak bonus and auto-advance
+
+These are implemented on the `v3-quiz` branch. The base score stays as in V2 §10b. A streak bonus `min(250, 50 × (streak − 1))` is added; a wrong or missing answer resets the streak. A dealer op `quizAdvance { seq, auto? }` steps through lobby → question → reveal → board → next question / `done`. `public/quiz-auto.js` adds a „Další ▶“ button (`#qzadvance`) and an „Automaticky“ checkbox (`#qzauto`) to the Kvíz tab.
+
+## 9. Lost PIN: login QR (dealer → student)
+
+- The dealer op `loginLink { sid }` creates a **one-time token** for that player: 16 random bytes in base64url. Only its hash is stored, as `p.lt = { h, exp }`, valid for 10 minutes. A new link replaces the previous one. The op returns `{ ok, url: '/play#login=<sid>:<token>', exp }`. Ghosts are allowed.
+- The student op `tokenLogin { sid, token }` checks the hash and the expiry, then deletes `p.lt` (one use only). It sets a **new random 4-digit PIN** (`p.pin = pinHash(...)`, as at registration) and returns `{ ok, sid, pin, name, team }`. The phone then stores `mup.sid` / `mup.pin` as at a normal login and shows the new PIN once („Tvůj nový PIN je 4821 – zapamatuj si ho.“). A wrong or expired token returns „Odkaz už neplatí. Požádej o nový.“ and gets the same rate limiting as PIN tries, if any exists.
+- The `resetPin` op stays as it is, as a fallback.
+
+## 10. Dealer preview of the student view (`/play?as=<sid>`)
+
+- Server: a dealer `GET /api/game?as=<sid>` (with `x-dealer`) returns the normal GET, with `me` = `meState` for that player exactly as their phone sees it, plus `asDealer: true`. Under `?view=wall`, a dealer `as=<sid>` returns that player's team wall with the student-shaped fields (`mine` computed for that player). This is read-only: there is no write access as a student.
+- Phone: `/play?as=<sid>` reads the dealer password from `localStorage['mup.dealer']`. It must never read or write `mup.sid` / `mup.pin`, so the device's own student login stays untouched. It renders the full student UI read-only: a sticky banner „Náhled: <jméno> (<tým>) – jen pro čtení“ with a „Zavřít“ button, inputs and buttons disabled, and posts blocked on the client. Without a dealer password it shows a short note with a link to `/dealer`.
+- Admin: in the Hráči tab, add per-player „Náhled“ (opens `/play?as=<sid>` in a new tab) and „QR“ buttons. „QR“ calls `loginLink`, then shows a modal with a large QR code (`/vendor/qrcode.js`, as on the table) of the absolute URL, the URL as text with a copy button, and a countdown to expiry. Do the same in the Nástěnky / Startupy team views: „Náhled týmu“ previews the first non-ghost member.
+
+## 11. Student view on a laptop
+
+`/play` must work well on a laptop, 1280×800 and larger, not only as a phone column:
+- From 1024 px, the bottom tab bar becomes a left sidebar (the same `[data-nav]` buttons).
+- Content gets a wider max width (about 1100 px), with two columns where it helps: Startupy cards in a grid, the Tým header and chart next to Investoři, a wide sticker wall, and Portfolio with the chart next to the stakes.
+- The invest dock and form stay usable with a mouse and keyboard. The quiz tiles become a 2×2 grid at a comfortable size.
+- The phone layout below 1024 px stays unchanged.
