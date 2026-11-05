@@ -204,8 +204,8 @@
     </header>
     <div class="sd-price">
       <div class="sd-big">${X.tw('sdV' + t.id, Vn(t))}</div>
-      <div class="sd-chg">${chgP != null && Math.abs(chgP) >= 0.05 ? `<span class="sd-ch ${chgP > 0 ? 's-up' : 's-down'}">${chgP > 0 ? '▲' : '▼'}${NB}${esc(pct(Math.abs(chgP), Math.abs(chgP) < 10 ? 1 : 0))}</span>` : '<span class="sd-ch s-faint">±0 %</span>'}<span class="s-faint">${live ? 'v tomto bloku' : 'od začátku bloku'}</span>
-        ${showDemand ? `<span class="p-mx sd-dm ${t.mult > 1 ? 's-up' : t.mult < 1 ? 's-down' : ''}" title="Poptávka v tomto bloku">Poptávka ${esc(xmult(t.mult))}</span>` : ''}</div>
+      <div class="sd-chg">${chgP != null && Math.abs(chgP) >= 0.05 ? `<span class="sd-ch ${chgP > 0 ? 's-up' : 's-down'}">${chgP > 0 ? '▲' : '▼'}${NB}${esc(pct(Math.abs(chgP), Math.abs(chgP) < 10 ? 1 : 0))}</span>` : '<span class="sd-ch s-faint">±0 %</span>'}<span class="s-faint">${live ? 'v tomto bloku' : 'od začátku bloku'}</span>
+        ${showDemand ? `<span class="p-mx sd-dm ${t.mult > 1 ? 's-up' : t.mult < 1 ? 's-down' : ''}" title="Poptávka v tomto bloku">Poptávka ${esc(xmult(t.mult))}</span>` : ''}</div>
       ${live ? '<div class="sd-live"><span class="p-lv"><i></i>živě</span><span>ocenění po tomto bloku, jak to teď vypadá</span></div>' : ''}
     </div>`;
     h += chartHTML(t, d);
@@ -249,7 +249,7 @@
       h += `<div class="sd-cur"><span class="p-lv"><i></i>Blok ${esc(cu.block)} běží</span><span>${cu.count ? `${esc(num(cu.count))} ${investorWord(cu.count)} · ${cu.totalIn ? `<b class="s-up">+${esc(fmtM(cu.totalIn))}</b>` : ''}${cu.totalOut ? ` <b class="s-down">−${esc(fmtM(cu.totalOut))}</b>` : ''}` : 'Zatím sem nikdo neposlal peníze.'}</span><small>Jména a důvody uvidíš po showdownu.</small></div>`;
     }
     const bl = d.blocks || [];
-    if (!bl.length) return h + (d.current ? '' : '<p class="p-hint">Zatím tu nikdo neinvestoval. Po prvním showdownu tu uvidíš, kdo a proč.</p>') + '</section>';
+    if (!bl.length) return h + (d.current ? '' : '<p class="p-hint">Zatím tu nikdo neinvestoval. Po prvním showdownu tu uvidíš, kdo a proč.</p>') + '</section>';
     bl.forEach((b, bi) => {
       const inv = b.investors || [];
       const withWhy = inv.filter((v) => v.whyIn || v.whyOut);
@@ -258,7 +258,7 @@
       const k = 'b' + b.block, all = moreOpen.has(k), LIM = bi === 0 ? 6 : 3;
       const shown = all ? list : list.slice(0, LIM);
       h += `<div class="sd-bl" data-key="bl${esc(b.block)}"><div class="sd-bl-h"><b>Blok ${esc(b.block)}</b><span class="s-num">${b.totalIn ? `<span class="s-up">+${esc(fmtM(b.totalIn))}</span>` : ''}${b.totalOut ? ` <span class="s-down">−${esc(fmtM(b.totalOut))}</span>` : ''}${b.mult != null && b.mult !== 1 ? ` <span class="p-mx ${b.mult > 1 ? 's-up' : 's-down'}">${esc(xmult(b.mult))}</span>` : ''}</span></div>
-        ${list.length ? `<ul class="sd-ivs">${shown.map((v) => ivHTML(v, b.block)).join('')}</ul>${list.length > LIM ? `<button type="button" class="sd-more" data-sd="more" data-k="${esc(k)}" aria-expanded="${all}">${all ? 'Méně' : `Všichni investoři (${esc(list.length)})`}</button>` : ''}` : '<p class="p-hint">V tomhle bloku sem nikdo neinvestoval.</p>'}</div>`;
+        ${list.length ? `<ul class="sd-ivs">${shown.map((v) => ivHTML(v, b.block)).join('')}</ul>${list.length > LIM ? `<button type="button" class="sd-more" data-sd="more" data-k="${esc(k)}" aria-expanded="${all}">${all ? 'Méně' : `Všichni investoři (${esc(list.length)})`}</button>` : ''}` : '<p class="p-hint">V tomhle bloku sem nikdo neinvestoval.</p>'}</div>`;
     });
     return h + '</section>';
   }
