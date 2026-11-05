@@ -1536,7 +1536,8 @@
   // ---------- Nástěnky ----------
   let wallW = null, wallTeam = store.get('mup.wallTeam') || 'all', wallSig = '';
   const wallOff = () => !!(S && S.features && S.features.wall === false); // missing key = server without v3 yet: still try
-  const wallRevs = () => (D && (D.wallRev || D.meta?.wallRev)) || (S && S.meta?.wallRev) || (S && S.wallRev && typeof S.wallRev === 'object' ? S.wallRev : null) || null;
+  const wallRevs = () => (D && (D.wallRev || D.meta?.wallRev)) || (S && S.meta?.wallRev) || (S && S.wallRev && typeof S.wallRev === 'object' ? S.wallRev : null)
+    || (S && S.teams && S.teams.some((t) => t.wallRev != null) ? Object.fromEntries(S.teams.map((t) => [t.id, t.wallRev || 0])) : null);
   const wallSeen = (() => { try { return JSON.parse(store.get('mup.wallSeen') || '{}') || {}; } catch { return {}; } })();
   const saveSeen = () => store.set('mup.wallSeen', JSON.stringify(wallSeen));
   const wallUnread = (id) => { const r = wallRevs(); if (!r) return 0; return Math.max(0, (Number(r[id]) || 0) - (Number(wallSeen[id]) || 0)); };
