@@ -83,6 +83,7 @@
     ['exit', 'Exit', 'Finále: akvizice, IPO nebo odpis a konečné pořadí investorů.'],
     ['demand', 'Cena podle poptávky', 'Jako na burze: po showdownu se cena startupu změní podle toho, kolik peněz přilákal oproti ostatním.'],
     ['quizplus', 'Kvíz+', 'Vysvětlení po odhalení, otázky za ×2, obrázky, stupně vítězů, počítadlo v\u00a0lobby a export výsledků.'],
+    ['sound', 'Zvuk na plátně', 'Znělky kvízu, zvonek při otevření trhu a vířivý buben u\u00a0showdownu. Hraje jen projektor (tlačítko 🔊 v\u00a0rohu), mobily jsou vždy potichu.'],
     ['wall', 'Nástěnky týmů', 'Každý tým má soukromou nástěnku s\u00a0otázkami a úkoly od vás i od svých členů.'],
     ['startupPage', 'Detail startupu', 'Klepnutím na startup v\u00a0mobilu se otevře detail: graf ocenění, čísla, karta a proč do něj spolužáci investovali.'],
     ['wallplus', 'Nástěnky+', 'Reakce, připnutí, označená odpověď, termín a řešitel úkolu, šablony a filtry na nástěnkách.'],

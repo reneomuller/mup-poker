@@ -14,6 +14,7 @@ export const FEATURE_DEFAULTS = {
   wallplus: true, // v4: reactions, pins, accepted answers, task due/assignee, templates on the team walls
   recap: true, // v4: end-of-game recap on the phone + class report (GET ?view=recap / ?view=report)
   regie: true, // v4 regie: run-of-show, class health, presence, nudges, shortcuts on /dealer
+  sound: true, // v4 sound lane: quiz/investing jingles on the projector only (phones stay silent)
 };
 export const OFF = 'Tato funkce je vypnutá.';
 export const REASON_LABELS = { milestone: 'Splněný milník', traction: 'Trakce', team: 'Tým', risk: 'Riziko', market: 'Trh', other: 'Jiné' };
