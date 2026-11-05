@@ -6,6 +6,7 @@ import * as F from './_lib/features.js';
 import * as Q from './_lib/quiz.js';
 import * as E from './_lib/economy.js';
 import * as A from './_lib/archive.js';
+import * as AC from './_lib/access.js';
 
 // Dealer is open (no password) unless DEALER_LOCK=1 and DEALER_PASSWORD are set in Vercel.
 const DEALER_PW = process.env.DEALER_LOCK === '1' ? process.env.DEALER_PASSWORD || 'mup-dealer' : '';
@@ -343,6 +344,11 @@ async function studentAction(b) {
     await S.hset('players', id, { id, name, team: b.team, pin: pinHash(id, b.pin), created: Date.now() });
     invalidate();
     return ok({ sid: id });
+  }
+  if (b.op === 'tokenLogin') { // v3 §9: one-time login QR from the dealer
+    const r = await AC.tokenLogin(b, meta.removed, pinHash);
+    invalidate();
+    return r.error ? fail(r.error, { relogin: true }) : ok(r);
   }
   if (b.op === 'restore') {
     const sid = String(b.sid || '');
@@ -946,6 +952,11 @@ async function dealerAction(b) {
       await save();
       return ok();
     }
+    case 'loginLink': { // v3 §9: one-time login QR for a student who lost the PIN
+      const r = await AC.loginLink(players, b.sid);
+      invalidate();
+      return r.error ? fail(r.error) : ok(r);
+    }
     case 'resetPin': {
       const p = players[b.sid];
       if (!p) return fail('Hráč nenalezen.');
@@ -1038,6 +1049,8 @@ export default async function handler(req, res) {
         if (p && p.pin && p.pin === pinHash(p.id, pin)) out.me = meState(meta, p, slips, bd, players, qa);
         else out.meError = p ? 'pin' : 'unknown';
       }
+      const asP = AC.asPlayer(req, players); // v3 §10: dealer preview, GET ?as=<sid> with x-dealer
+      if (asP) { out.me = meState(meta, asP, slips, bd, players, qa); out.asDealer = true; delete out.meError; }
       if (url.searchParams.get('view') === 'log' && dealerOk(req)) {
         return send(res, 200, { ok: true, storage: S.storageMode, pgEnv: S.pgEnvKey, log: await S.readLog(Number(url.searchParams.get('limit')) || 5000) });
       }
@@ -1061,7 +1074,7 @@ export default async function handler(req, res) {
     }
     if (req.method === 'POST') {
       const b = await readBody(req);
-      const studentOps = ['register', 'login', 'notes', 'submit', 'reasons', 'restore', 'ask', 'vote', 'answer', 'react', 'quizAnswer'];
+      const studentOps = ['register', 'login', 'tokenLogin', 'notes', 'submit', 'reasons', 'restore', 'ask', 'vote', 'answer', 'react', 'quizAnswer'];
       let r;
       // card / roundTerms exist for both: with a sid it is a student editing their own team
       // restore with a `dump` is the dealer's backup push (before v2 it was routed to the phones' restore and never ran)
@@ -1073,7 +1086,7 @@ export default async function handler(req, res) {
       }
       if (b.op !== 'auth') {
         // action log: what every student / the dealer sent, without PINs and big backup blobs
-        const { pin, dump, ...rest } = b;
+        const { pin, dump, token, ...rest } = b;
         await S.logAction({ ts: Date.now(), op: b.op, actor: student ? b.sid || r.body.sid || '' : 'dealer', ok: !!r.body.ok, error: r.body.ok ? undefined : r.body.error, body: rest, sid: r.body.sid });
       }
       if (!student && r.body.ok) r.body.dump = await makeDump();
