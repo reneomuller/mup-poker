@@ -2,7 +2,7 @@
 (function () {
   const T = window.TBL;
   if (!T) return;
-  const { $, esc, setText, setHTML, toggle, team, on } = T;
+  const { $, esc, typo, setText, setHTML, toggle, team, on } = T;
   const tx = MUP.t;
   MUP.addTexts({
     'table.quiz.kick': 'Kvíz',
@@ -54,7 +54,7 @@
     const k = JSON.stringify([q.q, q.a]);
     if (box._k !== k) {
       box._k = k;
-      box.innerHTML = (q.a || []).map((a, i) => `<div class="qz-tile c${i}" data-quiz="${i}" style="--d:${i * 90}ms"><i class="qz-bar"></i><span class="qz-l">${L[i]}</span><span class="qz-a">${esc(a)}</span><span class="qz-n"></span></div>`).join('');
+      box.innerHTML = (q.a || []).map((a, i) => `<div class="qz-tile c${i}" data-quiz="${i}" style="--d:${i * 90}ms"><i class="qz-bar"></i><span class="qz-l">${L[i]}</span><span class="qz-a">${esc(typo(a))}</span><span class="qz-n"></span></div>`).join('');
     }
     const max = reveal ? Math.max(1, ...(q.counts || [])) : 1;
     const sum = reveal ? (q.counts || []).reduce((a, b) => a + b, 0) : 0;
@@ -129,8 +129,8 @@
     if (mode === 'board') { board(s, q); return; }
     // question / reveal
     const qt = el.querySelector('.qz-qt');
-    if (qt._t !== q.q) {
-      setText(qt, q.q || '');
+    if (qt._t !== typo(q.q || '')) {
+      setText(qt, typo(q.q || ''));
       const len = (q.q || '').length;
       qt.style.fontSize = len > 120 ? '3rem' : len > 80 ? '3.5rem' : '4rem';
     }

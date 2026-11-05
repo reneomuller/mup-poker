@@ -83,10 +83,15 @@
     }
     if (tweens.size) raf = requestAnimationFrame(frame);
   }
+  // Czech typography for text shown big: no line break inside numbers, before % / $, or after one-letter prepositions
+  const typo = (str) => String(str ?? '')
+    .replace(/(\d) (?=\d{3}(\D|$))/g, '$1\u00a0')
+    .replace(/(\d) (?=[%$])/g, '$1\u00a0')
+    .replace(/(^|[\s(„])([vkszouaiVKSZOUAI]) /g, '$1$2\u00a0');
   const team = (s, id) => (s.teams || []).find((t) => t.id === id) || { id, name: '', color: '#888' };
   const on = (s, k) => !!(s.features && s.features[k]);
   const rem = () => Math.min(innerWidth / 100, innerHeight / 56.25);
-  window.TBL = { $, esc, fmtM, pct, num1, mult, nb, setText, setHTML, toggle, fit, tween, team, on, rem, sleep, stage, screens: [], state: () => S };
+  window.TBL = { $, esc, typo, fmtM, pct, num1, mult, nb, setText, setHTML, toggle, fit, tween, team, on, rem, sleep, stage, screens: [], state: () => S };
 
   function playUrl() { return location.origin + '/play'; }
   function qrSvg(text) {
@@ -283,8 +288,8 @@
       const big = $('mbig');
       const chips = s.teams.filter((t) => fx[t.id]).map((t) => `<span class="${fx[t.id] < 0 ? 'neg' : ''}"><i style="background:${t.color}"></i>${esc(t.name)} ${pct(fx[t.id])}</span>`).join('');
       big.innerHTML = `<div class="pcard"><div class="back"></div><div class="face">
-        <div class="mk">${esc(tx('table.market.kick'))}</div><div class="mt">${esc(r.title || card.title || '')}</div>
-        <div class="mx">${esc(r.text || card.text || '')}</div>${chips ? `<div class="mfx">${chips}</div>` : ''}</div></div>`;
+        <div class="mk">${esc(tx('table.market.kick'))}</div><div class="mt">${esc(typo(r.title || card.title || ''))}</div>
+        <div class="mx">${esc(typo(r.text || card.text || ''))}</div>${chips ? `<div class="mfx">${chips}</div>` : ''}</div></div>`;
       big.classList.remove('hidden');
       big.getAnimations().forEach((a) => a.cancel());
       big.animate([{ transform: 'translateY(-60vh) rotate(-6deg)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 700, easing: 'cubic-bezier(.2,.8,.2,1)' });
@@ -344,7 +349,7 @@
     const slots = [...shown];
     while (slots.length < 3) slots.push(null);
     board.innerHTML = slots.map((c, i) => c
-      ? `<div class="mcard ${i === shown.length - 1 ? 'newest' : ''}"><div class="pcard up"><div class="back"></div><div class="face"><div class="mk">${esc(tx('table.market.kick'))}</div><div class="mt">${esc(c.title)}</div></div></div></div>`
+      ? `<div class="mcard ${i === shown.length - 1 ? 'newest' : ''}"><div class="pcard up"><div class="back"></div><div class="face"><div class="mk">${esc(tx('table.market.kick'))}</div><div class="mt">${esc(typo(c.title))}</div></div></div></div>`
       : `<div class="mcard empty"><div class="pcard"><div class="back"></div><div class="face"></div></div></div>`).join('');
   }
 
@@ -412,6 +417,7 @@
   function renderSeats(s, animate) {
     const leader = [...s.teams].sort((a, b) => b.V - a.V)[0]?.id;
     const cap = on(s, 'captable'), rounds = on(s, 'rounds');
+    const rx = rjDelta(s);
     s.teams.forEach((t) => {
       const e = seatEls[t.id];
       if (!e) return;
@@ -449,9 +455,8 @@
         tween(e.val, t.V, fmtM, animate ? 900 : 0);
         renderStack(e.stack, Math.max(0, t.cls + lv), t.rj);
       }
-      fit(e.val, 0.75);
+      if (e.val._fitT !== e.val._t) { e.val._fitT = e.val._t; fit(e.val, 0.75); }
       const card = e.spot.querySelector('.rjcards .pcard:last-child');
-      const rx = rjDelta(s);
       if (!rx && !busy) card.classList.remove('up');
       if (rx && !busy) {
         const face = rjFace(rx[t.id] || 0);
@@ -622,7 +627,7 @@
     const L = (s.leaders || []).slice(0, nInv);
     if (!L.length) { setHTML(inv, `<li class="empty muted">${esc(tx('table.board.noInvestors'))}</li>`); inv._rows = null; inv.style.height = ''; }
     else {
-      if (!inv._rows) inv.innerHTML = '';
+      if (!inv._rows) { inv.innerHTML = ''; inv._h = null; }
       keyedList(inv, L.map((l) => ({ key: l.name + '|' + l.team, l })), 4.4, ({ l }, i) => {
         const t = team(s, l.team);
         const ret = track && l.returnPct != null ? `<b class="${l.returnPct > 0 ? 'up' : l.returnPct < 0 ? 'down' : 'muted'}">${pct(l.returnPct)}</b>` : '';
@@ -636,7 +641,7 @@
       const P = s.points.leaders.slice(0, n);
       const ol = $('pts');
       if (!P.length) { setHTML(ol, `<li class="empty muted">${esc(tx('table.board.noPoints'))}</li>`); ol._rows = null; ol.style.height = ''; return; }
-      if (!ol._rows) ol.innerHTML = '';
+      if (!ol._rows) { ol.innerHTML = ''; ol._h = null; }
       keyedList(ol, P.map((p) => ({ key: p.name + '|' + p.team, p })), 2.9, ({ p }, i) => {
         const t = team(s, p.team);
         return `<span class="pn one"><i>${i + 1}.</i> <span class="dot" style="background:${t.color}"></span>${esc(p.name)}</span><span class="pp">${esc(nb((p.total || 0).toLocaleString('cs-CZ')))}</span>`;
@@ -658,8 +663,9 @@
     const html = items.map((d) => {
       const t = team(s, d.team);
       const kind = tx('table.driver.' + d.kind) !== 'table.driver.' + d.kind ? tx('table.driver.' + d.kind) : d.kind;
-      const note = d.note && d.note !== kind ? ' · ' + esc(d.note) : '';
-      return `<span class="tk"><span class="dot" style="background:${t.color}"></span><b>${esc(t.name)}</b> <span class="${d.delta < 0 ? 'down' : 'up'}">${d.delta < 0 ? '▼' : '▲'} ${esc(sign(d.delta || 0))}</span> <span class="tkk">${esc(kind)}${note}</span></span>`;
+      const note = String(d.note || '').trim();
+      const label = !note || d.kind === 'class' ? kind : note.toLowerCase().includes(String(kind).toLowerCase()) ? note : kind + ' · ' + note;
+      return `<span class="tk"><span class="dot" style="background:${t.color}"></span><b>${esc(t.name)}</b> <span class="${d.delta < 0 ? 'down' : 'up'}">${d.delta < 0 ? '▼' : '▲'} ${esc(sign(d.delta || 0))}</span> <span class="tkk">${esc(label)}</span></span>`;
     }).join('');
     const strip = $('tkstrip');
     if (setHTML(strip, html + html)) {
@@ -671,7 +677,7 @@
   }
 
   // ---------- notes clouds ----------
-  const SLOTS = [[36, 31], [64, 31], [36, 64], [64, 64], [50, 47], [50, 21], [27, 47], [73, 47], [38, 80], [62, 80], [22, 31], [78, 64]];
+  const SLOTS = [[33, 31], [67, 64], [67, 31], [33, 64], [50, 47], [50, 21], [27, 47], [73, 47], [38, 80], [62, 80], [22, 31], [78, 64]];
   const cloudEls = new Map();
   function cloudSize(p) {
     const a = Math.abs(p.amt || 0), n = (p.a || '').length;
@@ -690,7 +696,7 @@
     if (!q) { el.classList.add('hidden'); return; }
     const t = team(s, q.team);
     el.innerHTML = `<div class="qph"><span class="dot" style="background:${t.color}"></span><span>Otázka pro <b>${esc(t.name)}</b></span><span class="qpc">${esc((s.qcats || {})[q.cat] || '')}</span><span class="qpv">▲ ${q.votes}</span></div>
-      <div class="qpt">${esc(q.text)}</div>${q.answer ? `<div class="qpa">${esc(q.answer.text)}</div>` : ''}`;
+      <div class="qpt">${esc(typo(q.text))}</div>${q.answer ? `<div class="qpa">${esc(typo(q.answer.text))}</div>` : ''}`;
     el.classList.remove('hidden');
   }
 
@@ -706,7 +712,7 @@
         el.className = 'cloud ' + cloudSize(p);
         const amt = p.amt ? `<span class="camt ${p.amt < 0 ? 'neg' : ''}">${p.amt < 0 ? '−' : '+'}${esc(fmtM(Math.abs(p.amt)))}</span>` : '';
         el.innerHTML = `<div class="ch"><span class="dot" style="background:${t.color}"></span><b>${esc(t.name)}</b>${amt}</div>
-          <div class="cq">${esc(p.q)}</div><div class="ca">${esc(p.a)}</div>`;
+          <div class="cq">${esc(p.q)}</div><div class="ca">${esc(typo(p.a))}</div>`;
         el.style.setProperty('--tc', t.color);
         el.style.setProperty('--r', ((((p.id.charCodeAt(0) + p.id.charCodeAt(1)) % 7) - 3) * 0.8) + 'deg');
         box.appendChild(el);
@@ -736,7 +742,7 @@
       <div class="aw-kind">${esc(kind)}</div>
       <div class="aw-name">${esc(a.name || '')}</div>
       <div class="aw-team"><span class="dot" style="background:${t.color}"></span>${esc(t.name)}</div>
-      ${a.note ? `<div class="aw-note">${esc(a.note)}</div>` : ''}</div>`;
+      ${a.note ? `<div class="aw-note">${esc(typo(a.note))}</div>` : ''}</div>`;
     el.classList.remove('hidden', 'out');
     await sleep(8000);
     el.classList.add('out');

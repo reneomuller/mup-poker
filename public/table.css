@@ -63,6 +63,7 @@ body {
 .glasswrap.over .clock { color: #ffb4ba; animation: blink 1s steps(2) infinite; }
 .glasswrap.low .clock { color: #ffd59a; }
 @keyframes blink { 50% { opacity: .3; } }
+.qrbox { animation: potin .6s ease-out both; }
 .qrbox .qrimg { width: 9rem; margin: 0 auto; background: #fff; padding: .45rem; border-radius: .6rem; box-shadow: 0 .6rem 1.6rem rgba(0,0,0,.6); }
 .qrbox .qrimg svg { width: 100%; height: auto; display: block; }
 .qrbox .qrl { font-size: 1.45rem; font-weight: 700; color: var(--gold-2); margin-top: .5rem; line-height: 1.15; }
@@ -152,17 +153,17 @@ body {
 .tranche .tl svg { width: 1.1rem; height: 1.25rem; flex: none; }
 
 /* ---------- community cards ---------- */
-.board { position: absolute; left: 50%; top: 38.5%; transform: translate(-50%, -50%); display: flex; gap: 1rem; z-index: 3; }
-.board .pcard { width: 5.8rem; height: 8.1rem; border-radius: .55rem; }
+.board { position: absolute; left: 50%; top: 38.5%; transform: translate(-50%, -50%); display: flex; gap: .7rem; z-index: 3; }
+.board .pcard { width: 6.4rem; height: 8.9rem; border-radius: .6rem; }
 .board .pcard .back { border-width: .3rem; }
 .board .pcard .face { padding: .35rem; }
-.board .pcard .face .r { position: absolute; left: .45rem; top: .35rem; font-size: 1.1rem; font-weight: 900; line-height: 1; text-align: center; }
-.board .pcard .face .r2 { left: auto; top: auto; right: .45rem; bottom: .35rem; transform: rotate(180deg); }
+.board .pcard .face .r { position: absolute; left: .4rem; top: .3rem; font-size: 1.45rem; font-weight: 900; line-height: .95; text-align: center; }
+.board .pcard .face .r2 { left: auto; top: auto; right: .4rem; bottom: .3rem; transform: rotate(180deg); }
 .board .pcard .face > div { text-align: center; }
-.board .pcard .face .c { font-size: 1.05rem; letter-spacing: .04em; margin-top: .3rem; font-weight: 800; text-transform: uppercase; font-family: var(--sans); }
-.board .pcard .face .s { font-size: 2.6rem; line-height: 1; }
+.board .pcard .face .c { font-size: 1.45rem; margin-top: .2rem; font-weight: 800; font-family: var(--sans); white-space: nowrap; }
+.board .pcard .face .s { font-size: 2.8rem; line-height: 1; }
 .board .pcard.red .face { color: #c0262f; }
-.board .pcard.cur { box-shadow: 0 0 0 .22rem var(--gold-2), 0 0 2.4rem rgba(232,205,134,.55); border-radius: .55rem; }
+.board .pcard.cur { box-shadow: 0 0 0 .22rem var(--gold-2), 0 0 2.4rem rgba(232,205,134,.55); border-radius: .6rem; }
 /* market cards as community cards */
 .board.market { gap: .9rem; }
 .board .mcard { width: 9.4rem; height: 12.4rem; border-radius: .7rem; perspective: 60rem; }
@@ -188,7 +189,8 @@ body {
 .mbig .mfx i { display: inline-block; width: .9rem; height: .9rem; border-radius: 50%; margin-right: .45rem; vertical-align: .05rem; }
 
 /* ---------- pot ---------- */
-.pot { position: absolute; left: 50%; top: 61%; width: 22rem; height: 8.4rem; transform: translate(-50%, -50%); z-index: 3; transition: opacity .5s; }
+.pot { position: absolute; left: 50%; top: 61%; width: 22rem; height: 8.4rem; transform: translate(-50%, -50%); z-index: 3; transition: opacity .5s; animation: potin .6s ease-out both; }
+@keyframes potin { from { opacity: 0; } }
 .pot .pile { position: absolute; inset: 0; }
 .pot .mini { position: absolute; left: 50%; top: 45%; width: 6rem; height: 2.8rem; border-radius: .28rem;
   background: repeating-linear-gradient(45deg, rgba(232,205,134,.25) 0 1px, transparent 1px 4px), linear-gradient(#1d5a43, #10392a);
