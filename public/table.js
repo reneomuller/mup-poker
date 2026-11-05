@@ -21,7 +21,7 @@
     'table.driver.market': 'Trh',
     'table.driver.exit': 'Exit',
     'table.award.kick': 'Ocenění',
-    'table.award.sharpest': 'Nejostřejší investor',
+    'table.award.sharpest': 'Nejlepší investor',
     'table.award.analyst': 'Analytik bloku',
     'table.award.contrarian': 'Proti proudu',
     'table.award.custom': 'Zvláštní ocenění',
