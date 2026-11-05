@@ -23,7 +23,10 @@ const MAX = () => num('MUP_GUARD_MAX', 8);
 const IP_MAX = () => num('MUP_GUARD_IP_MAX', 30);
 const WIN = () => num('MUP_GUARD_WINDOW_S', 600);
 const RID_TTL = 600;
-const on = (meta) => meta?.features?.guard !== false;
+export const on = (meta) => meta?.features?.guard !== false;
+// A map entry only if it is the map's own (a sid like "__proto__" or "toString" is never a player)
+export const own = (map, k) => (typeof k === 'string' && map && Object.hasOwn(map, k) ? map[k] : undefined);
+export const badKey = (k) => typeof k !== 'string' || k in Object.prototype;
 
 export function clientIp(req) {
   const xf = String(req?.headers?.['x-forwarded-for'] || '').split(',')[0].trim();

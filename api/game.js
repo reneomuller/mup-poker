@@ -360,16 +360,16 @@ async function studentAction(b, req) {
   if (b.op === 'tokenLogin') { // v3 §9: one-time login QR from the dealer
     const r = await AC.tokenLogin(b, meta.removed, pinHash);
     invalidate();
-    if (r.error) return fail((await GU.failed(meta, req, players[String(b.sid || '')])) ? GU.TOO_MANY : r.error, { relogin: true });
+    if (r.error) return fail((await GU.failed(meta, req, GU.own(players, String(b.sid || '')))) ? GU.TOO_MANY : r.error, { relogin: true });
     await GU.clear({ id: r.sid }); // v4 guard: a used login link resets the counter (the lock went with the new PIN)
     return ok(r);
   }
   if (b.op === 'restore') {
     const sid = String(b.sid || '');
-    if (!/^[\w-]{4,24}$/.test(sid) || !/^\d{4}$/.test(String(b.pin || ''))) return fail('Přihlas se znovu.', { relogin: true });
+    if (!/^[\w-]{4,24}$/.test(sid) || GU.badKey(sid) || !/^\d{4}$/.test(String(b.pin || ''))) return fail('Přihlas se znovu.', { relogin: true });
     const sameGame = b.gid === meta.gid || meta.auto;
     if ((meta.removed || []).includes(sid)) return fail('Přihlas se znovu.', { relogin: true });
-    let p = players[sid];
+    let p = GU.own(players, sid); // v4 guard: never Object.prototype (sid "__proto__")
     if (p) {
       if (p.pin && p.pin !== pinHash(sid, b.pin)) return fail((await GU.failed(meta, req, p)) ? GU.TOO_MANY : 'Špatný PIN.', { relogin: true });
       if (GU.locked(meta, p)) return fail(GU.TOO_MANY, { relogin: true });
@@ -388,15 +388,24 @@ async function studentAction(b, req) {
         const cur = blk === meta.block ? slips[sid] : (await S.hgetall('slip:' + blk))[sid];
         const ts = Number(sl.ts) || 0;
         if (cur && (Number(cur.ts) || 0) >= ts) continue;
+        let out = cleanEntries(sl.out, meta), inn = cleanEntries(sl.in, meta);
+        // v4 guard: a phone only brings back what the server lost. A slip the server has changes only while
+        // betting is open, and a sent slip for this block must pass the same checks as submit.
+        if (GU.on(meta) && cur && !(blk === meta.block && meta.phase === 'betting')) continue;
+        if (GU.on(meta) && sl.submitted && blk === meta.block) {
+          const v = G.validate(meta, sid, p.team, { out, in: inn });
+          if (!v.ok) continue;
+          out = v.out; inn = v.in;
+        }
         await S.hset('slip:' + blk, sid, {
-          out: cleanEntries(sl.out, meta), in: cleanEntries(sl.in, meta), notes: cleanNotes(sl.notes, meta), submitted: !!sl.submitted, ts: ts || Date.now(),
+          out, in: inn, notes: cleanNotes(sl.notes, meta), submitted: !!sl.submitted, ts: ts || Date.now(),
         });
       }
     }
     invalidate();
     return ok({ sid });
   }
-  const p = players[b.sid];
+  const p = GU.own(players, b.sid); // v4 guard: own keys only (no "__proto__" player)
   if (!p) return fail('Hráč nenalezen. Přihlas se znovu.', { relogin: true });
   if (!/^\d{4}$/.test(String(b.pin || ''))) return fail('PIN musí mít 4 číslice.');
   if (!p.pin) { p.pin = pinHash(p.id, b.pin); await S.hset('players', p.id, p); invalidate(); }
@@ -501,7 +510,7 @@ async function studentAction(b, req) {
     const slip = slips[p.id];
     if (!slip?.submitted) return fail('Nejdřív investuj.');
     for (const k of ['in', 'out']) {
-      for (const [t, why] of Object.entries(b[k] || {})) if (slip[k]?.[t]) slip[k][t].why = String(why || '').trim().slice(0, 600);
+      for (const [t, why] of Object.entries(b[k] || {})) if (slip[k] && Object.hasOwn(slip[k], t)) slip[k][t].why = String(why || '').trim().slice(0, 600);
     }
     slip.ts = Date.now();
     await S.hset('slip:' + meta.block, p.id, slip);
@@ -1082,7 +1091,7 @@ export default async function handler(req, res) {
         let viewer;
         if (asW) viewer = { role: 'student', p: asW };
         else if (wsid) {
-          const p = players[wsid];
+          const p = GU.own(players, wsid);
           if (!p || !p.pin || p.pin !== pinHash(p.id, String(req.headers['x-pin'] || ''))) return send(res, 401, { ok: false, error: p?.pin && (await GU.failed(meta, req, p)) ? GU.TOO_MANY : 'Přihlas se znovu.', relogin: true });
           if (GU.locked(meta, p)) return send(res, 401, { ok: false, error: GU.TOO_MANY, relogin: true });
           viewer = { role: 'student', p };
@@ -1096,7 +1105,7 @@ export default async function handler(req, res) {
       out.content = content;
       const sid = req.headers['x-sid'], pin = req.headers['x-pin'];
       if (sid && pin) {
-        const p = players[sid];
+        const p = GU.own(players, sid);
         const good = p && p.pin && p.pin === pinHash(p.id, pin);
         if (good && !GU.locked(meta, p)) out.me = meState(meta, p, slips, bd, players, qa, proj);
         else out.meError = !p ? 'unknown' : GU.locked(meta, p) || (!good && p.pin && (await GU.failed(meta, req, p))) ? 'locked' : 'pin'; // v4 guard

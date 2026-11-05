@@ -144,6 +144,27 @@ await main(async () => {
   ok(s1.ok && s2.ok && s2.dup, 'submit with the same rid twice: ok + dup');
   const mp = await c.me(P);
   ok(mp.me?.slip?.submitted && mp.me.slip.in[others[0]].amt === 600000, 'the slip is there once, as sent');
+
+  section('security: prototype keys, restore slips');
+  ok(!(await c.post({ op: 'login', sid: '__proto__', pin: '1234' })).ok, 'login as sid „__proto__“ refused');
+  ok(!(await c.post({ op: 'restore', sid: '__proto__', pin: '1234', name: 'Hacker X', team: T[0] })).ok, 'restore as sid „__proto__“ refused');
+  ok(!(await c.post({ op: 'restore', sid: 'toString', pin: '1234', name: 'Hacker Y', team: T[0] })).ok, 'restore as sid „toString“ refused');
+  const pl = (await c.get()).players || [];
+  ok(pl.every((x) => x && x.id && x.name), 'no junk player in the public list');
+  const polluted = await c.st(P, 'reasons', { in: { ['__proto__']: 'POLLUTED' }, out: {} });
+  ok(polluted.ok !== undefined, 'reasons with a „__proto__“ key answered');
+  const W2 = S[16], o2 = T.filter((t) => t !== W2.team);
+  await c.st(W2, 'submit', { in: { [o2[0]]: { amt: 1000000 } } });
+  const mw = await c.me(W2);
+  ok(mw.me?.slip?.in?.[o2[0]]?.why === '', 'no reason leaks in from a polluted prototype');
+  const Z = S[17], oz = T.filter((t) => t !== Z.team);
+  const fake = await c.post({ op: 'restore', sid: Z.sid, pin: Z.pin, name: Z.name, team: Z.team, gid: (await c.get()).gid, slips: { 1: { in: { [oz[0]]: { amt: 5000000 } }, submitted: true, ts: Date.now() } } });
+  const mz = await c.me(Z);
+  ok(fake.ok && !mz.me?.slip?.submitted, 'restore cannot bring in a slip that fails the submit checks (5 mil. $)');
+  await c.dealer('phase', { phase: 'closed' });
+  const late = await c.post({ op: 'restore', sid: P.sid, pin: P.pin, name: P.name, team: P.team, gid: (await c.get()).gid, slips: { 1: { in: { [others[2]]: { amt: 1000000 } }, submitted: true, ts: Date.now() + 1e7 } } });
+  const mp2 = await c.me(P);
+  ok(late.ok && mp2.me?.slip?.in?.[others[0]]?.amt === 600000 && !mp2.me.slip.in[others[2]], 'after betting closed, restore cannot change a slip the server has');
   await srv.stop();
 
   // ---------- short window: the lock ends by itself ----------

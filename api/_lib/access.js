@@ -57,5 +57,5 @@ export function asPlayer(req, players) {
   const q = req.url && req.url.includes('as=') ? new URL(req.url, 'http://local').searchParams.get('as') : null;
   // the x-dealer header must be sent (even on an open dealer), so a plain GET with as= reveals nothing
   if (!q || req.headers['x-dealer'] === undefined || !isDealer(req)) return null;
-  return players[q] || null;
+  return Object.hasOwn(players, q) ? players[q] : null; // v4 guard: own keys only
 }
