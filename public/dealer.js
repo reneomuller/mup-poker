@@ -1591,13 +1591,14 @@
 
   function renderExports() {
     const b = loadBk();
-    const el = gate('tools', [S.block, b?.meta?.rev, b?.meta?.gid, Object.keys(b?.players || {}).length]);
+    const el = gate('tools', [S.block, b?.meta?.rev, b?.meta?.gid, Object.keys(b?.players || {}).length, S.features?.recap]);
     if (!el) return;
     el.innerHTML = `<div class="ch"><h3>${E('dealer.sec.tools')}</h3></div>
       <div class="dlist">
         <button class="s-btn s-sm s-ghost" id="csv">Stáhnout všechny investice (CSV)</button>
         <button class="s-btn s-sm s-ghost" id="logdl">Stáhnout log všech akcí (JSON)</button>
         <button class="s-btn s-sm s-ghost" id="bkdl">Stáhnout zálohu z tohoto notebooku</button>
+        ${S.features?.recap !== false ? '<a class="s-btn s-sm s-ghost" href="/report" target="_blank" rel="noopener">Třídní report (tisk / CSV)</a>' : ''}
       </div>
       <p class="hint">Záloha v tomto prohlížeči: ${b ? `revize ${esc(b.meta?.rev ?? '?')}, ${Object.keys(b.players || {}).length} hráčů, ${Object.keys(b.slips || {}).length} ${pl(Object.keys(b.slips || {}).length, 'blok', 'bloky', 'bloků')} investic` : 'zatím žádná'}. Když server hru zapomene, tato stránka ji sama vrátí.</p>`;
     $('csv').onclick = exportCSV;

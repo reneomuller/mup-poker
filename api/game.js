@@ -11,6 +11,7 @@ import * as W from './_lib/wall.js';
 import * as D from './_lib/demand.js';
 import * as AC from './_lib/access.js';
 import * as SV from './_lib/startup-view.js';
+import * as RC from './_lib/recap.js';
 
 // Dealer is open (no password) unless DEALER_LOCK=1 and DEALER_PASSWORD are set in Vercel.
 const DEALER_PW = process.env.DEALER_LOCK === '1' ? process.env.DEALER_PASSWORD || 'mup-dealer' : '';
@@ -811,6 +812,7 @@ async function dealerAction(b) {
       const ct = D.classTrades(meta, slips, players);
       const skipped = ct.skipped.map(({ name, error }) => ({ name, error }));
       const dOn = D.demandOn(meta);
+      (meta.px = meta.px || {})[blk] = { ...meta.ledger.P }; // v4 recap: the block's class trade prices
       const { delta, before, dem, n } = D.settleClass(meta, ct.trades, dOn);
       for (const t in delta) delta[t] = r0(delta[t]);
       F.addDrivers(meta, 'class', delta, `Třída v bloku ${blk}`);
@@ -1079,6 +1081,7 @@ export default async function handler(req, res) {
         const r = await QP.runView(meta, players, url.searchParams.get('runId'), S);
         return send(res, r.status || 200, r);
       }
+      if (view === 'recap' || view === 'report') { const r = await RC.view(view, req, { meta, players, pinHash }); return send(res, r.status, r.body); } // v4 recap
       if (view === 'wall') {
         // v3 §4: a student sees only their own team's wall (x-sid / x-pin); without a sid it is the dealer view
         const wsid = req.headers['x-sid'];

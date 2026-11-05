@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Třídní report – MUP poker</title>
+<link rel="stylesheet" href="/fonts/stand-fonts.css">
+<link rel="stylesheet" href="/report.css">
+</head>
+<body class="r-app">
+<header class="r-top">
+  <div class="r-brand">
+    <div class="r-kicker">MUP × RainbowJet · Investiční stůl</div>
+    <h1 class="r-h1">Třídní report – MUP poker</h1>
+    <div class="r-meta" id="meta">Načítám…</div>
+  </div>
+  <div class="r-btns" role="group" aria-label="Akce s reportem">
+    <button type="button" class="r-btn" id="csv" aria-label="Stáhnout report jako CSV" disabled>Stáhnout CSV</button>
+    <button type="button" class="r-btn r-primary" id="print" aria-label="Vytisknout report nebo uložit jako PDF">Tisk / PDF</button>
+    <button type="button" class="r-btn r-ghost" id="reload" aria-label="Načíst report znovu">Obnovit</button>
+  </div>
+</header>
+<main id="main" class="r-main" aria-live="polite"></main>
+<footer class="r-foot" id="foot"></footer>
+<script src="/report.js"></script>
+</body>
+</html>

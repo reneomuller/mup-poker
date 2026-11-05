@@ -12,6 +12,7 @@ export const FEATURE_DEFAULTS = {
   startupPage: true, // v4: startup detail sheet on the phone (+ GET ?view=startup)
   quizplus: true, // v4: quiz explanations, ×2 questions, images, podium, lobby counter, results export
   wallplus: true, // v4: reactions, pins, accepted answers, task due/assignee, templates on the team walls
+  recap: true, // v4: end-of-game recap on the phone + class report (GET ?view=recap / ?view=report)
 };
 export const OFF = 'Tato funkce je vypnutá.';
 export const REASON_LABELS = { milestone: 'Splněný milník', traction: 'Trakce', team: 'Tým', risk: 'Riziko', market: 'Trh', other: 'Jiné' };

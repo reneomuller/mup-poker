@@ -1293,6 +1293,7 @@
     renderPortfolio(); renderCap(); renderStartups(); renderTeam(); renderProfile(); renderBoard(); renderQuiz(); renderDots(); renderReveal();
     window.PlayStartup?.render(); // v4 startup detail sheet
     syncWall(); runTweens();
+    if (window.PlayRecap) PlayRecap.update(S, me, auth()); // v4 recap: Tým card + auto-open at the final
   }
 
   async function tick() {
