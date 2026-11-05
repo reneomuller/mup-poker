@@ -287,7 +287,7 @@ body.p-kb .p-tabbar { display: none; }
 .p-captbar { display: flex; height: 14px; border-radius: 8px; overflow: hidden; background: var(--s-bg-2); margin: 10px 0 10px; gap: 2px; }
 .p-captbar i { display: block; height: 100%; transition: width .2s var(--s-ease); }
 .p-captbar .f, .p-caplg .f { background: var(--tc); }
-.p-captbar .c, .p-caplg .c { background: #3586D1; }
+.p-captbar .c, .p-caplg .c { background: #C7CCE6; }
 .p-captbar .r, .p-caplg .r { background: #FF8A47; }
 .p-captbar .o { background: var(--s-surface-3); }
 .p-caplg { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--s-muted); }
