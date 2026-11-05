@@ -25,7 +25,7 @@
     'play.quiz.lobby': 'Kvíz začíná',
     'play.quiz.lobbyHint': 'Otázky běží na plátně, odpovídáš tady na mobilu. Rychlost se počítá.',
     'play.card.title': 'Karta vašeho týmu',
-    'play.card.hint': 'Tohle uvidí všichni na kartě vašeho startupu. Měnit ji může kdokoli z týmu.',
+    'play.card.hint': 'Tohle uvidí všichni na kartě vašeho startupu. Měnit ji může kdokoli z týmu.',
     'play.round.title': 'Podmínky kola',
     'play.round.hint': 'Před otevřením investování nastavíte pre-money ocenění vašeho kola. Investice bloku proběhnou za tuto cenu.',
   });
@@ -145,7 +145,7 @@
         </form>
         <div class="p-err" id="lerr" role="alert"></div>
       </div>
-      <p class="p-foot s-faint">Investiční hra kurzu Digitální podnikání v éře AI</p>`;
+      <p class="p-foot s-faint">Investiční hra kurzu Digitální podnikání v éře AI</p>`;
     if ($('lname') && keep.name) $('lname').value = keep.name;
     if ($('lteam') && keep.team) $('lteam').value = keep.team;
     if ($('lwho') && keep.who) $('lwho').value = keep.who;
@@ -286,10 +286,10 @@
     const pres = S.phase === 'pitch' && S.presenting ? team(S.presenting) : null;
     const left = timeLeft(S);
     morph(el, `<div class="s-card p-card p-hero" data-ph="${esc(S.phase)}" ${pres ? `style="--tc:${esc(pres.color)}"` : ''}>
-      <div class="s-label">${S.phase === 'final' ? 'Finále' : `Blok ${S.block} z ${S.maxBlock}`}${S.timerLabel && left ? ` · ${esc(S.timerLabel)}` : ''}</div>
+      <div class="s-label">${S.phase === 'final' ? 'Finále' : `Blok ${S.block} z ${S.maxBlock}`}${S.timerLabel && left ? ` · ${esc(S.timerLabel)}` : ''}</div>
       <h2 class="p-hero-t">${pres ? dot(pres.color) : ''}${esc(t1)}</h2>
       <p class="p-hero-s">${esc(t2)}</p>
-      ${pres && pres.id !== me.team ? `<button type="button" class="s-btn s-ghost s-sm p-hero-btn" data-act="note-jump" data-team="${esc(pres.id)}">Psát poznámky k pitchi</button>` : ''}
+      ${pres && pres.id !== me.team ? `<button type="button" class="s-btn s-ghost s-sm p-hero-btn" data-act="note-jump" data-team="${esc(pres.id)}">Psát poznámky k pitchi</button>` : ''}
     </div>`);
   }
 
@@ -399,7 +399,7 @@
     const max = sliderMax(kind, t.id);
     return `<div class="arow ${e.amt ? 'has' : ''}" data-k="${kind}" data-t="${t.id}" style="--tc:${esc(t.color)}">
       <div class="ahead"><span class="s-dot" style="background:${esc(t.color)}"></span><span class="an"><b>${esc(t.name)}</b>${extra}</span>
-        <label class="amtwrap"><input class="amt s-num" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" value="${plain(e.amt || 0)}" aria-label="${kind === 'out' ? 'Vybrat z' : 'Vložit do'} ${esc(t.name)}, částka v dolarech"><span>$</span></label></div>
+        <label class="amtwrap"><input class="amt s-num" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" value="${plain(e.amt || 0)}" aria-label="${kind === 'out' ? 'Vybrat z' : 'Vložit do'} ${esc(t.name)}, částka v dolarech"><span>$</span></label></div>
       <div class="p-cap" aria-live="polite"></div>
       <input type="range" class="p-range" min="0" max="${max}" step="${STEP}" value="${Math.min(e.amt || 0, max)}" aria-label="Posuvník částky ${esc(t.name)}">
       <div class="qbtns"><button type="button" data-q="0">0</button><button type="button" data-q="-50000">−50 tis.</button><button type="button" data-q="50000">+50 tis.</button><button type="button" data-q="rest">+ zbytek</button></div>
@@ -426,7 +426,7 @@
         <p class="p-hint">${E('play.form.rebHint', { max: fmt(R.cashoutMax) })}</p>
         <div id="done"></div>
         <div class="p-sec"><span class="p-step">1</span><span class="s-label">${E('play.form.outLabel')}</span><span class="p-sec-v s-num" id="outsum"></span></div>
-        ${held.length ? held.map((t) => rowHTML('out', t, draft.out[t.id] || {}, ` <span class="have">máš ${esc(fmtM(me.stakes[t.id]))}</span>`)).join('') : '<p class="p-hint">Nemáš z čeho vybírat.</p>'}
+        ${held.length ? held.map((t) => rowHTML('out', t, draft.out[t.id] || {}, ` <span class="have">máš ${esc(fmtM(me.stakes[t.id]))}</span>`)).join('') : '<p class="p-hint">Nemáš z čeho vybírat.</p>'}
         <div class="p-sec"><span class="p-step">2</span><span class="s-label">${E('play.form.inLabel')}</span><span class="p-sec-v s-num" id="insum"></span></div>
         ${others.map((t) => rowHTML('in', t, draft.in[t.id] || {})).join('')}
       </div>`;
@@ -461,7 +461,7 @@
     if (row) {
       const cap = row.querySelector('.p-cap');
       const over = typed && want > lim;
-      cap.textContent = over ? (lim > 0 ? `Víc tu teď nejde – nejvýš ${fmt(lim)}.` : kind === 'in' && me.rules.mode !== 'initial' ? 'Nejdřív vyber peníze z jiného týmu.' : 'Víc už rozdělit nejde.') : '';
+      cap.textContent = over ? (lim > 0 ? `Víc tu teď nejde – nejvýš ${fmt(lim)}.` : kind === 'in' && me.rules.mode !== 'initial' ? 'Nejdřív vyber peníze z jiného týmu.' : 'Víc už rozdělit nejde.') : '';
       row.classList.toggle('over', !!over);
     }
     const e = draft[kind][t] || (draft[kind][t] = { amt: 0, why: '' });
@@ -546,7 +546,7 @@
     if (R.mode === 'initial' && inT !== R.capital) errs.unshift(`Zbývá rozdělit ${fmt(R.capital - inT)}.`);
     if (R.mode !== 'initial' && inT !== outT) errs.unshift(inT < outT ? `Zbývá vložit ${fmt(outT - inT)}.` : 'Vkládáš víc, než vybíráš.');
     if (R.mode !== 'initial' && R.exact && outT !== R.cashoutMax) errs.unshift(`Vyber ještě ${fmt(R.cashoutMax - outT)}.`);
-    if (R.mode !== 'initial' && !R.exact && outT === 0) errs.unshift('Nejdřív vyber, z čeho bereš.');
+    if (R.mode !== 'initial' && !R.exact && outT === 0) errs.unshift('Nejdřív vyber, z čeho bereš.');
     return errs;
   }
 
@@ -562,7 +562,7 @@
     const bar = (v, max, cls = '') => `<div class="s-progress p-prog ${cls}"><i style="width:${Math.min(100, max ? (v / max) * 100 : 0)}%"></i></div>`;
     let html;
     if (R.mode === 'initial') {
-      html = `<div class="p-sum-l"><span>Rozděleno <b class="s-num">${esc(fmt(inT))}</b> z ${esc(fmt(R.capital))}</span></div>${bar(inT, R.capital, inT === R.capital ? 'full' : '')}`;
+      html = `<div class="p-sum-l"><span>Rozděleno <b class="s-num">${esc(fmt(inT))}</b> z ${esc(fmt(R.capital))}</span></div>${bar(inT, R.capital, inT === R.capital ? 'full' : '')}`;
     } else {
       const max = R.cashoutMax;
       html = `<div class="p-sum-l"><span>Vybráno <b class="s-num">${esc(fmt(outT))}</b>${R.exact ? ' z ' + esc(fmt(max)) : ''}</span><span>vloženo <b class="s-num">${esc(fmt(inT))}</b></span></div>
@@ -631,7 +631,7 @@
     if (s?.submitted && (Object.keys(s.in || {}).length || Object.keys(s.out || {}).length)) {
       const line = (k, t, e) => `<div class="p-slip" style="--tc:${esc(team(t).color)}"><div class="p-slip-h"><span class="s-badge ${k === 'out' ? 's-bad' : 's-ok'}">${k === 'out' ? 'Výběr' : 'Vklad'}</span>${teamTag(t)}<b class="s-num">${esc(fmt(e.amt))}</b></div>
         <textarea class="s-input rwhy" rows="2" data-rk="${k}" data-rt="${t}" placeholder="${k === 'out' ? E('play.form.whyOut') : E('play.form.whyIn')} (nepovinné)">${esc(e.why || '')}</textarea></div>`;
-      html = `<div class="s-card p-card"><div class="p-card-h"><h3 class="s-h3">Tvoje rozhodnutí v bloku ${S.block}</h3><span class="s-badge s-ok">Odesláno</span></div><p class="p-hint">Částky už jsou dané, důvody můžeš ještě doplnit nebo opravit.</p>` +
+      html = `<div class="s-card p-card"><div class="p-card-h"><h3 class="s-h3">Tvoje rozhodnutí v bloku ${S.block}</h3><span class="s-badge s-ok">Odesláno</span></div><p class="p-hint">Částky už jsou dané, důvody můžeš ještě doplnit nebo opravit.</p>` +
         Object.entries(s.out || {}).map(([t, e]) => line('out', t, e)).join('') +
         Object.entries(s.in || {}).map(([t, e]) => line('in', t, e)).join('') + '<div class="p-saved rsaved" aria-live="polite"></div></div>';
     } else if (S.phase === 'lobby' || S.phase === 'pitch') {
@@ -742,9 +742,9 @@
     const tr = feat('track') && me.track;
     const trackHTML = tr ? `<div class="p-stats">
         <div class="s-stat p-stat"><span class="s-label">Návratnost</span><span class="s-v ${tr.returnPct >= 0 ? 's-up' : 's-down'}">${esc(spct(tr.returnPct))}</span></div>
-        <div class="s-stat p-stat"><span class="s-label">Pořadí</span><span class="s-v">${tr.rank ? esc(tr.rank + '.') : '–'}<small> z ${esc(tr.of || S.playerCount)}</small></span></div>
+        <div class="s-stat p-stat"><span class="s-label">Pořadí</span><span class="s-v">${tr.rank ? esc(tr.rank + '.') : '–'}<small> z ${esc(tr.of || S.playerCount)}</small></span></div>
       </div>` : '';
-    morph($('portfolio'), head + trackHTML + `<div class="s-card p-card"><div class="p-card-h"><h3 class="s-h3">Podíly ve startupech</h3><span class="s-label">${others.filter((t) => me.stakes[t.id] > 0).length} z ${others.length}</span></div>${rows}</div>`);
+    morph($('portfolio'), head + trackHTML + `<div class="s-card p-card"><div class="p-card-h"><h3 class="s-h3">Podíly ve startupech</h3><span class="s-label">${others.filter((t) => me.stakes[t.id] > 0).length} z ${others.length}</span></div>${rows}</div>`);
   }
 
   // ----- cap table of my own team -----
@@ -828,7 +828,7 @@
       <div class="p-me-h"><span class="p-ava p-ava-lg" style="--tc:${esc(t.color)}">${esc(initials(me.name))}</span><div><h2 class="s-h2">${esc(me.name)}</h2><div class="p-team">${dot(t.color)}<span>${esc(t.name)}</span>${me.ghost ? ' <span class="s-badge s-warn">Ghost</span>' : ''}</div></div></div>
       ${tr ? `<div class="p-stats p-stats-3">
         <div class="s-stat p-stat"><span class="s-label">Návratnost</span><span class="s-v ${tr.returnPct >= 0 ? 's-up' : 's-down'}">${esc(spct(tr.returnPct))}</span></div>
-        <div class="s-stat p-stat"><span class="s-label">Pořadí</span><span class="s-v">${tr.rank ? esc(tr.rank + '.') : '–'}<small> z ${esc(tr.of || '–')}</small></span></div>
+        <div class="s-stat p-stat"><span class="s-label">Pořadí</span><span class="s-v">${tr.rank ? esc(tr.rank + '.') : '–'}<small> z ${esc(tr.of || '–')}</small></span></div>
         <div class="s-stat p-stat"><span class="s-label">Nejlepší tah</span><span class="s-v p-best">${tr.bestCall ? `${esc(mult(tr.bestCall.multiple))}` : '–'}</span>${tr.bestCall ? `<span class="p-best-t">${teamTag(tr.bestCall.team)}</span>` : ''}</div>
       </div>` : me.invested ? `<div class="p-stats p-stats-3">
         <div class="s-stat p-stat"><span class="s-label">Portfolio</span><span class="s-v">${esc(fmtM(me.portfolio))}</span></div>
@@ -837,9 +837,9 @@
       </div>` : ''}
     </div>`;
     if (P) {
-      h += `<div class="s-card p-card p-points"><div class="p-card-h"><h3 class="s-h3">Body</h3><span class="s-label">${P.rank ? `${esc(P.rank)}. místo z ${esc(P.of || '–')}` : ''}</span></div>
+      h += `<div class="s-card p-card p-points"><div class="p-card-h"><h3 class="s-h3">Body</h3><span class="s-label">${P.rank ? `${esc(P.rank)}. místo z ${esc(P.of || '–')}` : ''}</span></div>
         <div class="p-pts-big"><span class="s-num s-grad-text">${esc(num(P.total || 0))}</span><small>${esc(ptsWord(P.total || 0))}</small></div>
-        ${(P.recent || []).length ? `<div class="p-pts-list">${P.recent.map((e) => `<div class="p-pt" data-key="pt${esc(e.id || e.ts)}"><span class="s-badge">${esc(PTK[e.kind] || e.kind || 'Body')}</span><span class="p-pt-n">${esc(e.note || '')}</span><b class="s-num ${e.amt < 0 ? 's-down' : 's-up'}">${e.amt > 0 ? '+' : '−'}${esc(num(Math.abs(e.amt)))}</b></div>`).join('')}</div>` : '<p class="p-hint">Body získáš v kvízu, za ocenění a za splněné milníky týmu.</p>'}
+        ${(P.recent || []).length ? `<div class="p-pts-list">${P.recent.map((e) => `<div class="p-pt" data-key="pt${esc(e.id || e.ts)}"><span class="s-badge">${esc(PTK[e.kind] || e.kind || 'Body')}</span><span class="p-pt-n">${esc(e.note || '')}</span><b class="s-num ${e.amt < 0 ? 's-down' : 's-up'}">${e.amt > 0 ? '+' : '−'}${esc(num(Math.abs(e.amt)))}</b></div>`).join('')}</div>` : '<p class="p-hint">Body získáš v kvízu, za ocenění a za splněné milníky týmu.</p>'}
       </div>`;
     }
     if (tr && (tr.awards || []).length) {
@@ -918,7 +918,7 @@
     if (!open) {
       roundDraft = null;
       morph(box, `<div class="p-card-h"><h3 class="s-h3">${E('play.round.title')}</h3><span class="s-badge">${S.phase === 'betting' ? 'Zamčeno' : 'Uzavřeno'}</span></div>
-        ${hasTerms(r) ? `<div class="p-round"><div><span class="s-label">Pre-money</span><b class="s-num">${esc(fmt(r.pre))}</b></div><span class="s-badge ${r.kind === 'up' ? 's-ok' : r.kind === 'down' ? 's-bad' : ''}">${esc(ROUND[r.kind] || '')} ${esc(spct(r.pct || 0))}</span></div>` : '<p class="p-hint">Podmínky kola nastavíte před otevřením investování v dalším bloku. Bez nich proběhne flat round.</p>'}`);
+        ${hasTerms(r) ? `<div class="p-round"><div><span class="s-label">Pre-money</span><b class="s-num">${esc(fmt(r.pre))}</b></div><span class="s-badge ${r.kind === 'up' ? 's-ok' : r.kind === 'down' ? 's-bad' : ''}">${esc(ROUND[r.kind] || '')} ${esc(spct(r.pct || 0))}</span></div>` : '<p class="p-hint">Podmínky kola nastavíte před otevřením investování v dalším bloku. Bez nich proběhne flat round.</p>'}`);
       return;
     }
     if (!box.querySelector('#rform')) {
@@ -987,7 +987,7 @@
       <div class="s-label">Exit · konec hry</div>
       <h2 class="p-exit-t">Tvoje portfolio</h2>
       <div class="p-exit-v s-num">${esc(fmt(val))}</div>
-      <div class="p-exit-r"><span class="${ret >= 0 ? 's-up' : 's-down'}">${esc(spct(ret))}</span>${myRank ? `<span>${esc(myRank)}. místo${tr.of ? ` z ${esc(tr.of)}` : ''}</span>` : ''}</div>
+      <div class="p-exit-r"><span class="${ret >= 0 ? 's-up' : 's-down'}">${esc(spct(ret))}</span>${myRank ? `<span>${esc(myRank)}. místo${tr.of ? ` z ${esc(tr.of)}` : ''}</span>` : ''}</div>
     </div>
     <div class="s-card p-card"><div class="p-card-h"><h3 class="s-h3">Jak dopadly startupy</h3></div>
       ${teams.map((o) => `<div class="p-xo" data-key="xo${esc(o.team)}">${teamTag(o.team)}<span class="s-badge ${o.kind === 'writeoff' ? 's-bad' : o.kind === 'hold' ? '' : 's-ok'}">${esc(EXITK[o.kind] || o.kind)}</span><b class="s-num">${o.kind === 'acquired' || o.kind === 'ipo' ? esc(mult(o.multiple)) : o.kind === 'writeoff' ? '0×' : '1×'}</b><span class="s-faint s-num">${esc(fmtM(o.V))}</span></div>`).join('')}
@@ -1025,7 +1025,7 @@
     const local = k ? picks[k] : null;
     const myChoice = local ? local.choice : mq.myChoice ?? null;
     const left = q.endsAt ? q.endsAt - MUP.now() : 0;
-    const head = `<div class="qz-top"><span class="s-label">Kvíz${q.setTitle ? ' · ' + esc(q.setTitle) : ''}</span><span class="s-label">${q.idx >= 0 ? `Otázka ${q.idx + 1} z ${q.total}` : ''}</span></div>`;
+    const head = `<div class="qz-top"><span class="s-label">Kvíz${q.setTitle ? ' · ' + esc(q.setTitle) : ''}</span><span class="s-label">${q.idx >= 0 ? `Otázka ${q.idx + 1} z ${q.total}` : ''}</span></div>`;
     let body = '';
     if (mode === 'question') {
       const n = (q.a || []).length;
@@ -1043,13 +1043,13 @@
           <div class="qz-res-p s-num">${right ? '+' + esc(pts(mq.myPoints || 0)) : '0 bodů'}</div></div>
         <p class="qz-qs">${esc(q.q || '')}</p>
         <div class="qz-list">${(q.a || []).map((a, i) => `<div class="qz-li ${i === q.correct ? 'right' : ''} ${i === myChoice ? 'mine' : ''}" style="--qc:${QCOL[i]}"><b>${LET[i]}</b><span>${esc(a)}</span><em class="s-num">${q.counts ? esc(q.counts[i] || 0) : ''}</em>${i === q.correct ? '<i>✓</i>' : i === myChoice ? '<i>✕</i>' : ''}</div>`).join('')}</div>
-        <div class="qz-foot"><span>${q.fastest ? `Nejrychlejší: <b>${esc(q.fastest.name)}</b> · ${esc(num(q.fastest.ms / 1000, 1))}${NB}s` : ''}</span><span class="qz-cnt">V kvízu máš <b class="s-num">${esc(pts(mq.runPoints || 0))}</b></span></div>`;
+        <div class="qz-foot"><span>${q.fastest ? `Nejrychlejší: <b>${esc(q.fastest.name)}</b> · ${esc(num(q.fastest.ms / 1000, 1))}${NB}s` : ''}</span><span class="qz-cnt">V kvízu máš <b class="s-num">${esc(pts(mq.runPoints || 0))}</b></span></div>`;
     } else {
       const lobby = mode === 'board' && q.idx < 0;
       const L = q.leaders || [];
       body = `${head}
         ${lobby ? `<div class="qz-lobby"><h2 class="s-h1">${E('play.quiz.lobby')}</h2><p>${E('play.quiz.lobbyHint')}</p><div class="qz-dots"><i style="--qc:${QCOL[0]}"></i><i style="--qc:${QCOL[1]}"></i><i style="--qc:${QCOL[2]}"></i><i style="--qc:${QCOL[3]}"></i></div></div>` :
-        `<div class="qz-rank"><span class="s-label">${mode === 'done' ? 'Konečné pořadí' : 'Průběžné pořadí'}</span><div class="qz-rank-v s-num">${mq.rank && mq.runPoints > 0 ? esc(mq.rank) + '.' : '–'}</div><div class="s-muted">${mq.rank && mq.runPoints > 0 ? `místo z ${esc(S.playerCount)} · <b class="s-num">${esc(pts(mq.runPoints))}</b>` : (mode === 'done' ? 'V\u00a0tomto kvízu bez bodů.' : 'Zatím bez bodů – další otázka je tvoje šance.')}</div></div>
+        `<div class="qz-rank"><span class="s-label">${mode === 'done' ? 'Konečné pořadí' : 'Průběžné pořadí'}</span><div class="qz-rank-v s-num">${mq.rank && mq.runPoints > 0 ? esc(mq.rank) + '.' : '–'}</div><div class="s-muted">${mq.rank && mq.runPoints > 0 ? `místo z ${esc(S.playerCount)} · <b class="s-num">${esc(pts(mq.runPoints))}</b>` : (mode === 'done' ? 'V\u00a0tomto kvízu bez bodů.' : 'Zatím bez bodů – další otázka je tvoje šance.')}</div></div>
         ${L.length ? `<div class="qz-board">${L.map((p, i) => `<div class="p-rk ${p.name === me.name && p.team === me.team ? 'me' : ''}" data-key="ql${i}"><span class="p-rk-i">${i + 1}</span><span class="p-rk-n"><b>${esc(p.name)}</b>${teamTag(p.team)}</span><span class="p-rk-v"><b class="s-num">${esc(num(p.quizPoints))}</b></span></div>`).join('')}</div>` : ''}`}
         ${mode === 'done' ? '<button type="button" class="s-btn s-primary s-block qz-close" data-act="quiz-close">Zpět do hry</button>' : ''}`;
     }
