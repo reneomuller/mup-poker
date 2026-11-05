@@ -20,7 +20,9 @@ import * as S from './store.js';
 export const TOO_MANY = 'Moc pokusů. Zkus to za pár minut, nebo požádej o QR přihlášení.';
 const num = (k, d) => (Number(process.env[k]) > 0 ? Number(process.env[k]) : d);
 const MAX = () => num('MUP_GUARD_MAX', 8);
-const IP_MAX = () => num('MUP_GUARD_IP_MAX', 30);
+// Per IP the default is high on purpose: a whole class shares one school Wi-Fi address, so ordinary typos must
+// never add up to a lockout. The per-player limit (MAX) is what stops anyone guessing one student's PIN.
+const IP_MAX = () => num('MUP_GUARD_IP_MAX', 200);
 const WIN = () => num('MUP_GUARD_WINDOW_S', 600);
 const RID_TTL = 600;
 export const on = (meta) => meta?.features?.guard !== false;

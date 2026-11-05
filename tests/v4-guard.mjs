@@ -14,8 +14,8 @@ const bad = (pin) => String((Number(pin) + 1111) % 10000).padStart(4, '0');
 const parseLink = (url) => { const m = /^\/play#login=([\w-]+):([\w-]+)$/.exec(url || ''); return m ? { sid: m[1], token: m[2] } : null; };
 
 await main(async () => {
-  // ---------- memory server, default limits (8 per player, 30 per IP, 10 min) ----------
-  const srv = await startServer({ port: PORT, tag: 'tagE' + PORT });
+  // ---------- memory server: 8 per player (default), 30 per IP (set here; the default is 200), 10 min ----------
+  const srv = await startServer({ port: PORT, tag: 'tagE' + PORT, env: { MUP_GUARD_IP_MAX: '30' } });
   const c = client(srv.base);
   const { T, S } = await freshGame(c, { n: 18, ghost: false });
   const st0 = await c.get();
