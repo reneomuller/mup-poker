@@ -89,7 +89,7 @@ await main(async () => {
   await c.st(A[1], 'wallReply', { id: tmp.id, text: 'odpověď' });
   ok((await c.st(A[0], 'wallDelete', { id: tmp.id })).ok, 'student deletes own sticker (with a teammate\'s reply on it)');
   ok(!has(await wall(A[0]), tmp.id), 'sticker gone');
-  ok(!Object.keys((await c.dump()).walls[T[0]]).some((f) => f.includes(tmp.id)), 'its replies and fields are gone from the hash too');
+  ok(!Object.keys((await c.dump()).walls[T[0]]).some((f) => !f.startsWith('t:') && f.includes(tmp.id)), 'its replies and fields are gone from the hash too (only the v4 tombstone t: stays)');
 
   section('validation');
   for (const [x, m] of [[{ kind: 'q', text: '' }, 'empty text'], [{ kind: 'q', text: '   \n ' }, 'blank text'], [{ kind: 'q' }, 'missing text'], [{ kind: 'q', text: 'x'.repeat(501) }, '501 chars'], [{ kind: 'note', text: 'ahoj' }, 'kind note'], [{ text: 'ahoj' }, 'no kind']]) {
@@ -232,7 +232,7 @@ await main(async () => {
 
   section('dump → wipe → restore');
   const dump = await c.dump();
-  ok(dump?.walls && T.every((t) => dump.walls[t] && Object.keys(dump.walls[t]).every((f) => /^(s|r|d):/.test(f))), 'dump has walls per team, fields s:/r:/d:');
+  ok(dump?.walls && T.every((t) => dump.walls[t] && Object.keys(dump.walls[t]).every((f) => /^(s|r|d|t):/.test(f))), 'dump has walls per team, fields s:/r:/d: (+ v4 tombstones t:)');
   ok(Object.keys(dump.walls[T[0]]).some((f) => f.startsWith('d:')) && Object.keys(dump.walls[T[0]]).some((f) => f.startsWith('r:')), 'dump keeps done states and replies');
   const ovBefore = await c.dget('?view=wall&team=all');
   const revsBefore = ovBefore.revs;

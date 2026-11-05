@@ -82,7 +82,15 @@
     ['tranches', 'Tranše RJ', 'RainbowJet slíbí peníze, které uvolní až po splnění podmínky.'],
     ['exit', 'Exit', 'Finále: akvizice, IPO nebo odpis a konečné pořadí investorů.'],
     ['demand', 'Cena podle poptávky', 'Jako na burze: po showdownu se cena startupu změní podle toho, kolik peněz přilákal oproti ostatním.'],
+    ['quizplus', 'Kvíz+', 'Vysvětlení po odhalení, otázky za ×2, obrázky, stupně vítězů, počítadlo v\u00a0lobby a export výsledků.'],
+    ['sound', 'Zvuk na plátně', 'Znělky kvízu, zvonek při otevření trhu a vířivý buben u\u00a0showdownu. Hraje jen projektor (tlačítko 🔊 v\u00a0rohu), mobily jsou vždy potichu.'],
     ['wall', 'Nástěnky týmů', 'Každý tým má soukromou nástěnku s\u00a0otázkami a úkoly od vás i od svých členů.'],
+    ['startupPage', 'Detail startupu', 'Klepnutím na startup v\u00a0mobilu se otevře detail: graf ocenění, čísla, karta a proč do něj spolužáci investovali.'],
+    ['wallplus', 'Nástěnky+', 'Reakce, připnutí, označená odpověď, termín a řešitel úkolu, šablony a filtry na nástěnkách.'],
+    ['regie', 'Režie', 'Plán hodiny s\u00a0dalším krokem, kdo chybí a kdo je připojený, připomínky týmům, klávesové zkratky a historie akcí.'], // v4 regie
+    ['tape', 'Burza na plátně', 'Při investování běží dole na plátně páska obchodů (jména jako iniciály), u\u00a0showdownu „Burza uzavřena“ s\u00a0násobky a v\u00a0pořadí malé grafy ocenění.'],
+    ['recap', 'Rekapitulace', 'Na konci hry si každý projde své karty s\u00a0výsledky (i\u00a0obrázek ke sdílení) a\u00a0vy máte třídní report k\u00a0tisku a\u00a0do CSV.'], // v4 recap (review: the flag had no switch)
+    ['guard', 'Ochrana PINu a\u00a0signálu', 'Po opakovaně špatném PINu se účet na pár minut zamkne (odemkne ho QR přihlášení); mobil bez signálu ukáže pruh a\u00a0odeslání sám zopakuje.'], // v4 guard (review: the flag had no switch)
   ];
   const featKnown = () => !!(S && S.features && typeof S.features === 'object');
   const F = (k) => !!(S && S.features && S.features[k]);
@@ -192,7 +200,7 @@
   $('dpw').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('dgo').click(); });
 
   // ---------- tabs ----------
-  const TABS = ['hra', 'investice', 'rj', 'oceneni', 'startupy', 'walls', 'kviz', 'body', 'hraci', 'funkce', 'data', 'texty'];
+  const TABS = ['hra', 'regie', 'investice', 'rj', 'oceneni', 'startupy', 'walls', 'kviz', 'body', 'hraci', 'funkce', 'data', 'texty'];
   let tab = TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'hra';
   function setTab(k) {
     if (!TABS.includes(k)) return;
@@ -238,7 +246,7 @@
   const closeBetting = () => act('phase', { phase: 'closed' });
   async function doShowdown() {
     const n = S.betCount, m = S.playerCount;
-    if (!confirm(`Spustit showdown? Započítá se ${n} ${pl(n, 'investor', 'investoři', 'investorů')} z ${m}. Kdo neinvestoval, v tomto bloku nic nevloží.`)) return;
+    if (!confirm(`Spustit showdown? ${pl(n, 'Započítá', 'Započítají', 'Započítá')} se ${n} ${pl(n, 'investor', 'investoři', 'investorů')} z\u00a0${m}. Kdo neinvestoval, v tomto bloku nic nevloží.`)) return;
     const r = await act('showdown', {}, 'Showdown proběhl');
     if (r.ok && r.skipped?.length) alert('Neplatné investice (nezapočítány):\n' + r.skipped.map((x) => `${x.name}: ${x.error}`).join('\n'));
   }
@@ -1100,7 +1108,7 @@
       <div class="qeh"><span class="qn">${i + 1}</span><textarea class="s-input sm" data-f="q" maxlength="160" rows="2" placeholder="Text otázky">${esc(q.q || '')}</textarea>
         <div class="qeb"><button class="ib" data-mv="-1" ${i === 0 ? 'disabled' : ''} title="Posunout nahoru">↑</button><button class="ib" data-mv="1" ${i === qe.questions.length - 1 ? 'disabled' : ''} title="Posunout dolů">↓</button><button class="ib del" data-rm title="Smazat otázku">✕</button></div></div>
       <div class="qea">${a.map((x, k) => `<label class="qa a${k} ${q.correct === k ? 'ok' : ''}"><input type="radio" name="qc${i}" value="${k}" ${q.correct === k ? 'checked' : ''} title="Správná odpověď"><span class="L">${'ABCD'[k]}</span><input class="s-input sm" data-a="${k}" maxlength="80" value="${esc(x)}" placeholder="Odpověď ${'ABCD'[k]}${k > 1 ? ' (nepovinná)' : ''}"></label>`).join('')}</div>
-      <div class="qet"><span class="s-faint sm">Kliknutím na kolečko označíte správnou odpověď.</span><span class="unit">čas <input class="s-input sm num" data-f="time" inputmode="numeric" value="${esc(q.time || 20)}" aria-label="Čas v sekundách"> s</span></div></div>`;
+      <div class="qet"><span class="s-faint sm">Kliknutím na kolečko označíte správnou odpověď.</span><span class="unit">čas <input class="s-input sm num" data-f="time" inputmode="numeric" value="${esc(q.time || 20)}" aria-label="Čas v sekundách"> s</span></div>${window.MupQuizPlusEd ? window.MupQuizPlusEd.fields(q, i) : ''}</div>`;
   }
   function drawQe() {
     const el = $('qzsets'), sets = quizSets();
@@ -1116,7 +1124,7 @@
         ${qe.isNew ? '' : '<button class="s-btn s-sm s-danger" id="qedel">Smazat sadu</button>'}
         <button class="s-btn s-sm s-ghost" id="qedrop">${dirty.qzsets ? 'Zahodit změny' : 'Zavřít'}</button>
         <button class="s-btn s-sm s-primary" id="qesave">Uložit sadu</button></div>`
-      : `<ol class="qsum">${qe.questions.map((q) => `<li><span>${esc(q.q)}</span><span class="s-faint sm">${'ABCD'[q.correct] || '?'} · ${esc(q.time)} s</span></li>`).join('') || '<li class="s-faint">Sada je prázdná.</li>'}</ol>
+      : `<ol class="qsum">${qe.questions.map((q) => `<li><span>${esc(q.q)}${window.MupQuizPlusEd?.badges(q) || ''}</span><span class="s-faint sm">${'ABCD'[q.correct] || '?'} · ${esc(q.time)} s</span></li>`).join('') || '<li class="s-faint">Sada je prázdná.</li>'}</ol>
       <div class="inl"><button class="s-btn s-sm" id="qeopen">Upravit otázky</button></div>`}`;
     if (!qeOpen) {
       $('qeset').onchange = (e) => { qeId = e.target.value || null; redraw('qzsets'); renderQuizSets(); };
@@ -1161,6 +1169,7 @@
       all(box, 'input[type=radio]').forEach((r) => (r.onchange = () => { q.correct = +r.value; all(box, '.qa').forEach((l, k) => l.classList.toggle('ok', k === q.correct)); setQeDirty(); }));
       all(box, '[data-mv]').forEach((b) => (b.onclick = () => { const j = i + Number(b.dataset.mv); [qe.questions[i], qe.questions[j]] = [qe.questions[j], qe.questions[i]]; setQeDirty(); drawQe(); }));
       box.querySelector('[data-rm]').onclick = () => { if ((q.q || '').trim() && !confirm(`Smazat otázku ${i + 1}?`)) return; qe.questions.splice(i, 1); setQeDirty(); drawQe(); };
+      window.MupQuizPlusEd?.bind(box, q, setQeDirty, drawQe); // v4 quizplus: why / ×2 / image
     });
   }
   function cleanSet(s) {
@@ -1173,7 +1182,7 @@
       if (!text) return { error: `Otázka ${i + 1} nemá text.` };
       if (kept.length < 2) return { error: `Otázka ${i + 1} potřebuje aspoň dvě odpovědi.` };
       if (correct < 0) return { error: `U otázky ${i + 1} označte správnou (vyplněnou) odpověď.` };
-      questions.push({ q: text.slice(0, 160), a: kept, correct, time: Math.min(120, Math.max(5, Math.round(Number(q.time) || 20))) });
+      questions.push({ q: text.slice(0, 160), a: kept, correct, time: Math.min(120, Math.max(5, Math.round(Number(q.time) || 20))), ...(window.MupQuizPlusEd?.clean(q) || {}) });
     }
     if (!questions.length) return { error: 'Sada potřebuje aspoň jednu otázku.' };
     return { set: { id: s.id, title: String(s.title || '').trim().slice(0, 60) || 'Kvíz', questions } };
@@ -1185,7 +1194,7 @@
     if (!set || !Array.isArray(set.questions)) return toast('V JSON chybí seznam otázek.', true);
     qe = {
       id: newId(), title: String(set.title || 'Import'), isNew: true,
-      questions: set.questions.map((q) => ({ q: String(q.q ?? q.question ?? ''), a: (q.a || q.answers || []).slice(0, 4).map((x) => String(x ?? '')), correct: Number(q.correct) || 0, time: Number(q.time) || 20 })),
+      questions: set.questions.map((q) => ({ q: String(q.q ?? q.question ?? ''), a: (q.a || q.answers || []).slice(0, 4).map((x) => String(x ?? '')), correct: Number(q.correct) || 0, time: Number(q.time) || 20, ...(window.MupQuizPlusEd?.clean(q) || {}) })),
     };
     setQeDirty(); drawQe();
     toast(`Načteno ${qe.questions.length} otázek – zkontrolujte a uložte.`);
@@ -1368,7 +1377,7 @@
     const dvp = {};
     for (const p of (DV && DV.players) || []) dvp[p.id] = p;
     const pts = pointsTotals();
-    const el = gate('players', [rows.map((r) => [r.id, r.name, r.team, r.hasPin, r.holdings, r.portfolio, r.portfolioNow]), S.teams.map((t) => [t.id, t.name, t.color]), Object.values(dvp).map((p) => [p.id, p.returnPct]), pts, F('points'), F('track'), S.regOpen]);
+    const el = gate('players', [rows.map((r) => [r.id, r.name, r.team, r.hasPin, r.holdings, r.portfolio, r.portfolioNow, !!r.locked]), S.teams.map((t) => [t.id, t.name, t.color]), Object.values(dvp).map((p) => [p.id, p.returnPct]), pts, F('points'), F('track'), S.regOpen]);
     if (!el) return;
     el.innerHTML = `<div class="ch"><h3>${E('dealer.sec.players')} (${rows.length})</h3><span class="s-badge ${S.regOpen ? 's-ok' : 's-warn'}">${S.regOpen ? 'registrace otevřená' : 'registrace zavřená'}</span></div>
       <p class="hint">Zapomenutý PIN: nejrychlejší je „QR“ – hráč ho naskenuje telefonem a\u00a0je zpátky přihlášený (dostane nový PIN). „PIN“ ho jen smaže a\u00a0hráč si při dalším přihlášení zvolí nový. „Náhled“ ukáže jeho mobil jen pro čtení. Smazat jde jen hráče bez investic.</p>
@@ -1379,7 +1388,7 @@
           const live = r.portfolioNow != null;
           const ret = live ? r.returnNow : dvp[r.id]?.returnPct ?? (r.holdings ? (r.portfolio / 1e6 - 1) * 100 : null);
           return `<div class="pr ${F('points') ? 'wp' : ''}" data-id="${r.id}">
-            <span class="pn"><span class="nm">${dot(team(r.team).color)}${esc(r.name)}</span><span class="s-faint sm">${tname(r.team)}${r.hasPin ? '' : ' · <span class="s-down">PIN resetován</span>'}</span></span>
+            <span class="pn"><span class="nm">${dot(team(r.team).color)}${esc(r.name)}</span><span class="s-faint sm">${tname(r.team)}${r.hasPin ? '' : ' · <span class="s-down">PIN resetován</span>'}${r.locked ? ' · <span class="s-down" title="Moc špatných PINů – pomůže QR nebo reset PINu">zamčeno</span>' : ''}</span></span>
             <span class="pv" data-l="Portfolio">${r.holdings || (live && r.portfolioNow) ? esc(fmtM(live ? r.portfolioNow : r.portfolio)) : '–'}</span>
             <span class="pv ${ret > 0 ? 's-up' : ret < 0 ? 's-down' : ''}" data-l="Výnos">${ret == null ? '–' : esc(signPct(ret))}</span>
             ${F('points') ? `<span class="pv" data-l="Body">${plain(pts[r.id] || 0)}</span>` : ''}
@@ -1588,13 +1597,14 @@
 
   function renderExports() {
     const b = loadBk();
-    const el = gate('tools', [S.block, b?.meta?.rev, b?.meta?.gid, Object.keys(b?.players || {}).length]);
+    const el = gate('tools', [S.block, b?.meta?.rev, b?.meta?.gid, Object.keys(b?.players || {}).length, S.features?.recap]);
     if (!el) return;
     el.innerHTML = `<div class="ch"><h3>${E('dealer.sec.tools')}</h3></div>
       <div class="dlist">
         <button class="s-btn s-sm s-ghost" id="csv">Stáhnout všechny investice (CSV)</button>
         <button class="s-btn s-sm s-ghost" id="logdl">Stáhnout log všech akcí (JSON)</button>
         <button class="s-btn s-sm s-ghost" id="bkdl">Stáhnout zálohu z tohoto notebooku</button>
+        ${S.features?.recap !== false ? '<a class="s-btn s-sm s-ghost" href="/report" target="_blank" rel="noopener">Třídní report (tisk / CSV)</a>' : ''}
       </div>
       <p class="hint">Záloha v tomto prohlížeči: ${b ? `revize ${esc(b.meta?.rev ?? '?')}, ${Object.keys(b.players || {}).length} hráčů, ${Object.keys(b.slips || {}).length} ${pl(Object.keys(b.slips || {}).length, 'blok', 'bloky', 'bloků')} investic` : 'zatím žádná'}. Když server hru zapomene, tato stránka ji sama vrátí.</p>`;
     $('csv').onclick = exportCSV;
@@ -1678,13 +1688,14 @@
       const j = await get(H(), '?view=wall&team=' + encodeURIComponent(tid));
       if (!j || j.ok === false) throw new Error((j && j.error) || 'Nástěnku se nepodařilo načíst.');
       markSeen(tid === 'all' ? S.teams.map((t) => t.id) : [tid]);
-      if (tid === 'all') return { walls: j.walls || {} };
-      return j.stickers || [];
+      if (tid === 'all') return j.walls ? j : { walls: {} }; // v4: + templates, groups, members
+      return j.stickers ? j : [];
     },
     post: (b = {}) => wcall('wallPost', b.all ? { all: true, kind: b.kind, text: b.text } : { team: pickTeam(b), kind: b.kind, text: b.text }),
     reply: (b = {}) => wcall('wallReply', { team: pickTeam(b), id: b.id, text: b.text }),
     done: (b = {}) => wcall('wallDone', { team: pickTeam(b), id: b.id, done: !!b.done }),
     del: (b = {}) => wcall('wallDelete', { team: pickTeam(b), id: b.id, ...(b.reply ? { reply: b.reply } : {}) }),
+    op: (b = {}) => wcall(b.op, b.all ? b : { ...b, team: pickTeam(b) }), // v4 wallplus
   };
   function unmountWall() {
     if (!wallW) return;
@@ -1731,6 +1742,7 @@
     $('wallsum').textContent = r ? (wallUnreadTotal() ? `nové: ${wallUnreadTotal()}` : 'vše přečteno') : '';
     renderWallChips();
     const mount = $('wmount');
+    if (wallW && wallW.plus !== F('wallplus')) unmountWall(); // v4: remount when wallplus flips
     if (wallW || !mount) return;
     if (!window.MupWall || typeof window.MupWall.mount !== 'function') {
       if (!mount.dataset.miss) { mount.innerHTML = '<div class="wmiss">Nástěnky se nenačetly (chybí <code>/wall.js</code>). Obnovte stránku za chvíli.</div>'; mount.dataset.miss = '1'; }
@@ -1740,8 +1752,9 @@
     try {
       wallW = window.MupWall.mount(mount, {
         role: 'dealer', teams: S.teams.map((t) => ({ id: t.id, name: t.name, color: t.color })), team: wallTeam,
-        api: wallApi, canSendAll: true, pollMs: 4000,
+        api: wallApi, canSendAll: true, pollMs: 4000, plus: F('wallplus'), seenKey: 'mup.wseen.dealer',
       });
+      wallW.plus = F('wallplus');
     } catch (e) { console.error('MupWall.mount', e); wallW = null; }
   }
 
@@ -1759,6 +1772,7 @@
     funkce: [renderFeatures],
     data: [renderArchives, renderTables, renderExports, renderDanger],
     texty: [],
+    regie: [() => window.MUPRegie && window.MUPRegie.render()], // v4 regie (public/dealer-regie.js)
   };
   function renderPanel() {
     for (const fn of PANELS[tab] || []) {
@@ -1783,6 +1797,7 @@
     if (S.phase === 'pitch' && S.presenting) markPitched(S.presenting);
     renderTop();
     renderPanel();
+    if (window.MUPRegie) window.MUPRegie.tick(); // v4 regie
     if (['hraci', 'body', 'data'].includes(tab) && dumpN % 3 === 1) loadData();
   }
 
@@ -1802,5 +1817,6 @@
     setInterval(tickClock, 250);
   }
 
+  window.MUPD = { get S() { return S; }, get D() { return D; }, get tab() { return tab; }, H, F, act, toast, setTab, team, nextStep, nextPitchTeam, startPitch, openBetting, closeBetting, doShowdown, doRjReveal, doNext, doFinal, quiz, pitchedList }; // v4 regie
   tryLogin(pw || '').then((ok) => { if (!ok) $('dlogin').classList.remove('hidden'); });
 })();

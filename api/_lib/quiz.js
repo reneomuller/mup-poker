@@ -2,6 +2,7 @@
 // Answers live in one small hash per question, `qa:<runId>:<idx>` (field = sid, value { choice, ms, ts }),
 // written once per student with HSETNX, so 20 students answering at the same moment never touch meta.
 import * as F from './features.js';
+import * as QP from './quizplus.js';
 
 export const qaKey = (runId, idx) => `qa:${runId}:${idx}`;
 export const setOf = (m) => m.quizSets.find((s) => s.id === m.quiz.setId) || null;
@@ -52,7 +53,9 @@ export function cleanSet(set) {
     if (!Number.isInteger(correct) || correct < 0 || correct >= a.length) return { error: `Otázka ${n} nemá platnou správnou odpověď.` };
     const time = Math.round(Number(x.time) || 20);
     if (time < 5 || time > 120) return { error: `Čas u otázky ${n} musí být 5 až 120 s.` };
-    questions.push({ q, a, correct, time });
+    const ex = QP.cleanExtras(x, n); // v4 quizplus: why / double / img
+    if (ex.error) return { error: ex.error };
+    questions.push({ q, a, correct, time, ...ex.extra });
   }
   return { set: { id, title, questions } };
 }
@@ -87,10 +90,10 @@ export function scoreCurrent(m, players, qa) {
     if (!(c >= 0 && c < q.a.length)) continue;
     counts[c]++; answered++;
     if (c === q.correct) {
-      const streak = (prev[sid] || 0) + 1, base = score(ans.ms, q.time), bonus = streakBonus(streak);
+      const streak = (prev[sid] || 0) + 1, base = score(ans.ms, q.time), bonus = streakBonus(streak), x = QP.mult(m, q);
       by[sid] = streak;
-      const note = `Kvíz: otázka ${z.idx + 1}` + (bonus > 0 ? ` · série ${streak} (+${bonus})` : '');
-      F.addPoints(m, sid, base + bonus, 'quiz', note, { run: z.runId, qi: z.idx, base, bonus });
+      const note = `Kvíz: otázka ${z.idx + 1}` + (bonus > 0 ? ` · série ${streak} (+${bonus})` : '') + (x > 1 ? ' · ×2' : '');
+      F.addPoints(m, sid, (base + bonus) * x, 'quiz', note, { run: z.runId, qi: z.idx, base, bonus, ...(x > 1 ? { x } : {}) });
       if (!fastest || ans.ms < fastest.ms) fastest = { name: p.name, team: p.team, ms: Math.max(0, Math.round(ans.ms)) };
       if (streak >= 2 && (!top || streak > top.streak)) top = { name: p.name, team: p.team, streak };
     }
@@ -114,7 +117,7 @@ export function step(m, op, players, qa, b) {
     const q = setOf(m).questions[idx];
     const now = Date.now();
     bump(m, { idx, state: 'question', startedAt: now, endsAt: now + q.time * 1000, res: null });
-    m.quizLog.push({ runId: z.runId, setId: z.setId, idx, ts: now });
+    m.quizLog.push({ runId: z.runId, setId: z.setId, idx, ts: now, c: q.correct, ...(QP.mult(m, q) > 1 ? { x2: 1 } : {}) });
     if (m.quizLog.length > 400) m.quizLog.splice(0, m.quizLog.length - 400);
     return null;
   }
@@ -178,10 +181,10 @@ export function publicQuiz(m, players, qa) {
   if (z.state === 'question' && q) {
     let answered = 0;
     for (const sid of Object.keys(qa || {})) if (players[sid] && !players[sid].ghost) answered++;
-    Object.assign(out, { q: q.q, a: q.a, time: q.time, startedAt: z.startedAt, endsAt: z.endsAt, answered, expected: expectedOf(players) });
+    Object.assign(out, { q: q.q, a: q.a, time: q.time, startedAt: z.startedAt, endsAt: z.endsAt, answered, expected: expectedOf(players) }, QP.publicExtras(m, z, q, s, 'question'));
   } else if (z.state === 'reveal' && q) {
     const res = z.res || { counts: q.a.map(() => 0), answered: 0, fastest: null };
-    Object.assign(out, { q: q.q, a: q.a, correct: q.correct, counts: res.counts, answered: res.answered, fastest: res.fastest, topStreak: res.topStreak || null });
+    Object.assign(out, { q: q.q, a: q.a, correct: q.correct, counts: res.counts, answered: res.answered, fastest: res.fastest, topStreak: res.topStreak || null }, QP.publicExtras(m, z, q, s, 'reveal'));
   } else if (z.state === 'board' || z.state === 'done') {
     const { tot, run } = runBoard(m, players);
     out.leaders = Object.entries(run)
@@ -189,6 +192,7 @@ export function publicQuiz(m, players, qa) {
       .map(([id, quizPoints]) => ({ name: players[id].name, team: players[id].team, quizPoints, total: tot[id] || 0 }))
       .sort((a, b) => b.quizPoints - a.quizPoints || b.total - a.total || String(a.name).localeCompare(String(b.name), 'cs'))
       .slice(0, 10);
+    if (z.state === 'board') Object.assign(out, QP.publicExtras(m, z, q, s, 'board'));
   }
   return out;
 }
@@ -208,6 +212,7 @@ export function meQuiz(m, p, players, qa) {
     streak: p.ghost ? 0 : streakOf(z, p.id),
     runPoints,
     rank: p.ghost || !z.runId ? null : 1 + Object.keys(tot).filter((id) => (run[id] || 0) > runPoints).length,
+    ...QP.meExtras(m, z, p),
   };
 }
 

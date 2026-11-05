@@ -1,0 +1,32 @@
+/* v4 quizplus on the phone and the laptop (play-quizplus.js) */
+.qzp-x2, .qzp-next2 { align-self: center; display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; font-weight: 800; font-size: 14px; text-transform: uppercase; letter-spacing: .03em;
+  color: #1A0F05; background: linear-gradient(90deg, #FFB547, #FF8A47 55%, #FF5574); box-shadow: 0 4px 18px rgba(255, 138, 71, .35); animation: qzp-pulse 1.6s ease-in-out infinite; }
+.qzp-x2 b, .qzp-next2 b { font-family: var(--s-display); font-size: 18px; line-height: 1; }
+.qzp-x2.sm { font-size: 12px; padding: 4px 11px; animation: none; }
+.qzp-next2 { margin: 6px auto 0; font-size: 12.5px; letter-spacing: .01em; text-align: center; max-width: 100%; }
+@keyframes qzp-pulse { 50% { transform: scale(1.05); } }
+.qzp-img { display: flex; justify-content: center; }
+.qzp-img[hidden] { display: none; }
+.qzp-img img { display: block; max-width: 100%; max-height: 120px; width: auto; height: auto; object-fit: contain; border-radius: 12px; background: var(--s-surface); border: 1px solid var(--s-border); }
+.qzp-why { --qc: #3FCF8E; padding: 12px 14px; border-radius: 14px; font-size: 14px; line-height: 1.45; background: var(--s-surface); border: 1px solid var(--s-border); border-left: 4px solid var(--qc); overflow-wrap: anywhere; animation: p-pop .25s var(--s-ease) both; }
+.qzp-why b { color: var(--s-green); margin-right: 2px; }
+/* final card at done (replaces the plain rank card) */
+.qz-in:has(.qzp-final) .qz-rank { display: none; }
+.qzp-final { text-align: center; padding: 20px 14px 16px; border-radius: 22px; background: var(--s-grad-soft), var(--s-surface); border: 1px solid var(--s-border-2); }
+.qzp-final.top { background: radial-gradient(ellipse at 50% 0%, rgba(245, 196, 81, .28), transparent 70%), var(--s-surface); border-color: rgba(245, 196, 81, .55); }
+.qzp-fr { font-family: var(--s-display); font-weight: 800; font-size: 64px; line-height: 1; margin: 8px 0 6px; display: inline-flex; align-items: center; gap: 10px; }
+.qzp-medal { font-size: 48px; animation: p-pop .4s var(--s-ease) both; }
+.qzp-fs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+.qzp-fs > div { display: grid; gap: 4px; padding: 10px 8px; border-radius: 14px; background: var(--s-surface-2, rgba(255, 255, 255, .04)); border: 1px solid var(--s-border); }
+.qzp-fs b { font-family: var(--s-display); font-weight: 800; font-size: 24px; }
+/* 2 answers (Pravda / Nepravda): side by side, tall; 3 answers: the last one spans the row */
+.qz-tiles.n2 { grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(150px, 1fr); }
+.qz-tiles.n2 .qz-tile span { font-size: 17px; }
+@media (max-width: 359px) { .qz-tiles.n2 { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .qzp-x2, .qzp-next2, .qzp-why, .qzp-medal { animation: none; } }
+@media (min-width: 1024px) {
+  .qzp-img img { max-height: 200px; }
+  .qzp-why { font-size: 16px; }
+  .qz-tiles.n3 { grid-template-columns: repeat(3, 1fr); }
+  .qz-tiles.n3 .qz-tile:last-child { grid-column: auto; }
+}

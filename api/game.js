@@ -4,11 +4,17 @@ import * as S from './_lib/store.js';
 import * as G from './_lib/game.js';
 import * as F from './_lib/features.js';
 import * as Q from './_lib/quiz.js';
+import * as QP from './_lib/quizplus.js';
 import * as E from './_lib/economy.js';
 import * as A from './_lib/archive.js';
 import * as W from './_lib/wall.js';
 import * as D from './_lib/demand.js';
+import * as TP from './_lib/tape.js';
 import * as AC from './_lib/access.js';
+import * as SV from './_lib/startup-view.js';
+import * as RC from './_lib/recap.js';
+import * as PR from './_lib/presence.js'; // v4 regie
+import * as GU from './_lib/guard.js'; // v4 guard: PIN brute-force limits, rid dedupe
 import * as SF from './_lib/safe.js';
 
 // Dealer is open (no password) unless DEALER_LOCK=1 and DEALER_PASSWORD are set in Vercel.
@@ -171,6 +177,7 @@ function publicState(meta, players, slips, bd, tx = {}, qa = {}, proj = D.projec
   if (F.on(meta, 'exit') && meta.exit) v2.exit = E.publicExit(meta, players);
   if (F.on(meta, 'points')) v2.points = F.publicPoints(meta, players);
   v2.demand = D.publicDemand(meta);
+  Object.assign(v2, TP.publicTape(meta, slips, players));
   return {
     ...v2,
     now: Date.now(), teams, block: meta.block, maxBlock: G.CFG.MAX_BLOCK, phase: meta.phase,
@@ -250,7 +257,7 @@ function callList(meta, players, slips) {
 
 function dealerState(meta, players, slips, bd, tx = {}, qa = {}, proj = null) {
   const rows = Object.values(players).filter((p) => !p.ghost).map((p) => ({
-    id: p.id, name: p.name, team: p.team, hasPin: !!p.pin,
+    id: p.id, name: p.name, team: p.team, hasPin: !!p.pin, ...(GU.locked(meta, p) ? { locked: true } : {}), // v4 guard
     portfolio: r0(G.portfolio(meta, p.id)), holdings: G.hasHoldings(meta, p.id), slip: slips[p.id] || null,
     // v3 §2: the live (projected) portfolio while class trades are pending, for the Hráči tab
     ...(proj?.pending ? { portfolioNow: r0(G.portfolio(proj.pm, p.id)), returnNow: F.returnPct(G.portfolio(proj.pm, p.id)) } : {}),
@@ -288,6 +295,7 @@ async function backup(meta) {
     while (b.length > 15) b.shift();
     while (b.length > 1 && JSON.stringify(b).length > 900_000) b.shift();
     await S.setJSON('backups', b);
+    PR.noteBackup(); // v4 regie: the next meta save names what undo reverts
   } catch (e) { console.error('backup failed', e?.message); }
 }
 
@@ -296,7 +304,7 @@ async function backup(meta) {
 async function makeDump() {
   const { meta, players, content } = await load(true);
   const d = await A.buildDump(meta, players, content);
-  d.walls = await W.dumpWalls(meta); // v3 §4: team sticker walls
+  // v3 §4 team sticker walls: A.buildDump includes them (v4: so archives keep them too)
   return d;
 }
 
@@ -347,8 +355,8 @@ async function loadForAnswer(sid) {
   return m && m.v2ArchivedAt ? { ...d, meta: F.normalize(m) } : load(true);
 }
 
-async function studentAction(b) {
-  const { meta, players, slips } = b.op === 'quizAnswer' ? await loadForAnswer(String(b.sid || '')) : await load(true);
+async function studentAction(b, req) {
+  const { meta, players, slips } = b.op === 'quizAnswer' || b.op === 'quizReady' ? await loadForAnswer(String(b.sid || '')) : await load(true);
   if (b.op === 'register') {
     if (!meta.regOpen) return fail('Registrace je zavřená. Požádej dealera.');
     const name = String(b.name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
@@ -364,16 +372,19 @@ async function studentAction(b) {
   if (b.op === 'tokenLogin') { // v3 §9: one-time login QR from the dealer
     const r = await AC.tokenLogin(b, meta.removed, pinHash);
     invalidate();
-    return r.error ? fail(r.error, { relogin: true }) : ok(r);
+    if (r.error) return fail((await GU.failed(meta, req, GU.own(players, String(b.sid || '')))) ? GU.TOO_MANY : r.error, { relogin: true });
+    await GU.clear({ id: r.sid }); // v4 guard: a used login link resets the counter (the lock went with the new PIN)
+    return ok(r);
   }
   if (b.op === 'restore') {
     const sid = String(b.sid || '');
-    if (!/^[\w-]{4,24}$/.test(sid) || SF.badKey(sid) || !/^\d{4}$/.test(String(b.pin || ''))) return fail('Přihlas se znovu.', { relogin: true });
+    if (!/^[\w-]{4,24}$/.test(sid) || GU.badKey(sid) || !/^\d{4}$/.test(String(b.pin || ''))) return fail('Přihlas se znovu.', { relogin: true });
     const sameGame = b.gid === meta.gid || meta.auto;
     if ((meta.removed || []).includes(sid)) return fail('Přihlas se znovu.', { relogin: true });
-    let p = SF.own(players, sid); // never Object.prototype (sid "__proto__")
+    let p = GU.own(players, sid); // v4 guard: never Object.prototype (sid "__proto__")
     if (p) {
-      if (p.pin && p.pin !== pinHash(sid, b.pin)) return fail('Špatný PIN.', { relogin: true });
+      if (p.pin && p.pin !== pinHash(sid, b.pin)) return fail((await GU.failed(meta, req, p)) ? GU.TOO_MANY : 'Špatný PIN.', { relogin: true });
+      if (GU.locked(meta, p)) return fail(GU.TOO_MANY, { relogin: true });
       if (!p.pin) { p.pin = pinHash(sid, b.pin); await S.hset('players', sid, p); }
     } else {
       const name = String(b.name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
@@ -410,7 +421,8 @@ async function studentAction(b) {
   if (!p) return fail('Hráč nenalezen. Přihlas se znovu.', { relogin: true });
   if (!/^\d{4}$/.test(String(b.pin || ''))) return fail('PIN musí mít 4 číslice.');
   if (!p.pin) { p.pin = pinHash(p.id, b.pin); await S.hset('players', p.id, p); invalidate(); }
-  else if (p.pin !== pinHash(p.id, b.pin)) return fail('Špatný PIN.', { relogin: true });
+  else if (p.pin !== pinHash(p.id, b.pin)) return fail((await GU.failed(meta, req, p)) ? GU.TOO_MANY : 'Špatný PIN.', { relogin: true });
+  if (GU.locked(meta, p)) return fail(GU.TOO_MANY, { relogin: true });
 
   if (b.op === 'login') return ok({ sid: p.id });
 
@@ -464,6 +476,7 @@ async function studentAction(b) {
   }
 
   // v2 student ops write only their own hash fields (never meta), so nobody's write can be lost.
+  if (b.op === 'quizReady') { const r = await QP.ready(meta, p, S); return r.error ? fail(r.error) : ok({ lobby: r.lobby }); } // v4 quizplus
   if (b.op === 'quizAnswer') {
     if (!F.on(meta, 'quiz')) return fail(F.OFF);
     const z = meta.quiz, q = Q.current(meta);
@@ -529,7 +542,7 @@ async function studentAction(b) {
     return ok();
   }
   // v3 §4: wall ops on the student's own team (after the PIN check above)
-  if (W.OPS.includes(b.op)) { const r = await W.op(b, meta, { role: 'student', p }, serial); invalidate(); return r; }
+  if (W.OPS.includes(b.op)) { const r = await W.op(b, meta, { role: 'student', p }, serial, players); invalidate(); return r; }
   return fail('Neznámá akce.');
 }
 
@@ -594,7 +607,7 @@ async function dealerAction(b) {
   if (b.op === 'restore') return restoreFrom(b.dump);
   const { meta, players, slips, content, tx, qa } = await load(true);
   const blk = meta.block;
-  const save = async () => { meta.rev = (meta.rev || 0) + 1; meta.auto = false; await S.setJSON('meta', meta); invalidate(); };
+  const save = async () => { meta.rev = (meta.rev || 0) + 1; meta.auto = false; PR.logInMeta(meta, b); await S.setJSON('meta', meta); invalidate(); }; // v4 regie: log in the same write
   const gate = GATES[b.op];
   if (gate && !F.on(meta, gate)) return fail(F.OFF);
   const archive = (label) => A.createArchive(label, true, meta, players, content);
@@ -602,7 +615,7 @@ async function dealerAction(b) {
   switch (b.op) {
     // ---------- v2 ----------
     case 'features': {
-      for (const [k, v] of Object.entries(b.set || {})) if (k in F.FEATURE_DEFAULTS) meta.features[k] = !!v;
+      for (const [k, v] of Object.entries(b.set || {})) if (k in F.FEATURE_DEFAULTS) meta.features[k] = k === 'tapeNames' ? TP.flagValue(v) : !!v;
       await save();
       return ok({ features: meta.features });
     }
@@ -773,9 +786,11 @@ async function dealerAction(b) {
     }
 
     case 'auth': return ok();
+    case 'regiePlan': case 'nudge': { const r = await PR.dealerOp(b, meta, players, slips, save); invalidate(); return r; } // v4 regie
     // v3 §4: dealer wall ops on any team (wallPost also with all: true)
-    case 'wallPost': case 'wallReply': case 'wallDone': case 'wallDelete': {
-      const r = await W.op(b, meta, { role: 'dealer' });
+    case 'wallPost': case 'wallReply': case 'wallDone': case 'wallDelete':
+    case 'wallReact': case 'wallPin': case 'wallAccept': case 'wallTask': case 'wallTplSave': case 'wallTplDelete': { // v4 wallplus
+      const r = await W.op(b, meta, { role: 'dealer' }, undefined, players);
       invalidate();
       return r;
     }
@@ -821,6 +836,7 @@ async function dealerAction(b) {
       const ct = D.classTrades(meta, slips, players);
       const skipped = ct.skipped.map(({ name, error }) => ({ name, error }));
       const dOn = D.demandOn(meta);
+      (meta.px = meta.px || {})[blk] = { ...meta.ledger.P }; // v4 recap: the block's class trade prices
       const { delta, before, dem, n } = D.settleClass(meta, ct.trades, dOn);
       for (const t in delta) delta[t] = r0(delta[t]);
       F.addDrivers(meta, 'class', delta, `Třída v bloku ${blk}`);
@@ -956,11 +972,12 @@ async function dealerAction(b) {
     }
     case 'content': {
       const texts = {};
-      for (const [k, v] of Object.entries(b.texts || {}).slice(0, 600)) { // at most 600 keys
+      for (const [k, v] of Object.entries(b.texts || {}).slice(0, 600)) { // v4 guard: at most 600 keys
         if (/^[\w.]{1,80}$/.test(k) && typeof v === 'string' && v.trim()) texts[k] = v.slice(0, 2000);
       }
       let founders = null;
       if (Array.isArray(b.founders)) {
+        // v4 guard: wiki only as „lang/Title“ (the lang part becomes a hostname on the phones)
         founders = b.founders.slice(0, 12)
           .map((f) => ({ name: String(f?.name || '').trim().slice(0, 40), wiki: /^[a-z-]{2,12}\/[^/?#\s]{1,110}$/.test(String(f?.wiki || '').trim()) ? String(f.wiki).trim() : '', /* „lang/Title“ only: the lang part becomes a hostname on the phones */ story: String(f?.story || '').trim().slice(0, 200), photo: /^https:\/\//.test(f?.photo || '') ? String(f.photo).slice(0, 500) : '' }))
           .filter((f) => f.name);
@@ -991,6 +1008,7 @@ async function dealerAction(b) {
       return ok();
     }
     case 'loginLink': { // v3 §9: one-time login QR for a student who lost the PIN
+      await GU.clear(players[String(b.sid || '')]); // v4 guard: drop the lock (AC.loginLink writes the record)
       const r = await AC.loginLink(players, b.sid);
       invalidate();
       return r.error ? fail(r.error) : ok(r);
@@ -999,6 +1017,7 @@ async function dealerAction(b) {
       const p = SF.own(players, String(b.sid ?? ''));
       if (!p) return fail('Hráč nenalezen.');
       p.pin = null;
+      await GU.clear(p); // v4 guard: drop the lock and the failed-try counter
       await S.hset('players', p.id, p);
       invalidate();
       return ok();
@@ -1039,6 +1058,7 @@ async function dealerAction(b) {
       await archive('Před novou hrou');
       const fresh = freshMeta(meta.teams, meta.startV);
       for (const k of ['features', 'quizSets', 'milestoneDefs', 'cards']) fresh[k] = meta[k];
+      if (meta.wallTpl) fresh.wallTpl = meta.wallTpl; // v4 wallplus: templates are course-level, like quiz sets
       fresh.rev = (meta.rev || 0) + 1;
       await Promise.all(Object.keys(await S.hgetall('tx')).filter((k) => k.startsWith('rt:')).map((k) => S.hdel('tx', k)));
       for (let i = 1; i <= G.CFG.MAX_BLOCK; i++) await S.del('slip:' + i);
@@ -1084,6 +1104,21 @@ export default async function handler(req, res) {
         dv.walls = await W.dataWalls(meta);
         return send(res, 200, dv);
       }
+      if (view === 'quizready') return send(res, 200, await QP.readyView(meta, players, S)); // v4 quizplus: lobby counter
+      if (view === 'quizrun') { // v4 quizplus: per-question results of one run (dealer)
+        if (!dealerOk(req)) return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
+        const r = await QP.runView(meta, players, url.searchParams.get('runId'), S);
+        return send(res, r.status || 200, r);
+      }
+      // review: the student views recap / startup check the PIN themselves; a wrong PIN there must count and a
+      // locked player be refused like on every other route (else they were a PIN oracle around the guard lockout)
+      if ((view === 'recap' || view === 'startup') && req.headers['x-sid'] && !AC.asPlayer(req, players)) {
+        const gp = GU.own(players, String(req.headers['x-sid']));
+        if (gp?.pin && gp.pin !== pinHash(gp.id, String(req.headers['x-pin'] || ''))) return send(res, 401, { ok: false, error: (await GU.failed(meta, req, gp)) ? GU.TOO_MANY : 'Přihlas se znovu.', relogin: true });
+        if (GU.locked(meta, gp)) return send(res, 401, { ok: false, error: GU.TOO_MANY, relogin: true });
+      }
+      if (view === 'recap' || view === 'report') { const r = await RC.view(view, req, { meta, players, pinHash }); return send(res, r.status, r.body); } // v4 recap
+      if (view === 'presence') { const r = await PR.view(meta, players, slips, dealerOk(req)); return send(res, r.status, r.body); } // v4 regie
       if (view === 'wall') {
         // v3 §4: a student sees only their own team's wall (x-sid / x-pin); without a sid it is the dealer view
         const wsid = req.headers['x-sid'];
@@ -1091,22 +1126,25 @@ export default async function handler(req, res) {
         let viewer;
         if (asW) viewer = { role: 'student', p: asW };
         else if (wsid) {
-          const p = SF.own(players, wsid);
-          if (!p || !p.pin || p.pin !== pinHash(p.id, String(req.headers['x-pin'] || ''))) return send(res, 401, { ok: false, error: 'Přihlas se znovu.', relogin: true });
+          const p = GU.own(players, wsid);
+          if (!p || !p.pin || p.pin !== pinHash(p.id, String(req.headers['x-pin'] || ''))) return send(res, 401, { ok: false, error: p?.pin && (await GU.failed(meta, req, p)) ? GU.TOO_MANY : 'Přihlas se znovu.', relogin: true });
+          if (GU.locked(meta, p)) return send(res, 401, { ok: false, error: GU.TOO_MANY, relogin: true });
           viewer = { role: 'student', p };
         } else if (req.headers['x-dealer'] !== undefined && dealerOk(req)) viewer = { role: 'dealer' }; // header required even on an open dealer
         else return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
-        const r = await W.view(meta, viewer, url.searchParams.get('team'), tx);
+        const r = await W.view(meta, viewer, url.searchParams.get('team'), tx, players);
         return send(res, r.status, r.body);
       }
+      if (view === 'startup') { const r = SV.view(req, url, { meta, players, slips, pinHash }); return send(res, r.status, r.body); } // v4 startup detail sheet
       const proj = D.project(meta, slips, players);
       const out = publicState(meta, players, slips, bd, tx, qa, proj);
       out.content = content;
       const sid = req.headers['x-sid'], pin = req.headers['x-pin'];
       if (sid && pin) {
-        const p = SF.own(players, sid);
-        if (p && p.pin && p.pin === pinHash(p.id, pin)) out.me = meState(meta, p, slips, bd, players, qa, proj);
-        else out.meError = p ? 'pin' : 'unknown';
+        const p = GU.own(players, sid);
+        const good = p && p.pin && p.pin === pinHash(p.id, pin);
+        if (good && !GU.locked(meta, p)) out.me = meState(meta, p, slips, bd, players, qa, proj);
+        else out.meError = !p ? 'unknown' : GU.locked(meta, p) || (!good && p.pin && (await GU.failed(meta, req, p))) ? 'locked' : 'pin'; // v4 guard
         if (out.me && F.on(meta, 'wall')) out.me.wallRev = W.rev(meta, p.team, tx); // v3 §4: badge, from the tx hash the GET already read
       }
       const asP = AC.asPlayer(req, players); // v3 §10: dealer preview, GET ?as=<sid> with x-dealer
@@ -1137,12 +1175,13 @@ export default async function handler(req, res) {
     }
     if (req.method === 'POST') {
       const b = await readBody(req);
-      const studentOps = ['register', 'login', 'tokenLogin', 'notes', 'submit', 'reasons', 'restore', 'ask', 'vote', 'answer', 'react', 'quizAnswer'];
+      if (b.op === 'hb') { const r = await PR.hb(b, pinHash, req); return send(res, r.status, r.body); } // v4 regie: presence heartbeat, never logged
+      const studentOps = ['register', 'login', 'tokenLogin', 'notes', 'submit', 'reasons', 'restore', 'ask', 'vote', 'answer', 'react', 'quizAnswer', 'quizReady'];
       let r;
       // card / roundTerms exist for both: with a sid it is a student editing their own team
       // restore with a `dump` is the dealer's backup push (before v2 it was routed to the phones' restore and never ran)
       const student = (studentOps.includes(b.op) && !(b.op === 'restore' && b.dump)) || (['card', 'roundTerms', ...W.OPS].includes(b.op) && !!b.sid);
-      if (student) r = await studentAction(b);
+      if (student) r = await GU.once(b, () => studentAction(b, req)); // v4 guard: same sid:rid runs once
       else {
         if (!dealerOk(req)) return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
         r = await serial(() => dealerAction(b));

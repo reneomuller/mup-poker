@@ -34,6 +34,9 @@ if (pgUrl) {
   }
 }
 
+// v4 guard (api/_lib/guard.js): raw clients for its own TTL counters, which are never mirrored
+export { redis as rawRedis, q as rawPg };
+
 export const storageMode = redis ? (q ? 'redis+postgres' : 'redis') : q ? 'postgres' : 'memory';
 
 const P = 'mup:';

@@ -1,0 +1,72 @@
+/* v4 projector: live market tape, „Burza uzavřena“ banner, board sparklines (table-tape.js). */
+:root { --tp-fs: max(1.9rem, 2.5vh); --tape-h: calc(var(--tp-fs) * 2.25); }
+
+/* the table makes room for the tape: the stage ends above it */
+.stage { transition: bottom .6s cubic-bezier(.2,.8,.2,1); }
+body.tapeon .stage { bottom: var(--tape-h); }
+
+/* ---------- live market tape ---------- */
+.tape { position: fixed; left: 0; right: 0; bottom: 0; height: var(--tape-h); z-index: 20; display: flex; align-items: stretch;
+  font-size: var(--tp-fs); line-height: 1.2; color: var(--cream);
+  background: linear-gradient(180deg, #0b0f0d, #040605); border-top: .16rem solid rgba(201,162,74,.75);
+  box-shadow: 0 -.6rem 1.6rem rgba(0,0,0,.6); transform: translateY(100%); transition: transform .6s cubic-bezier(.2,.8,.2,1); pointer-events: none; }
+.tape.on { transform: none; }
+.tp-lab { flex: none; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 0 1.4rem 0 1.6rem; background: var(--gold-2); color: #1d1606;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 1rem) 100%, 0 100%); padding-right: 2.4rem; }
+.tp-lab b { font-size: .72em; font-weight: 900; letter-spacing: .2em; text-transform: uppercase; line-height: 1.05; }
+.tp-lab span { font-size: .68em; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; line-height: 1.1; display: inline-flex; align-items: center; gap: .4em; }
+.tp-lab span::before { content: ''; width: .6em; height: .6em; border-radius: 50%; background: #c0262f; animation: live 1.4s ease-in-out infinite; }
+.tape.closed .tp-lab span::before { animation: none; background: #5c5220; border-radius: .1em; }
+.tp-win { position: relative; flex: 1; min-width: 0; overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 2.5%, #000 97%, transparent); mask-image: linear-gradient(90deg, transparent, #000 2.5%, #000 97%, transparent); }
+.tp-empty { position: absolute; left: 2rem; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: .85em; font-style: italic; white-space: nowrap; }
+.tp-empty.hidden { display: none; }
+.tp-i { position: absolute; left: 0; top: 50%; margin-top: calc(var(--tp-fs) * -.85); height: calc(var(--tp-fs) * 1.7); display: flex; align-items: center; gap: .45em; white-space: nowrap;
+  padding: 0 .55em; border-radius: .4em; will-change: transform; font-variant-numeric: tabular-nums; }
+.tp-i::after { content: ''; position: absolute; right: -2.25rem; top: 50%; width: .55rem; height: .55rem; margin-top: -.28rem; background: var(--gold); transform: rotate(45deg); opacity: .8; }
+.tp-i.fresh { animation: tpfresh 6s ease-out both; }
+@keyframes tpfresh { 0% { background: rgba(232,205,134,.34); box-shadow: 0 0 0 .14rem var(--gold-2); } 70% { background: rgba(232,205,134,.12); box-shadow: 0 0 0 .14rem rgba(232,205,134,.4); } 100% { background: transparent; box-shadow: none; } }
+.tp-who { display: inline-flex; align-items: center; gap: .35em; font-weight: 700; color: var(--cream); }
+.tp-who i, .tp-t i { display: inline-block; width: .55em; height: .55em; border-radius: 50%; flex: none; }
+.tp-t { display: inline-flex; align-items: center; gap: .32em; font-weight: 800; color: #fff; }
+.tp-ar { color: var(--gold-2); font-weight: 800; }
+.tp-sep { color: var(--muted); margin-left: -.3em; }
+.tp-gap { width: .5em; }
+.tp-amt { font-weight: 800; color: var(--cream); }
+.tp-amt.up { color: #8be3b0; }
+.tp-amt.down { color: #ffb4ba; }
+
+/* the plate a trade hits flashes up (money in) or down (money out) */
+.plate.tf-up { animation: tfup 1.4s ease-out; }
+.plate.tf-dn { animation: tfdn 1.4s ease-out; }
+@keyframes tfup { 15% { box-shadow: 0 0 0 .3rem #3fbf7a, 0 0 3.2rem rgba(63,191,122,.75), 0 1rem 2.4rem rgba(0,0,0,.65); border-color: #8be3b0; } }
+@keyframes tfdn { 15% { box-shadow: 0 0 0 .3rem var(--red), 0 0 3.2rem rgba(232,80,91,.7), 0 1rem 2.4rem rgba(0,0,0,.65); border-color: #ffb4ba; } }
+
+/* ---------- „Burza uzavřena“ ---------- */
+.mclose { position: absolute; inset: 0; z-index: 85; display: grid; place-items: center; pointer-events: none; background: rgba(3,5,4,.62); animation: fadein .35s both; transition: opacity .45s; }
+.mclose.hidden { display: none; }
+.mclose.out { opacity: 0; }
+.mc-band { width: 100%; padding: 2.4rem 3rem 2.8rem; text-align: center;
+  background: linear-gradient(180deg, rgba(10,22,17,.97), rgba(4,10,8,.97)); border-top: .22rem solid var(--gold); border-bottom: .22rem solid var(--gold);
+  box-shadow: 0 0 0 .4rem rgba(0,0,0,.45), 0 2rem 5rem rgba(0,0,0,.7); animation: mcband .5s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes mcband { from { transform: scaleY(.2); opacity: 0; } }
+.mc-kick { font-size: max(1.6rem, 2.2vh); letter-spacing: .26em; text-transform: uppercase; color: var(--gold-2); font-weight: 800; }
+.mc-title { font-family: var(--serif); font-weight: 900; font-size: 5.4rem; line-height: 1.05; margin-top: .3rem; color: var(--cream); text-shadow: 0 .3rem 1.6rem rgba(0,0,0,.7); animation: qzin .5s .1s both; }
+.mc-row { list-style: none; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 1.2rem; max-width: 94rem; margin: 2rem auto 0; }
+.mc-t { display: flex; flex-direction: column; align-items: center; gap: .2rem; padding: 1rem .8rem 1.1rem; border-radius: 1rem; min-width: 0;
+  background: rgba(255,255,255,.06); border: .12rem solid rgba(242,234,214,.16); border-top: .5rem solid var(--tc); animation: mcin .55s cubic-bezier(.2,1.2,.4,1) both; animation-delay: var(--d); }
+@keyframes mcin { from { opacity: 0; transform: translateY(2.4rem) scale(.9); } }
+.mc-pos { font-family: var(--serif); font-weight: 900; font-size: max(1.8rem, 2.4vh); color: var(--gold-2); line-height: 1; }
+.mc-n { font-weight: 700; font-size: 1.8rem; line-height: 1.2; max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; min-height: 2.4em; text-wrap: balance; overflow-wrap: normal; word-break: normal; }
+.mc-m { font-family: var(--serif); font-weight: 900; font-size: 4.2rem; line-height: 1.05; color: var(--cream); font-variant-numeric: tabular-nums lining-nums; }
+.mc-t.up .mc-m { color: #8be3b0; }
+.mc-t.down .mc-m { color: #ffb4ba; }
+.mc-t:first-child { box-shadow: 0 0 0 .22rem var(--gold-2), 0 0 2.4rem rgba(232,205,134,.35); }
+
+/* ---------- sparklines on the board's rank rows ---------- */
+.rank li .spk { position: absolute; right: 0; top: .6rem; width: 6.2rem; height: 2.3rem; overflow: visible; }
+.rank li .spk-end { fill: var(--cream); }
+.rank li:has(.spk) .tn { padding-right: 6.9rem; }
+/* the rank column gets a little wider so names still fit next to the sparkline */
+.bs-grid:has(.rank .spk) { grid-template-columns: minmax(0, 36fr) minmax(0, 29fr) minmax(0, 23fr); }
+@media (max-aspect-ratio: 3/2) { .bs-grid:has(.rank .spk) { grid-template-columns: minmax(0, 30fr) minmax(0, 34fr) minmax(0, 24fr); } }

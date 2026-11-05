@@ -8,10 +8,11 @@
     #070a09;
   opacity: 0; pointer-events: none; transition: opacity .6s; }
 .boardscreen.on { opacity: 1; pointer-events: auto; }
-.boardscreen .kick { font-size: 1.45rem; letter-spacing: .26em; text-transform: uppercase; color: var(--gold-2); font-weight: 700; margin-bottom: .5rem; }
+.boardscreen .kick { font-size: max(1.45rem, 2.2vh); letter-spacing: .26em; text-transform: uppercase; color: var(--gold-2); font-weight: 700; margin-bottom: .5rem; }
 .boardscreen h2 { font-family: var(--serif); font-size: 3.4rem; font-weight: 900; line-height: 1.05; }
 .bs-head { display: flex; align-items: flex-end; justify-content: space-between; flex: none; }
 .bs-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 40fr) minmax(0, 25fr) minmax(0, 23fr); gap: 2.6rem; }
+@media (max-aspect-ratio: 3/2) { .bs-grid { grid-template-columns: minmax(0, 33fr) minmax(0, 31fr) minmax(0, 24fr); gap: 2.2rem; } }
 .bs-chart { position: relative; min-height: 0; min-width: 0; }
 .bs-chart .chart { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .chart text { font-family: var(--sans); }
@@ -26,17 +27,17 @@
 .rank .nmx { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .rank .tv { display: flex; align-items: baseline; gap: .9rem; white-space: nowrap; line-height: 1.15; align-self: start; }
 .rank .tv b { font-family: var(--serif); font-size: 2.1rem; font-weight: 700; }
-.rank .tv small { font-size: 1.45rem; font-weight: 700; }
+.rank .tv small { font-size: max(1.45rem, 2.2vh); font-weight: 700; }
 .rank .tv small.fp { margin-left: auto; color: var(--muted); font-weight: 600; }
 .bs-inv, .bs-pts { margin-bottom: 1.6rem; }
 .plist li { display: flex; flex-direction: column; justify-content: center; height: 4.4rem; border-bottom: .1rem solid rgba(242,234,214,.08); }
-.plist .pn { font-size: 1.6rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plist .pn { font-size: max(1.6rem, 2.2vh); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .plist .pn i { font-style: normal; color: var(--gold-2); font-family: var(--serif); font-weight: 900; margin-right: .2rem; }
-.plist .pv { font-size: 1.5rem; color: var(--cream); display: flex; align-items: center; gap: .6rem; white-space: nowrap; }
+.plist .pv { font-size: max(1.5rem, 2.2vh); color: var(--cream); display: flex; align-items: center; gap: .6rem; white-space: nowrap; }
 .plist .pv b { margin-left: auto; font-weight: 800; }
 .plist .dot { width: .9rem; height: .9rem; }
 #pts li { flex-direction: row; align-items: center; justify-content: space-between; height: 2.9rem; gap: 1rem; }
-#pts .pn { display: flex; align-items: center; gap: .5rem; min-width: 0; font-size: 1.55rem; }
+#pts .pn { display: flex; align-items: center; gap: .5rem; min-width: 0; font-size: max(1.55rem, 2.2vh); }
 #pts .pp { font-family: var(--serif); font-weight: 900; font-size: 1.8rem; color: var(--gold-2); font-variant-numeric: tabular-nums; }
 .up { color: #8be3b0; } .down { color: #ffb4ba; }
 /* drivers ticker */
@@ -44,7 +45,7 @@
 .tk-lab { flex: none; font-size: 1.45rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #1d1606; background: var(--gold-2); padding: .2rem .8rem; border-radius: .4rem; }
 .tk-win { flex: 1; min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent); mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent); }
 .tk-strip { display: inline-flex; white-space: nowrap; animation: tick 40s linear infinite; will-change: transform; }
-.tk { font-size: 1.6rem; padding-right: 3.4rem; display: inline-flex; align-items: center; gap: .5rem; }
+.tk { font-size: max(1.6rem, 2.2vh); padding-right: 3.4rem; display: inline-flex; align-items: center; gap: .5rem; }
 .tk .dot { width: .9rem; height: .9rem; }
 .tk b { font-weight: 800; }
 .tk .tkk { color: var(--muted); }
@@ -61,7 +62,7 @@
   background: linear-gradient(180deg, #fbf6e9, #efe4c6); color: #1d1b17; box-shadow: 0 0 0 .4rem var(--gold), 0 2rem 6rem rgba(0,0,0,.7);
   animation: awin .8s cubic-bezier(.2,1.3,.4,1) both; }
 @keyframes awin { from { opacity: 0; transform: scale(.6) rotate(-3deg); } }
-.aw-kick { font-size: 1.6rem; letter-spacing: .28em; text-transform: uppercase; color: #8a6a1f; font-weight: 800; }
+.aw-kick { font-size: max(1.6rem, 2.2vh); letter-spacing: .28em; text-transform: uppercase; color: #8a6a1f; font-weight: 800; }
 .aw-kind { font-family: var(--serif); font-size: 3.2rem; font-weight: 900; color: #8a6a1f; margin-top: .6rem; }
 .aw-name { font-family: var(--serif); font-size: 6rem; font-weight: 900; line-height: 1.05; margin-top: .8rem; }
 .aw-team { display: inline-flex; align-items: center; gap: .7rem; font-size: 2rem; font-weight: 700; margin-top: 1rem; }
@@ -81,7 +82,7 @@
 .qz-kick { display: flex; align-items: center; gap: 1.2rem; min-width: 0; }
 .qz-logo { font-family: 'Archivo Expanded', 'Archivo', sans-serif; font-weight: 800; font-size: 1.7rem; text-transform: uppercase; letter-spacing: .04em; padding: .25rem 1rem; border-radius: .6rem;
   background: linear-gradient(90deg, #3586D1, #6754DF 45%, #FF5574); }
-.qz-set, .qz-count { font-family: 'JetBrains Mono', monospace; font-size: 1.6rem; letter-spacing: .1em; text-transform: uppercase; color: #9FB4FF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qz-set, .qz-count { font-family: 'JetBrains Mono', monospace; font-size: max(1.6rem, 2.2vh); letter-spacing: .1em; text-transform: uppercase; color: #9FB4FF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qz-count { color: #F4F5FA; font-weight: 700; flex: none; }
 .qz-main { flex: 1; min-height: 0; position: relative; }
 .qz-play, .qz-boardw, .qz-lobby { position: absolute; inset: 0; display: none; }
@@ -142,7 +143,7 @@
 .qz-tm { display: flex; align-items: center; gap: .6rem; font-size: 1.6rem; color: #B8BED6; white-space: nowrap; min-width: 0; }
 .qz-tmn { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .qz-pts { font-family: 'Archivo Expanded', 'Archivo', sans-serif; font-weight: 800; font-size: 2.3rem; text-align: right; font-variant-numeric: tabular-nums; }
-.qz-tot { font-family: 'JetBrains Mono', monospace; font-size: 1.45rem; color: #B8BED6; text-align: right; white-space: nowrap; }
+.qz-tot { font-family: 'JetBrains Mono', monospace; font-size: max(1.45rem, 2.2vh); color: #B8BED6; text-align: right; white-space: nowrap; }
 .qz-empty { font-size: 2rem; color: #B8BED6; text-align: center; padding-top: 4rem; }
 @keyframes qzrise { from { opacity: 0; transform: translateY(4rem); } }
 @keyframes qzin { from { opacity: 0; transform: translateY(1.6rem); } }
@@ -164,7 +165,7 @@
     radial-gradient(ellipse 90% 70% at 50% 60%, #0f3a2a, #06140e 70%, #030806);
   animation: fadein .7s both; }
 .ex-head { text-align: center; flex: none; }
-.ex-kick { font-size: 1.6rem; letter-spacing: .3em; text-transform: uppercase; color: var(--gold-2); font-weight: 700; }
+.ex-kick { font-size: max(1.6rem, 2.2vh); letter-spacing: .3em; text-transform: uppercase; color: var(--gold-2); font-weight: 700; }
 .ex-head h2 { font-family: var(--serif); font-weight: 900; font-size: 4.4rem; line-height: 1.05; margin-top: .3rem; text-shadow: 0 .3rem 1.6rem rgba(0,0,0,.7); }
 .stage-final .ex-head h2 { font-size: 3.4rem; }
 .ex-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 2rem 2.4rem; padding: 2.4rem 4rem 1rem; perspective: 140rem; }
@@ -197,7 +198,7 @@
 .ex-outs li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 1rem; height: 4.2rem; border-bottom: .1rem solid rgba(242,234,214,.1); animation: qzin .5s both; }
 .ex-outs .ex-tn { color: var(--cream); font-size: 1.8rem; }
 .ex-outs .ex-v { color: var(--cream); font-family: var(--serif); font-size: 2rem; text-align: right; min-width: 9rem; }
-.ex-pill { font-size: 1.5rem; font-weight: 800; padding: .1rem .7rem; border-radius: .5rem; background: rgba(255,255,255,.1); color: #dfe3e6; white-space: nowrap; }
+.ex-pill { font-size: max(1.5rem, 2.2vh); font-weight: 800; padding: .1rem .7rem; border-radius: .5rem; background: rgba(255,255,255,.1); color: #dfe3e6; white-space: nowrap; }
 .ex-outs .k-ipo .ex-pill { background: rgba(226,86,155,.25); color: #ffc1df; }
 .ex-outs .k-acquired .ex-pill { background: rgba(201,162,74,.28); color: var(--gold-2); }
 .ex-outs .k-writeoff .ex-pill { background: rgba(232,80,91,.25); color: #ffb4ba; }
@@ -207,12 +208,12 @@
 .ex-cn { font-family: var(--serif); font-size: 3rem; font-weight: 900; line-height: 1.1; margin-top: .3rem; }
 .ex-ct { display: flex; align-items: center; gap: .5rem; font-size: 1.6rem; font-weight: 700; margin-top: .2rem; }
 .ex-ct .dot { width: 1rem; height: 1rem; }
-.ex-ch { font-size: 1.6rem; line-height: 1.35; margin-top: .5rem; color: #3a3630; }
+.ex-ch { font-size: max(1.6rem, 2.2vh); line-height: 1.35; margin-top: .5rem; color: #3a3630; }
 .ex-rank li { display: grid; grid-template-columns: 3rem minmax(0, 1fr) minmax(0, 9.5rem) auto 7.6rem; align-items: center; gap: 1rem; height: 3.9rem; border-bottom: .1rem solid rgba(242,234,214,.1); animation: qzrise .7s cubic-bezier(.2,.9,.25,1.1) both; animation-delay: var(--d); }
 .ex-rank li.first { background: linear-gradient(90deg, rgba(232,205,134,.2), transparent 80%); border-radius: .6rem; }
 .ex-pos { font-family: var(--serif); font-weight: 900; font-size: 2.2rem; color: var(--gold-2); text-align: center; }
 .ex-nm { font-weight: 700; font-size: 1.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ex-tm { display: flex; align-items: center; gap: .5rem; font-size: 1.5rem; color: var(--muted); white-space: nowrap; overflow: hidden; }
+.ex-tm { display: flex; align-items: center; gap: .5rem; font-size: max(1.5rem, 1.9vh); color: var(--muted); white-space: nowrap; overflow: hidden; }
 .ex-tm .dot { width: .9rem; height: .9rem; }
 .ex-tmn { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .ex-val { font-family: var(--serif); font-weight: 700; font-size: 2rem; text-align: right; white-space: nowrap; }
@@ -222,3 +223,5 @@
 .qz-fast { flex-wrap: wrap; row-gap: .3rem; }
 .qz-st { color: #ffcf8a; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .qz-st b { color: var(--cream); }
+/* v4 readability: answer counts sit on a dark pill so they keep 4.5:1 on every tile colour */
+.qz-n { background: rgba(11,16,48,.58); padding: .1rem .7rem; border-radius: .6rem; }

@@ -9,7 +9,8 @@ export const QUIZ_SEED = [
    "Měsíční opakované tržby"
   ],
   "correct": 0,
-  "time": 20
+  "time": 20,
+  "why": "CAC (Customer Acquisition Cost) = všechny náklady na marketing a prodej za období děleno počtem nově získaných zákazníků."
  },
  {
   "q": "LTV by podle běžného pravidla měla být aspoň…",
@@ -20,7 +21,8 @@ export const QUIZ_SEED = [
    "Trojnásobkem CAC"
   ],
   "correct": 3,
-  "time": 20
+  "time": 20,
+  "why": "LTV je hrubý zisk z jednoho zákazníka za celou dobu, co u vás zůstane. Pravidlo LTV : CAC aspoň 3 : 1 znamená, že se získání zákazníka vyplatí i s rezervou."
  },
  {
   "q": "Churn je…",
@@ -31,7 +33,8 @@ export const QUIZ_SEED = [
    "Podíl zákazníků, kteří za období odejdou"
   ],
   "correct": 3,
-  "time": 20
+  "time": 20,
+  "why": "Churn je míra odchodu: kolik procent zákazníků (nebo tržeb) za měsíc či rok odejde. Vysoký churn zkracuje LTV a růst pak teče jako z děravého kbelíku."
  },
  {
   "q": "Go-to-market (GTM) je…",
@@ -42,7 +45,8 @@ export const QUIZ_SEED = [
    "Měsíční opakované tržby"
   ],
   "correct": 1,
-  "time": 20
+  "time": 20,
+  "why": "Go-to-market je plán, komu, jakým kanálem a za kolik budete produkt prodávat – tedy jak se dostanete k prvním platícím zákazníkům."
  },
  {
   "q": "V jakých jednotkách se uvádí TAM?",
@@ -53,7 +57,8 @@ export const QUIZ_SEED = [
    "V počtu firem v oboru"
   ],
   "correct": 1,
-  "time": 20
+  "time": 20,
+  "why": "TAM (Total Addressable Market) je celková roční útrata za daný typ řešení, proto se uvádí v penězích za rok, např. 2 mld. Kč ročně."
  },
  {
   "q": "Kterému odhadu trhu investoři věří nejvíc?",
@@ -64,7 +69,8 @@ export const QUIZ_SEED = [
    "TAM z globální zprávy"
   ],
   "correct": 2,
-  "time": 20
+  "time": 20,
+  "why": "Odhad zdola (bottom-up) stojí na reálných číslech: kolik zákazníků umíte oslovit × kolik zaplatí. Proto mu investoři věří víc než „1 % z obřího trhu“."
  },
  {
   "q": "MVP je…",
@@ -75,7 +81,8 @@ export const QUIZ_SEED = [
    "Prezentace pro investory"
   ],
   "correct": 1,
-  "time": 20
+  "time": 20,
+  "why": "MVP (Minimum Viable Product) je nejjednodušší verze produktu, se kterou co nejrychleji a nejlevněji ověříte hlavní předpoklad u skutečných zákazníků."
  },
  {
   "q": "Runway je…",
@@ -86,7 +93,8 @@ export const QUIZ_SEED = [
    "Kolik firma měsíčně spálí"
   ],
   "correct": 2,
-  "time": 20
+  "time": 20,
+  "why": "Runway = peníze na účtu ÷ měsíční burn. Se 3 mil. Kč na účtu a výdaji 250 tis. Kč měsíčně firma vydrží 12 měsíců."
  },
  {
   "q": "Co je pivot?",
@@ -97,7 +105,8 @@ export const QUIZ_SEED = [
    "První kolo financování"
   ],
   "correct": 0,
-  "time": 20
+  "time": 20,
+  "why": "Pivot je zásadní změna strategie – zákazníka, problému nebo byznys modelu – podle toho, co jste se naučili od trhu. Nejde o kosmetickou úpravu."
  },
  {
   "q": "Vertikální produkt…",
@@ -108,7 +117,8 @@ export const QUIZ_SEED = [
    "Řeší jednu funkci pro všechny obory"
   ],
   "correct": 2,
-  "time": 20
+  "time": 20,
+  "why": "Vertikální produkt jde do hloubky jednoho odvětví (např. systém pro zubní ordinace). Horizontální řeší jednu funkci pro všechny obory (např. fakturace)."
  },
  {
   "q": "Moat je…",
@@ -119,7 +129,8 @@ export const QUIZ_SEED = [
    "Výhoda, kterou konkurence těžko okopíruje"
   ],
   "correct": 3,
-  "time": 20
+  "time": 20,
+  "why": "Moat (vodní příkop) je trvalá výhoda: síťové efekty, data, značka, patenty nebo vysoké náklady na přechod. Konkurence ji těžko okopíruje."
  },
  {
   "q": "Product-market fit znamená, že…",
@@ -130,7 +141,8 @@ export const QUIZ_SEED = [
    "Produkt je levnější než konkurence"
   ],
   "correct": 2,
-  "time": 20
+  "time": 20,
+  "why": "Product-market fit nastává, když produkt řeší skutečný problém tak dobře, že ho zákazníci sami chtějí, platí za něj a doporučují – růst pak táhne trh, ne marketing."
  },
  {
   "q": "Co zjistíte z cap table?",
@@ -141,7 +153,8 @@ export const QUIZ_SEED = [
    "Které fondy investici odmítly"
   ],
   "correct": 2,
-  "time": 20
+  "time": 20,
+  "why": "Cap table ukazuje, kdo vlastní kolik akcií a procent firmy – zakladatelé, investoři, opční program – a jak se podíly mění s každým kolem."
  },
  {
   "q": "Vesting chrání hlavně…",
@@ -152,7 +165,8 @@ export const QUIZ_SEED = [
    "Investory před down roundem"
   ],
   "correct": 1,
-  "time": 20
+  "time": 20,
+  "why": "Vesting: zakladatel získává podíl postupně, typicky 4 roky s ročním cliffem. Kdo odejde dřív, odchází jen s částí a zbytek zůstane firmě a týmu."
  },
  {
   "q": "Power law ve VC říká, že…",
@@ -163,6 +177,7 @@ export const QUIZ_SEED = [
    "Riziko roste s cenou podílu"
   ],
   "correct": 1,
-  "time": 20
+  "time": 20,
+  "why": "Výnosy VC se řídí mocninným zákonem: většina investic vrátí málo nebo nic a jedna či dvě hvězdy vrátí celý fond i víc."
  }
 ];

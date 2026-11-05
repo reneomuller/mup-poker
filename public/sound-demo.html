@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Zvuk – ukázka · MUP poker</title>
+<style>
+  :root { --bg: #f6f3ec; --fg: #1d1b16; --mut: #6b6457; --card: #fff; --line: #ddd5c4; --acc: #b8661b; --ok: #1f7a3a; --bad: #b3261e; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #15140f; --fg: #f2ead6; --mut: #a39a86; --card: #211f19; --line: #3a362c; --acc: #e09a3a; --ok: #6fcf8a; --bad: #ff8a80; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  p { color: var(--mut); margin: 0 0 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin: 16px 0; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--fg); border-radius: 10px; padding: 12px 14px; text-align: left; cursor: pointer; }
+  button:hover { border-color: var(--acc); }
+  button b { display: block; }
+  button span { color: var(--mut); font-size: .85rem; }
+  button.main { background: var(--acc); color: #fff; border-color: var(--acc); text-align: center; }
+  .row { display: flex; flex-wrap: wrap; gap: 16px 24px; align-items: center; margin: 12px 0; }
+  label { display: flex; gap: 10px; align-items: center; }
+  input[type=range] { width: 180px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: .9rem; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  td.ok { color: var(--ok); } td.bad { color: var(--bad); font-weight: 600; }
+  .wrap { overflow-x: auto; }
+  #status { color: var(--mut); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Zvuk na plátně – ukázka</h1>
+  <p>Vlastní znělky kvízu a investování, syntetizované v&nbsp;prohlížeči (žádné zvukové soubory). Klikněte na zvuk, který chcete slyšet.</p>
+  <div class="row">
+    <button class="main" id="unlock" type="button">🔊 Zapnout zvuk</button>
+    <button type="button" id="stop">⏹ Zastavit vše</button>
+    <label>Hlasitost <input type="range" id="vol" min="0" max="1" step="0.01" aria-label="Hlasitost"></label>
+    <label>Rozladění <input type="range" id="wob" min="0" max="1" step="0.01" aria-label="Rozladění (wobble)"></label>
+  </div>
+  <div class="grid" id="cues"></div>
+  <div class="row"><button type="button" id="test">Ověřit všechny zvuky (offline)</button><span id="status"></span></div>
+  <div class="wrap"><table id="res" hidden><thead><tr><th>Zvuk</th><th>Délka</th><th>Špička</th><th>RMS</th><th>NaN</th><th>Smyčka</th><th>Výsledek</th></tr></thead><tbody></tbody></table></div>
+</main>
+<script src="/sound.js"></script>
+<script>
+(function () {
+  const S = window.MupSound;
+  const $ = (id) => document.getElementById(id);
+  const LABELS = {
+    lobby: ['Lobby', 'smyčka před první otázkou'], question: ['Otázka', '20s odpočet, posledních 5 s zrychlí'], tick: ['Tik', 'jedna sekunda odpočtu'],
+    reveal: ['Odhalení', 'krátká znělka + potlesk'], correctCrowd: ['Správně!', 'oslavná vlnka a potlesk'], board: ['Pořadí', 'znělka žebříčku'],
+    streak: ['🔥 Série', 'někdo má 3 a víc v řadě'], podium: ['Finále', 'závěrečná fanfára'], showdown: ['Showdown', 'vířivý buben a rozuzlení'], marketOpen: ['Trh otevřen', 'zvonek: investování začíná'],
+  };
+  const box = $('cues');
+  for (const name of S.cues) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.dataset.cue = name;
+    b.innerHTML = `<b>${LABELS[name]?.[0] || name}</b><span>${LABELS[name]?.[1] || ''}</span>`;
+    b.onclick = () => {
+      S.unlock();
+      const go = () => S.cue(name, name === 'question' ? { endsAt: Date.now() + 20000, serverNow: Date.now() } : name === 'reveal' ? { crowd: true } : {});
+      if (S.unlocked) go(); else setTimeout(go, 150);
+    };
+    box.appendChild(b);
+  }
+  $('unlock').onclick = () => { S.setEnabled(true); S.unlock(); };
+  $('stop').onclick = () => S.stopAll();
+  $('vol').value = S.volume; $('wob').value = S.wobble;
+  $('vol').oninput = (e) => S.setVolume(e.target.value);
+  $('wob').oninput = (e) => S.setWobble(e.target.value);
+  S.onchange = () => { $('unlock').textContent = S.playing ? '🔊 Zvuk zapnutý' : '🔊 Zapnout zvuk'; };
+
+  // Offline check of every cue: non-silent, no NaN, peak <= 0.9, and the loops wrap without a gap or click.
+  function stats(buf, seam, seamBar) {
+    const d = buf.getChannelData(0), sr = buf.sampleRate, W = Math.round(sr * 0.05);
+    let peak = 0, nan = 0, sq = 0;
+    for (let i = 0; i < d.length; i++) { const x = d[i]; if (x !== x) { nan++; continue; } const a = Math.abs(x); if (a > peak) peak = a; sq += x * x; }
+    const out = { secs: +(d.length / sr).toFixed(2), peak: +peak.toFixed(3), rms: +Math.sqrt(sq / d.length).toFixed(4), nan };
+    if (seam) {
+      const win = (a) => { let s = 0; for (let i = a; i < a + W && i < d.length; i++) s += d[i] * d[i]; return Math.sqrt(s / W); };
+      const all = []; for (let i = Math.round(sr * 0.1); i + W < d.length; i += W) all.push(win(i));
+      const med = all.slice().sort((a, b) => a - b)[all.length >> 1];
+      const b = Math.round(seam * sr);
+      // quietest 50 ms around the wrap vs around the same beat two bars earlier (no gap = similar)
+      const minAround = (c) => { let m = Infinity; for (let i = c - Math.round(sr * 0.5); i < c + Math.round(sr * 0.5); i += W) m = Math.min(m, win(i)); return m; };
+      const minNear = minAround(b), minRef = minAround(b - Math.round(sr * seamBar * 2));
+      let jumpNear = 0, jumpAll = 0;
+      for (let i = 1; i < d.length; i++) { const j = Math.abs(d[i] - d[i - 1]); if (j > jumpAll) jumpAll = j; if (i > b - sr * 0.05 && i < b + sr * 0.05 && j > jumpNear) jumpNear = j; }
+      // the same 2 s after the start and after the wrap should sound alike (correlation of 50 ms envelopes)
+      const env = (a) => { const e = []; for (let k = 0; k < 40; k++) e.push(win(a + k * W)); return e; };
+      const e1 = env(Math.round(sr * 0.05)), e2 = env(b);
+      const m1 = e1.reduce((a, x) => a + x, 0) / 40, m2 = e2.reduce((a, x) => a + x, 0) / 40;
+      let num = 0, d1 = 0, d2 = 0; for (let k = 0; k < 40; k++) { num += (e1[k] - m1) * (e2[k] - m2); d1 += (e1[k] - m1) ** 2; d2 += (e2[k] - m2) ** 2; }
+      out.seam = { at: +seam.toFixed(2), gap: +(minNear / (minRef || 1e-9)).toFixed(2), quiet: +(minNear / med).toFixed(2), jumpNear: +jumpNear.toFixed(3), jumpAll: +jumpAll.toFixed(3), corr: +(num / Math.sqrt(d1 * d2 || 1)).toFixed(2) };
+      out.seamOk = out.seam.gap > 0.6 && jumpNear <= jumpAll && out.seam.corr > 0.5;
+    }
+    out.ok = nan === 0 && out.rms > 0.004 && peak <= 0.9 && peak > 0.02 && (!seam || out.seamOk);
+    return out;
+  }
+  const PLAN = {
+    lobby: () => { const L = S.loopSeconds('lobby'); return [L + 4, {}, 0.05 + L, 'lobby', L / 32]; },
+    question: () => [13, { endsAt: 12000, serverNow: 0 }],
+    questionLoop: () => { const L = S.loopSeconds('question'); return [L + 3, { endsAt: 60000, serverNow: 0 }, 0.05 + L, 'question', L / 8]; },
+    tick: () => [1, {}], reveal: () => [4, { crowd: true }], correctCrowd: () => [3, {}], board: () => [6, {}],
+    streak: () => [2.5, {}], podium: () => [17, {}], showdown: () => [6, {}], marketOpen: () => [4, {}],
+  };
+  window.soundSelfTest = async function () {
+    const res = {};
+    for (const [k, plan] of Object.entries(PLAN)) {
+      const [secs, opts, seam, cue = k, bar] = plan();
+      const t = performance.now();
+      try { const buf = await S.renderOffline(cue, secs, opts); res[k] = { ...stats(buf, seam, bar), ms: Math.round(performance.now() - t) }; }
+      catch (e) { res[k] = { ok: false, error: String(e && e.stack || e) }; }
+    }
+    return res;
+  };
+  $('test').onclick = async () => {
+    $('status').textContent = 'Počítám…';
+    const r = await window.soundSelfTest();
+    const tb = $('res').querySelector('tbody');
+    tb.innerHTML = Object.entries(r).map(([k, x]) => `<tr><td>${k}</td><td>${x.secs ?? '–'} s</td><td>${x.peak ?? '–'}</td><td>${x.rms ?? '–'}</td><td>${x.nan ?? '–'}</td><td>${x.seam ? `mezera ${x.seam.gap}, korelace ${x.seam.corr}` : '–'}</td><td class="${x.ok ? 'ok' : 'bad'}">${x.ok ? 'OK' : 'CHYBA ' + (x.error || '')}</td></tr>`).join('');
+    $('res').hidden = false;
+    $('status').textContent = Object.values(r).every((x) => x.ok) ? 'Vše v pořádku.' : 'Něco nesedí.';
+  };
+})();
+</script>
+</body>
+</html>

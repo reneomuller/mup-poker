@@ -11,13 +11,13 @@ export async function buildDump(meta, players, content) {
   const slips = {};
   const hs = await Promise.all(Array.from({ length: G.CFG.MAX_BLOCK }, (_, i) => S.hgetall('slip:' + (i + 1))));
   hs.forEach((h, i) => { if (Object.keys(h).length) slips[i + 1] = h; });
-  const [qs, qv, qr, tx] = await Promise.all([S.hgetall('qs'), S.hgetall('qv'), S.hgetall('qr'), S.hgetall('tx')]);
-  return { meta, players, slips, content, board: { qs, qv, qr }, tx };
+  const [qs, qv, qr, tx, walls] = await Promise.all([S.hgetall('qs'), S.hgetall('qv'), S.hgetall('qr'), S.hgetall('tx'), W.dumpWalls(meta)]);
+  // v4: team walls too, so every archive („Před blokem N“, „Stav před v2“, manual ones) keeps them
+  return { meta, players, slips, content, board: { qs, qv, qr }, tx, walls };
 }
 
 export async function createArchive(label, auto, meta, players, content) {
   const dump = await buildDump(meta, players, content);
-  dump.walls = await W.dumpWalls(meta); // v3 §4: the team walls too (reset clears them right after its archive)
   const ts = Date.now();
   const id = ts.toString(36) + crypto.randomBytes(3).toString('hex');
   const obj = { id, ts, label: String(label || 'Archiv').slice(0, 80), auto: !!auto, block: meta.block, dump };

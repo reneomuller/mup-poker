@@ -835,7 +835,7 @@
       const locked = tr.filter((x) => x.team === t.id && x.status === 'locked');
       // own team: the live founders % from myTeam, so Startupy matches the Tým header while trades are pending
       const capF = feat('captable') && t.cap ? (t.id === me.team && me.myTeam?.founders != null ? me.myTeam.founders : t.cap.founders) : null;
-      return `<article class="s-card p-card p-su ${t.id === me.team ? 'mine' : ''}" data-key="su${t.id}" style="--tc:${esc(t.color)}">
+      return `<article class="s-card p-card p-su ${t.id === me.team ? 'mine' : ''}" data-key="su${t.id}" style="--tc:${esc(t.color)}"${window.PlayStartup?.cardAttrs(t) || ''}>
         <div class="p-su-h"><span class="p-su-ic">${esc(initials(t.name))}</span><div class="p-su-n"><b>${esc(t.name)}</b>${t.id === me.team ? '<span class="s-badge">Tvůj tým</span>' : ''}</div>
           <div class="p-su-v">${tw('suV' + t.id, Vn(t))}${multChip(t, true)}${r && r.kind && r.kind !== 'flat' ? `<span class="s-badge ${r.kind === 'up' ? 's-ok' : r.kind === 'down' ? 's-bad' : ''}">${esc(ROUND[r.kind] || '')}${r.pct ? ' ' + esc(spct(r.pct)) : ''}</span>` : '<span class="s-label">ocenění</span>'}</div></div>
         ${c.oneLiner ? `<p class="p-su-one">${esc(c.oneLiner)}</p>` : cards ? '<p class="p-su-one s-faint">Tým zatím nenapsal one-liner.</p>' : ''}
@@ -952,8 +952,9 @@
     async list() {
       const r = DEMO && window.PlayDemo?.wallList ? await window.PlayDemo.wallList() : await get(auth(), '?view=wall');
       if (!r || r.ok === false) throw Object.assign(new Error(r?.error || 'Nástěnku se nepodařilo načíst.'), { ok: false, error: r?.error });
-      return r.stickers || [];
+      return r.stickers ? r : []; // v4: the whole response (members for the assignee picker)
     },
+    op: DEMO ? undefined : (b) => wallOp(b), // v4 wallplus: reactions, pins, answers, task details
     post: (b) => (DEMO && window.PlayDemo?.wallOp ? window.PlayDemo.wallOp('post', b) : wallOp({ op: 'wallPost', kind: b.kind, text: b.text })),
     reply: (b) => (DEMO && window.PlayDemo?.wallOp ? window.PlayDemo.wallOp('reply', b) : wallOp({ op: 'wallReply', id: b.id, text: b.text })),
     done: (b) => (DEMO && window.PlayDemo?.wallOp ? window.PlayDemo.wallOp('done', b) : wallOp({ op: 'wallDone', id: b.id, done: !!b.done })),
@@ -963,12 +964,12 @@
   function syncWall() {
     const on = wallOn();
     $('wallcard').classList.toggle('hidden', !on);
-    const want = on && view === 'profile' ? `${me.id}|${me.team}` : null;
+    const want = on && view === 'profile' ? `${me.id}|${me.team}|${feat('wallplus')}` : null;
     if (want === wallKey) return;
     if (wallW) { try { wallW.destroy(); } catch {} wallW = null; $('wallbox').innerHTML = ''; }
     wallKey = want;
     if (want) {
-      try { wallW = window.MupWall.mount($('wallbox'), { role: 'student', team: me.team, api: wallApi, pollMs: 4000 }); } catch (e) { console.warn(e); wallW = null; }
+      try { wallW = window.MupWall.mount($('wallbox'), { role: 'student', team: me.team, api: wallApi, pollMs: 4000, plus: feat('wallplus'), seenKey: 'mup.wseen.' + me.id }); } catch (e) { console.warn(e); wallW = null; }
     }
   }
 
@@ -1211,6 +1212,7 @@
         ${L.length ? `<div class="qz-board">${L.map((p, i) => `<div class="p-rk ${p.name === me.name && p.team === me.team ? 'me' : ''}" data-key="ql${i}"><span class="p-rk-i">${i + 1}</span><span class="p-rk-n"><b>${esc(p.name)}</b>${teamTag(p.team)}</span><span class="p-rk-v"><b class="s-num">${esc(num(p.quizPoints))}</b></span></div>`).join('')}</div>` : ''}`}
         ${mode === 'done' ? '<button type="button" class="s-btn s-primary s-block qz-close" data-act="quiz-close">Zpět do hry</button>' : ''}`;
     }
+    if (window.MupQuizPlus) body = window.MupQuizPlus.phone({ mode, q, mq, me, S, body, ready: pin ? () => send({ op: 'quizReady', sid, pin }) : null }); // v4 quizplus
     const key = mode + '|' + body;
     if (key !== quizKey) { quizKey = key; morph(el, `<div class="qz-in" data-mode="${mode}">${body}</div>`); }
     tickQuiz();
@@ -1295,7 +1297,9 @@
     document.body.classList.toggle('p-bet', S.phase === 'betting');
     renderHeader(); renderStatus(); renderExit(); renderHero(); renderMsgs(); renderNotes(); renderMain(); renderDock();
     renderPortfolio(); renderCap(); renderStartups(); renderTeam(); renderProfile(); renderBoard(); renderQuiz(); renderDots(); renderReveal();
+    window.PlayStartup?.render(); // v4 startup detail sheet
     syncWall(); runTweens();
+    if (window.PlayRecap) PlayRecap.update(S, me, auth()); // v4 recap: Tým card + auto-open at the final
   }
 
   async function tick() {
@@ -1325,6 +1329,7 @@
         else if (r?.relogin) logout();
         return; // keep the last screen while reconnecting
       }
+      if (s.meError === 'locked') { PA.loginError = 'Moc pokusů se špatným PINem. Zkus to za pár minut, nebo požádej o QR přihlášení.'; logout(); return; } // v4 guard: say why
       if (++meFail >= 3) logout();
     } else if (!sid || !pin) showLogin();
   }
@@ -1340,14 +1345,19 @@
     const fast = feat('quiz') && S?.quiz?.state === 'question';
     let ms = fast ? 1000 : 2500;
     if (document.hidden) ms *= 3;
+    if (window.PN) ms = PN.delay(ms); // v4 guard: exponential backoff while offline
     loopT = setTimeout(loop, ms);
   }
   function kick(d = 150) { clearTimeout(loopT); loopT = setTimeout(loop, d); }
+  // v4 guard (play-net.js): the retry button re-polls at once; back online, a flushed queue re-polls and the wall reloads
+  if (window.PN) { PN.kick = kick; PN.onSync = (sent) => { if (sent) kick(0); try { if (wallW) wallW.refresh(); } catch {} }; }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) kick(0); });
   window.addEventListener('online', () => kick(0));
 
   setInterval(() => { if (S && me) renderStatus(); }, 500);
   setInterval(() => { if (S && me) tickQuiz(); }, 200);
+  let hbAt = 0; // v4 regie: presence heartbeat every 30 s, only while visible (never in preview / demo)
+  setInterval(() => { if (!document.hidden && !PA.on && !DEMO && sid && pin && me && feat('regie') && Date.now() - hbAt > 29000) { hbAt = Date.now(); MUP.post({ op: 'hb', sid, pin }); } }, 5000);
 
   async function start() {
     if (DEMO) {
@@ -1359,5 +1369,6 @@
     applyView();
     loop();
   }
+  window.PlayStartup?.init({ state: () => ({ S, me, view }), go, get: (q) => get(auth(), q), tw, runTweens, readOnly: () => !!PA.on }); // v4 startup detail sheet
   start();
 })();
