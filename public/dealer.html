@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="/stand.css">
 <link rel="stylesheet" href="/wall.css">
 <link rel="stylesheet" href="/dealer.css">
+<script src="/vendor/qrcode.js" defer></script>
 </head>
 <body class="s-app adm">
 <section id="dlogin" class="hidden">
@@ -116,7 +117,7 @@
       <div class="s-card" id="wallbox">
         <div class="ch"><h3>Nástěnky týmů</h3><span class="s-label" id="wallsum"></span></div>
         <p class="hint">Otázky a úkoly pro týmy. Každý tým vidí jen svou nástěnku. Úkol můžete poslat všem týmům najednou.</p>
-        <div class="wchips" id="wchips" role="tablist" aria-label="Tým"></div>
+        <div class="wbar"><div class="wchips" id="wchips" role="tablist" aria-label="Tým"></div><div class="wpv" id="wpv" hidden></div></div>
         <div class="wmount" id="wmount"></div>
       </div>
       <p class="offnote" id="wnote" hidden></p>
