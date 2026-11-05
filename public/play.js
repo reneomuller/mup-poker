@@ -946,8 +946,9 @@
     async list() {
       const r = DEMO && window.PlayDemo?.wallList ? await window.PlayDemo.wallList() : await get(auth(), '?view=wall');
       if (!r || r.ok === false) throw Object.assign(new Error(r?.error || 'Nástěnku se nepodařilo načíst.'), { ok: false, error: r?.error });
-      return r.stickers || [];
+      return r.stickers ? r : []; // v4: the whole response (members for the assignee picker)
     },
+    op: DEMO ? undefined : (b) => wallOp(b), // v4 wallplus: reactions, pins, answers, task details
     post: (b) => (DEMO && window.PlayDemo?.wallOp ? window.PlayDemo.wallOp('post', b) : wallOp({ op: 'wallPost', kind: b.kind, text: b.text })),
     reply: (b) => (DEMO && window.PlayDemo?.wallOp ? window.PlayDemo.wallOp('reply', b) : wallOp({ op: 'wallReply', id: b.id, text: b.text })),
     done: (b) => (DEMO && window.PlayDemo?.wallOp ? window.PlayDemo.wallOp('done', b) : wallOp({ op: 'wallDone', id: b.id, done: !!b.done })),
@@ -957,12 +958,12 @@
   function syncWall() {
     const on = wallOn();
     $('wallcard').classList.toggle('hidden', !on);
-    const want = on && view === 'profile' ? `${me.id}|${me.team}` : null;
+    const want = on && view === 'profile' ? `${me.id}|${me.team}|${feat('wallplus')}` : null;
     if (want === wallKey) return;
     if (wallW) { try { wallW.destroy(); } catch {} wallW = null; $('wallbox').innerHTML = ''; }
     wallKey = want;
     if (want) {
-      try { wallW = window.MupWall.mount($('wallbox'), { role: 'student', team: me.team, api: wallApi, pollMs: 4000 }); } catch (e) { console.warn(e); wallW = null; }
+      try { wallW = window.MupWall.mount($('wallbox'), { role: 'student', team: me.team, api: wallApi, pollMs: 4000, plus: feat('wallplus'), seenKey: 'mup.wseen.' + me.id }); } catch (e) { console.warn(e); wallW = null; }
     }
   }
 

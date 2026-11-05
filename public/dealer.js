@@ -83,6 +83,7 @@
     ['exit', 'Exit', 'Finále: akvizice, IPO nebo odpis a konečné pořadí investorů.'],
     ['demand', 'Cena podle poptávky', 'Jako na burze: po showdownu se cena startupu změní podle toho, kolik peněz přilákal oproti ostatním.'],
     ['wall', 'Nástěnky týmů', 'Každý tým má soukromou nástěnku s\u00a0otázkami a úkoly od vás i od svých členů.'],
+    ['wallplus', 'Nástěnky+', 'Reakce, připnutí, označená odpověď, termín a řešitel úkolu, šablony a filtry na nástěnkách.'],
   ];
   const featKnown = () => !!(S && S.features && typeof S.features === 'object');
   const F = (k) => !!(S && S.features && S.features[k]);
@@ -1677,13 +1678,14 @@
       const j = await get(H(), '?view=wall&team=' + encodeURIComponent(tid));
       if (!j || j.ok === false) throw new Error((j && j.error) || 'Nástěnku se nepodařilo načíst.');
       markSeen(tid === 'all' ? S.teams.map((t) => t.id) : [tid]);
-      if (tid === 'all') return { walls: j.walls || {} };
-      return j.stickers || [];
+      if (tid === 'all') return j.walls ? j : { walls: {} }; // v4: + templates, groups, members
+      return j.stickers ? j : [];
     },
     post: (b = {}) => wcall('wallPost', b.all ? { all: true, kind: b.kind, text: b.text } : { team: pickTeam(b), kind: b.kind, text: b.text }),
     reply: (b = {}) => wcall('wallReply', { team: pickTeam(b), id: b.id, text: b.text }),
     done: (b = {}) => wcall('wallDone', { team: pickTeam(b), id: b.id, done: !!b.done }),
     del: (b = {}) => wcall('wallDelete', { team: pickTeam(b), id: b.id, ...(b.reply ? { reply: b.reply } : {}) }),
+    op: (b = {}) => wcall(b.op, b.all ? b : { ...b, team: pickTeam(b) }), // v4 wallplus
   };
   function unmountWall() {
     if (!wallW) return;
@@ -1730,6 +1732,7 @@
     $('wallsum').textContent = r ? (wallUnreadTotal() ? `nové: ${wallUnreadTotal()}` : 'vše přečteno') : '';
     renderWallChips();
     const mount = $('wmount');
+    if (wallW && wallW.plus !== F('wallplus')) unmountWall(); // v4: remount when wallplus flips
     if (wallW || !mount) return;
     if (!window.MupWall || typeof window.MupWall.mount !== 'function') {
       if (!mount.dataset.miss) { mount.innerHTML = '<div class="wmiss">Nástěnky se nenačetly (chybí <code>/wall.js</code>). Obnovte stránku za chvíli.</div>'; mount.dataset.miss = '1'; }
@@ -1739,8 +1742,9 @@
     try {
       wallW = window.MupWall.mount(mount, {
         role: 'dealer', teams: S.teams.map((t) => ({ id: t.id, name: t.name, color: t.color })), team: wallTeam,
-        api: wallApi, canSendAll: true, pollMs: 4000,
+        api: wallApi, canSendAll: true, pollMs: 4000, plus: F('wallplus'), seenKey: 'mup.wseen.dealer',
       });
+      wallW.plus = F('wallplus');
     } catch (e) { console.error('MupWall.mount', e); wallW = null; }
   }
 
