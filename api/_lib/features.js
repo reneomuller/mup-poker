@@ -10,6 +10,7 @@ export const FEATURE_DEFAULTS = {
   wall: true,
   demand: true,
   startupPage: true, // v4: startup detail sheet on the phone (+ GET ?view=startup)
+  quizplus: true, // v4: quiz explanations, ×2 questions, images, podium, lobby counter, results export
 };
 export const OFF = 'Tato funkce je vypnutá.';
 export const REASON_LABELS = { milestone: 'Splněný milník', traction: 'Trakce', team: 'Tým', risk: 'Riziko', market: 'Trh', other: 'Jiné' };

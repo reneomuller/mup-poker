@@ -82,6 +82,7 @@
     ['tranches', 'Tranše RJ', 'RainbowJet slíbí peníze, které uvolní až po splnění podmínky.'],
     ['exit', 'Exit', 'Finále: akvizice, IPO nebo odpis a konečné pořadí investorů.'],
     ['demand', 'Cena podle poptávky', 'Jako na burze: po showdownu se cena startupu změní podle toho, kolik peněz přilákal oproti ostatním.'],
+    ['quizplus', 'Kvíz+', 'Vysvětlení po odhalení, otázky za ×2, obrázky, stupně vítězů, počítadlo v\u00a0lobby a export výsledků.'],
     ['wall', 'Nástěnky týmů', 'Každý tým má soukromou nástěnku s\u00a0otázkami a úkoly od vás i od svých členů.'],
     ['startupPage', 'Detail startupu', 'Klepnutím na startup v\u00a0mobilu se otevře detail: graf ocenění, čísla, karta a proč do něj spolužáci investovali.'],
   ];
@@ -1102,7 +1103,7 @@
       <div class="qeh"><span class="qn">${i + 1}</span><textarea class="s-input sm" data-f="q" maxlength="160" rows="2" placeholder="Text otázky">${esc(q.q || '')}</textarea>
         <div class="qeb"><button class="ib" data-mv="-1" ${i === 0 ? 'disabled' : ''} title="Posunout nahoru">↑</button><button class="ib" data-mv="1" ${i === qe.questions.length - 1 ? 'disabled' : ''} title="Posunout dolů">↓</button><button class="ib del" data-rm title="Smazat otázku">✕</button></div></div>
       <div class="qea">${a.map((x, k) => `<label class="qa a${k} ${q.correct === k ? 'ok' : ''}"><input type="radio" name="qc${i}" value="${k}" ${q.correct === k ? 'checked' : ''} title="Správná odpověď"><span class="L">${'ABCD'[k]}</span><input class="s-input sm" data-a="${k}" maxlength="80" value="${esc(x)}" placeholder="Odpověď ${'ABCD'[k]}${k > 1 ? ' (nepovinná)' : ''}"></label>`).join('')}</div>
-      <div class="qet"><span class="s-faint sm">Kliknutím na kolečko označíte správnou odpověď.</span><span class="unit">čas <input class="s-input sm num" data-f="time" inputmode="numeric" value="${esc(q.time || 20)}" aria-label="Čas v sekundách"> s</span></div></div>`;
+      <div class="qet"><span class="s-faint sm">Kliknutím na kolečko označíte správnou odpověď.</span><span class="unit">čas <input class="s-input sm num" data-f="time" inputmode="numeric" value="${esc(q.time || 20)}" aria-label="Čas v sekundách"> s</span></div>${window.MupQuizPlusEd ? window.MupQuizPlusEd.fields(q, i) : ''}</div>`;
   }
   function drawQe() {
     const el = $('qzsets'), sets = quizSets();
@@ -1118,7 +1119,7 @@
         ${qe.isNew ? '' : '<button class="s-btn s-sm s-danger" id="qedel">Smazat sadu</button>'}
         <button class="s-btn s-sm s-ghost" id="qedrop">${dirty.qzsets ? 'Zahodit změny' : 'Zavřít'}</button>
         <button class="s-btn s-sm s-primary" id="qesave">Uložit sadu</button></div>`
-      : `<ol class="qsum">${qe.questions.map((q) => `<li><span>${esc(q.q)}</span><span class="s-faint sm">${'ABCD'[q.correct] || '?'} · ${esc(q.time)} s</span></li>`).join('') || '<li class="s-faint">Sada je prázdná.</li>'}</ol>
+      : `<ol class="qsum">${qe.questions.map((q) => `<li><span>${esc(q.q)}${window.MupQuizPlusEd?.badges(q) || ''}</span><span class="s-faint sm">${'ABCD'[q.correct] || '?'} · ${esc(q.time)} s</span></li>`).join('') || '<li class="s-faint">Sada je prázdná.</li>'}</ol>
       <div class="inl"><button class="s-btn s-sm" id="qeopen">Upravit otázky</button></div>`}`;
     if (!qeOpen) {
       $('qeset').onchange = (e) => { qeId = e.target.value || null; redraw('qzsets'); renderQuizSets(); };
@@ -1163,6 +1164,7 @@
       all(box, 'input[type=radio]').forEach((r) => (r.onchange = () => { q.correct = +r.value; all(box, '.qa').forEach((l, k) => l.classList.toggle('ok', k === q.correct)); setQeDirty(); }));
       all(box, '[data-mv]').forEach((b) => (b.onclick = () => { const j = i + Number(b.dataset.mv); [qe.questions[i], qe.questions[j]] = [qe.questions[j], qe.questions[i]]; setQeDirty(); drawQe(); }));
       box.querySelector('[data-rm]').onclick = () => { if ((q.q || '').trim() && !confirm(`Smazat otázku ${i + 1}?`)) return; qe.questions.splice(i, 1); setQeDirty(); drawQe(); };
+      window.MupQuizPlusEd?.bind(box, q, setQeDirty, drawQe); // v4 quizplus: why / ×2 / image
     });
   }
   function cleanSet(s) {
@@ -1175,7 +1177,7 @@
       if (!text) return { error: `Otázka ${i + 1} nemá text.` };
       if (kept.length < 2) return { error: `Otázka ${i + 1} potřebuje aspoň dvě odpovědi.` };
       if (correct < 0) return { error: `U otázky ${i + 1} označte správnou (vyplněnou) odpověď.` };
-      questions.push({ q: text.slice(0, 160), a: kept, correct, time: Math.min(120, Math.max(5, Math.round(Number(q.time) || 20))) });
+      questions.push({ q: text.slice(0, 160), a: kept, correct, time: Math.min(120, Math.max(5, Math.round(Number(q.time) || 20))), ...(window.MupQuizPlusEd?.clean(q) || {}) });
     }
     if (!questions.length) return { error: 'Sada potřebuje aspoň jednu otázku.' };
     return { set: { id: s.id, title: String(s.title || '').trim().slice(0, 60) || 'Kvíz', questions } };
@@ -1187,7 +1189,7 @@
     if (!set || !Array.isArray(set.questions)) return toast('V JSON chybí seznam otázek.', true);
     qe = {
       id: newId(), title: String(set.title || 'Import'), isNew: true,
-      questions: set.questions.map((q) => ({ q: String(q.q ?? q.question ?? ''), a: (q.a || q.answers || []).slice(0, 4).map((x) => String(x ?? '')), correct: Number(q.correct) || 0, time: Number(q.time) || 20 })),
+      questions: set.questions.map((q) => ({ q: String(q.q ?? q.question ?? ''), a: (q.a || q.answers || []).slice(0, 4).map((x) => String(x ?? '')), correct: Number(q.correct) || 0, time: Number(q.time) || 20, ...(window.MupQuizPlusEd?.clean(q) || {}) })),
     };
     setQeDirty(); drawQe();
     toast(`Načteno ${qe.questions.length} otázek – zkontrolujte a uložte.`);
