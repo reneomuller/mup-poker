@@ -60,7 +60,7 @@
       ],
     },
     dealer: {
-      label: 'Dealer (my)', src: '/dealer', w: 1180, h: 900,
+      label: 'Admin (my)', src: '/dealer', w: 1180, h: 900,
       groups: [
         ['Tlačítka', [
           ['dealer.btn.pitch', 'Spustit pitch'], ['dealer.btn.qa', 'Otázky'], ['dealer.btn.stop', 'Stop časovač'], ['dealer.btn.lobby', 'Lobby'],
@@ -85,8 +85,8 @@
     const cur = vals[key] ?? def;
     const long = LONG.test(key) || def.length > 60;
     const ctl = long
-      ? `<textarea class="input" rows="3" data-k="${key}" placeholder="${esc(def)}">${esc(cur)}</textarea>`
-      : `<input class="input" data-k="${key}" value="${esc(cur)}" placeholder="${esc(def)}">`;
+      ? `<textarea class="s-input" rows="3" data-k="${key}" placeholder="${esc(def)}">${esc(cur)}</textarea>`
+      : `<input class="s-input" data-k="${key}" value="${esc(cur)}" placeholder="${esc(def)}">`;
     return `<div class="f ${cur !== def ? 'changed' : ''}" data-f="${key}"><div class="top"><span class="name">${esc(label)}</span>${vars ? `<span class="vars">${esc(vars)}</span>` : ''}
       <button class="reset" data-r="${key}" ${cur !== def ? '' : 'hidden'}>výchozí</button></div>${ctl}</div>`;
   }
@@ -95,7 +95,7 @@
     const sc = SCHEMA[tab];
     if (tab === 'bills') return renderBills();
     $('editor').innerHTML = sc.groups.map(([g, fields]) => `<div class="group"><h2>${esc(g)}</h2>${fields.map(fieldHTML).join('')}</div>`).join('') +
-      '<p class="muted small">Proměnné ve složených závorkách (např. {team}) se doplní samy. Prázdné pole = výchozí text.</p>';
+      '<p class="s-muted small">Proměnné ve složených závorkách (např. {team}) se doplní samy. Prázdné pole = výchozí text.</p>';
     $('editor').querySelectorAll('[data-k]').forEach((el) => el.addEventListener('input', () => {
       const k = el.dataset.k;
       vals[k] = el.value;
@@ -114,13 +114,13 @@
   function renderBills() {
     MUP.FOUNDERS.splice(0, MUP.FOUNDERS.length, ...founders.map((f) => ({ ...f })));
     $('editor').innerHTML = `<div class="group"><h2>Zakladatelé na bankovkách</h2>
-      <p class="muted small" style="margin-bottom:10px">Fotka se načte z Wikipedie podle odkazu (např. en/Jeff_Bezos nebo cs/Pavel_Baudiš). Pokud tam fotka není, vložte přímý odkaz na obrázek (https://…).</p>
-      ${founders.map((f, i) => `<div class="f" data-i="${i}"><div class="bill-ed"><div>${billHTML(i)}<button class="btn sm ghost rm" data-rm="${i}">Odebrat</button></div>
-        <div class="brow2"><input class="input" data-b="name" value="${esc(f.name)}" placeholder="Jméno">
-        <input class="input" data-b="wiki" value="${esc(f.wiki || '')}" placeholder="Wikipedie (en/Jmeno)">
-        <input class="input full" data-b="story" value="${esc(f.story || '')}" placeholder="Jedna věta: jak začal úzce">
-        <input class="input full" data-b="photo" value="${esc(f.photo || '')}" placeholder="Vlastní fotka (https://…), nepovinné"></div></div></div>`).join('')}
-      <div class="actions"><button class="btn ghost" id="addb">+ Přidat bankovku</button><button class="btn ghost" id="defb">Vrátit výchozí zakladatele</button></div></div>`;
+      <p class="s-muted small" style="margin:0 0 10px">Fotka se načte z Wikipedie podle odkazu (např. en/Jeff_Bezos nebo cs/Pavel_Baudiš). Pokud tam fotka není, vložte přímý odkaz na obrázek (https://…).</p>
+      ${founders.map((f, i) => `<div class="f" data-i="${i}"><div class="bill-ed"><div>${billHTML(i)}<button class="s-btn s-sm s-ghost rm" data-rm="${i}">Odebrat</button></div>
+        <div class="brow2"><input class="s-input" data-b="name" value="${esc(f.name)}" placeholder="Jméno">
+        <input class="s-input" data-b="wiki" value="${esc(f.wiki || '')}" placeholder="Wikipedie (en/Jmeno)">
+        <input class="s-input full" data-b="story" value="${esc(f.story || '')}" placeholder="Jedna věta: jak začal úzce">
+        <input class="s-input full" data-b="photo" value="${esc(f.photo || '')}" placeholder="Vlastní fotka (https://…), nepovinné"></div></div></div>`).join('')}
+      <div class="actions"><button class="s-btn s-sm s-ghost" id="addb">+ Přidat bankovku</button><button class="s-btn s-sm s-ghost" id="defb">Vrátit výchozí zakladatele</button></div></div>`;
     loadPortraits();
     $('editor').querySelectorAll('[data-b]').forEach((el) => el.addEventListener('input', () => {
       const i = +el.closest('[data-i]').dataset.i;
