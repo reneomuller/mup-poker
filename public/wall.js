@@ -264,7 +264,7 @@
               h('h3', { class: 'mw-team-h' }, [
                 h('span', { class: 'mw-team-dot', 'aria-hidden': 'true' }),
                 h('span', { class: 'mw-team-name' }, t.name),
-                h('span', { class: 'mw-team-n' }, list.length ? noteCount(list.length) + ' · ' + nq + NB + plural(nq, 'otázka', 'otázky', 'otázek') + ' · ' + open + '/' + nt + NB + 'úkolů otevřeno' : 'prázdná'),
+                h('span', { class: 'mw-team-n' }, list.length ? noteCount(list.length) + ' · ' + nq + NB + plural(nq, 'otázka', 'otázky', 'otázek') + (nt ? ' · otevřené úkoly ' + open + '/' + nt : '') : 'prázdná'),
               ]),
               gridEl(list, k, 'Zatím bez lístečků.'),
             ]));

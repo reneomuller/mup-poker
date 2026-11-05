@@ -96,7 +96,7 @@
 }
 @media (min-width: 700px) { .mw-grid { grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 24px 20px; } }
 .mw-note {
-  position: relative; display: block; width: 100%; aspect-ratio: 1 / 1; padding: 0; margin: 0;
+  position: relative; display: flex; flex-direction: column; width: 100%; aspect-ratio: 1 / 1; padding: 0; margin: 0;
   border: 0; background: none; text-align: left; cursor: pointer; color: var(--mw-ink);
   font: inherit; -webkit-tap-highlight-color: transparent;
 }
@@ -117,7 +117,7 @@
 @media (hover: hover) { .mw-note:hover .mw-paper-wrap { transform: rotate(calc(var(--mw-tilt, 0deg) * .4)) scale(.98); } }
 .mw-note:active .mw-paper-wrap { transform: rotate(0deg) scale(.96); }
 .mw-note-in {
-  position: relative; display: flex; flex-direction: column; gap: 6px; height: 100%; padding: 16px 16px 18px;
+  position: relative; display: flex; flex-direction: column; gap: 6px; flex: 1 0 auto; padding: 16px 16px 20px;
 }
 .mw-note-top { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .mw-chip {
