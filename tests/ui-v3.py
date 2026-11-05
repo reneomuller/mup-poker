@@ -140,6 +140,18 @@ def main():
         cond.check('Nástěnky + Kvíz')
         conb.check('Tým')
 
+        # --- 360 px phone: 2-column sticker grid, no horizontal scroll ---
+        c3 = br.new_context(**{**phone, 'viewport': {'width': 360, 'height': 640}})
+        p3 = login(c3, A)
+        con3 = Console(p3, 'phone 360')
+        open_team(p3)
+        xs = p3.evaluate("() => [...document.querySelectorAll('#wallbox .mw-grid > *')].map((e) => Math.round(e.getBoundingClientRect().left))")
+        ok(len(set(xs)) == 2, f'360 px: sticker grid has 2 columns ({sorted(set(xs))})')
+        ok(no_hscroll(p3), '360 px Tým: no horizontal scroll')
+        shot(p3, 'v3-phone360-tym')
+        con3.check('360')
+        c3.close()
+
         # --- laptop: sidebar + 2 columns ---
         cl = br.new_context(viewport={'width': 1280, 'height': 800}, locale='cs-CZ')
         pl = login(cl, A)
