@@ -36,7 +36,7 @@
   // ±3–10° from the id, only the paper turns
   function tilt(id) { var x = hash(id); var mag = 3 + (x % 701) / 100; return ((x >>> 12) & 1 ? mag : -mag).toFixed(2) + 'deg'; }
   function arr(a) { return Array.isArray(a) ? a : []; }
-  function errMsg(e) { var m = e && (e.message || e.error || e.msg); return m ? String(m) : 'Něco se nepovedlo. Zkus to znovu.'; }
+  function errMsg(e) { var m = e && (e.message || e.error || e.msg); if (m && /failed to fetch|networkerror|load failed|network request failed/i.test(String(m))) m = 'Spojení vypadlo. Zkus to znovu.'; return m ? String(m) : 'Něco se nepovedlo. Zkus to znovu.'; }
   function checkOk(r) { if (r && typeof r === 'object' && !Array.isArray(r) && r.ok === false) throw new Error(r.error || r.msg || ''); return r; }
   function call(fn, arg) { return Promise.resolve().then(function () { if (typeof fn !== 'function') throw new Error('Akce není k dispozici.'); return fn(arg); }).then(checkOk); }
   function pad(n) { return (n < 10 ? '0' : '') + n; }
@@ -410,6 +410,8 @@
       render();
       var req = plus ? call(api.op, assign({ op: 'wallPost' }, body)) : call(api.post, body);
       req.then(function (r) {
+        // v4 guard: an offline post waits in the phone's retry queue; it stays on the board as „Odesílám…“ until the server has it
+        if (r && r.queued) { temps.forEach(function (p) { p.queued = Date.now(); }); render(); return; }
         if (plus && r && r.id) targets.forEach(function (tk) { markSeen(tk, r.id, 0); });
         return load().then(drop, drop);
       }, function (er) {
@@ -603,6 +605,7 @@
         }
         if (res && Array.isArray(res.templates) && my >= st.tplSeq) st.templates = res.templates; // a list started before a template op is stale
         st.walls = walls; st.loaded = true; st.loadErr = '';
+        settleQueued(walls);
         if (plus) {
           Object.keys(walls).forEach(initSeen);
           if (comp.plusBox) updPlusBox();
@@ -614,6 +617,20 @@
         st.loadErr = 'Nástěnku se nepodařilo načíst: ' + errMsg(e);
         render();
       }).then(function () { if (my === st.seq) st.inflight = false; });
+    }
+    // v4 guard: a queued (offline) post / reply leaves the board once the server's list has it (or after the queue's 10 min)
+    function settleQueued(walls) {
+      var now = Date.now(), QMAX = 10 * 60 * 1000;
+      var same = function (a, b) { return a && a.mine && a.text === b.text; };
+      st.tmp = st.tmp.filter(function (p) {
+        if (!p.queued) return true;
+        return now - p.queued < QMAX && !arr(walls[key(p.team)]).some(function (s) { return same(s, p.s) && s.kind === p.s.kind; });
+      });
+      st.tmpReplies = st.tmpReplies.filter(function (p) {
+        if (!p.queued) return true;
+        var s = arr(walls[key(p.team)]).filter(function (x) { return x && x.id === p.sid; })[0];
+        return now - p.queued < QMAX && !(s && arr(s.replies).some(function (r) { return same(r, p.r); }));
+      });
     }
     var timer = null;
     function tick() {
@@ -879,7 +896,8 @@
       st.tmpReplies.push(p);
       m.rta.value = ''; m.rcount.textContent = '0/' + MAX;
       render();
-      call(api.reply, assign(teamArg(op.team), { id: op.id, text: text })).then(function () {
+      call(api.reply, assign(teamArg(op.team), { id: op.id, text: text })).then(function (r) {
+        if (r && r.queued) { p.queued = Date.now(); render(); return; } // v4 guard: queued offline, see settleQueued()
         return load().then(drop, drop);
       }, function (er) {
         drop();
