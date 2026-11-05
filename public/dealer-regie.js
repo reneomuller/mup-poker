@@ -499,6 +499,8 @@
     if (!on() || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
     const t = e.target;
     if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
+    // another dialog is open (a wall sticker, the login QR): its keys are its own, no game step / timer behind it
+    if ([...document.querySelectorAll('[aria-modal="true"]')].some((d) => !d.closest('#rghelp, #rgdrawer') && d.getClientRects().length)) return;
     if (e.key === 'Escape') { if ($('rghelp') && !$('rghelp').hidden) help(false); else if (drawerOpen) closeDrawer(); return; }
     const k = e.key.toLowerCase();
     if (e.key === '?') { e.preventDefault(); help(true); }
