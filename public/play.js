@@ -1049,7 +1049,7 @@
       const L = q.leaders || [];
       body = `${head}
         ${lobby ? `<div class="qz-lobby"><h2 class="s-h1">${E('play.quiz.lobby')}</h2><p>${E('play.quiz.lobbyHint')}</p><div class="qz-dots"><i style="--qc:${QCOL[0]}"></i><i style="--qc:${QCOL[1]}"></i><i style="--qc:${QCOL[2]}"></i><i style="--qc:${QCOL[3]}"></i></div></div>` :
-        `<div class="qz-rank"><span class="s-label">${mode === 'done' ? 'Konečné pořadí' : 'Průběžné pořadí'}</span><div class="qz-rank-v s-num">${mq.rank && mq.runPoints > 0 ? esc(mq.rank) + '.' : '–'}</div><div class="s-muted">${mq.rank && mq.runPoints > 0 ? `místo z ${esc(S.playerCount)} · <b class="s-num">${esc(pts(mq.runPoints))}</b>` : 'Zatím bez bodů – další otázka je tvoje šance.'}</div></div>
+        `<div class="qz-rank"><span class="s-label">${mode === 'done' ? 'Konečné pořadí' : 'Průběžné pořadí'}</span><div class="qz-rank-v s-num">${mq.rank && mq.runPoints > 0 ? esc(mq.rank) + '.' : '–'}</div><div class="s-muted">${mq.rank && mq.runPoints > 0 ? `místo z ${esc(S.playerCount)} · <b class="s-num">${esc(pts(mq.runPoints))}</b>` : (mode === 'done' ? 'V\u00a0tomto kvízu bez bodů.' : 'Zatím bez bodů – další otázka je tvoje šance.')}</div></div>
         ${L.length ? `<div class="qz-board">${L.map((p, i) => `<div class="p-rk ${p.name === me.name && p.team === me.team ? 'me' : ''}" data-key="ql${i}"><span class="p-rk-i">${i + 1}</span><span class="p-rk-n"><b>${esc(p.name)}</b>${teamTag(p.team)}</span><span class="p-rk-v"><b class="s-num">${esc(num(p.quizPoints))}</b></span></div>`).join('')}</div>` : ''}`}
         ${mode === 'done' ? '<button type="button" class="s-btn s-primary s-block qz-close" data-act="quiz-close">Zpět do hry</button>' : ''}`;
     }
