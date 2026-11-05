@@ -90,7 +90,7 @@
   }
   function renderTape(s) {
     const blocked = ['boardscreen'].some((id) => $(id)?.classList.contains('on'))
-      || ['quiz', 'exit', 'award'].some((id) => $(id) && !$(id).classList.contains('hidden'));
+      || ['quiz', 'qzpodium', 'exit', 'award'].some((id) => $(id) && !$(id).classList.contains('hidden')); // qzpodium: the quiz+ finale
     const show = tapeOn(s) && pending(s) && !blocked;
     T.toggle(bar, 'on', show);
     T.toggle(document.body, 'tapeon', show);
