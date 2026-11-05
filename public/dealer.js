@@ -52,7 +52,7 @@
   const REASONS = { milestone: 'Splněný milník', traction: 'Trakce', team: 'Tým', risk: 'Riziko', market: 'Trh', other: 'Jiné' };
   const reasonLabels = () => ({ ...REASONS, ...((S && S.reasonLabels) || {}) });
   const DRK = { class: 'Třída', rj: 'RJ', revalue: 'Přecenění', round: 'Kolo', market: 'Trh', exit: 'Exit' };
-  const AWK = { sharpest: 'Nejostřejší investor', analyst: 'Nejlepší analytik', contrarian: 'Proti proudu', custom: 'Vlastní ocenění' };
+  const AWK = { sharpest: 'Nejlepší investor', analyst: 'Nejlepší analytik', contrarian: 'Proti proudu', custom: 'Vlastní ocenění' };
   const EXK = { acquired: 'Akvizice', ipo: 'IPO', hold: 'Bez exitu', writeoff: 'Odpis' };
   const RK = { up: 'Up round', flat: 'Flat round', down: 'Down round' };
   const FEATS = [

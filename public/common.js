@@ -198,7 +198,8 @@
   // Pages and features register their own default texts here instead of editing T above.
   function addTexts(d) { for (const [k, v] of Object.entries(d || {})) if (!(k in T)) T[k] = v; }
   function applyStatic(root = document) {
-    root.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
+    // [data-t] on investing rows is a team id, not a text key: leave those alone
+    root.querySelectorAll('[data-t]:not([data-k])').forEach((el) => { el.textContent = t(el.dataset.t); });
   }
   const portraits = {};
   function loadPortraits() {

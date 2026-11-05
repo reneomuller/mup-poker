@@ -49,7 +49,7 @@
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
 }
-.s-app button, .s-app input, .s-app select, .s-app textarea { font: inherit; color: inherit; }
+:where(.s-app) :where(button, input, select, textarea) { font: inherit; color: inherit; }
 .s-app a { color: var(--s-label); }
 
 /* Type -------------------------------------------------------------------- */
