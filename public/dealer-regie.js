@@ -263,6 +263,7 @@
   };
   function opLabel(a) {
     if (!a) return '';
+    if (a.label) return a.label; // the server names it (meta.regieLog)
     if (a.op === 'phase') return (PHL[a.phase] || a.phase) + (a.phase === 'pitch' && a.team ? ': ' + tName(a.team) : '');
     if (a.op === 'timer') return Number(a.minutes) > 0 ? `Časovač ${mins(a.minutes)} min${a.label ? ' (' + a.label + ')' : ''}` : 'Zastavení časovače';
     if (a.op === 'screen') return a.screen === 'board' ? 'Plátno: žebříček' : 'Plátno: stůl';

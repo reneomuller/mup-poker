@@ -8,7 +8,7 @@
 //   the last dealer actions and what `undo` would revert.
 // - Dealer ops: `regiePlan` (run-of-show plan in meta.regie, so it travels in dumps and survives undo) and
 //   `nudge` (reminder to a team: a wall task when walls are on, otherwise a private team message).
-// - track(b): after every successful dealer op, a short list of recent actions + the undo stack (key `regie:acts`).
+// - meta.regieLog / meta.regieUndo: the last dealer actions + what undo reverts, written in the op's own meta save.
 import { Redis } from '@upstash/redis';
 import * as S from './store.js';
 import * as F from './features.js';
@@ -77,10 +77,9 @@ export async function view(meta, players, slips, dealer) {
   if (!F.on(meta, 'regie')) return fail(F.OFF);
   const now = Date.now(), win = WINDOW() * 1000;
   const real = Object.values(players).filter((p) => p && !p.ghost && meta.teams.some((t) => t.id === p.team));
-  const [seen, walls, acts] = await Promise.all([
+  const [seen, walls] = await Promise.all([
     seenMap(real.map((p) => p.id)),
     F.on(meta, 'wall') ? W.dataWalls(meta) : null,
-    S.getJSON('regie:acts'),
   ]);
   const miss = missingByTeam(meta, players, slips);
   const rows = real.map((p) => {
@@ -96,7 +95,6 @@ export async function view(meta, players, slips, dealer) {
       tasks: tasks.length, taskTexts: tasks.slice(0, 5).map((s) => String(s.text).slice(0, 120)),
     };
   });
-  const a = acts && typeof acts === 'object' ? acts : { list: [], stack: [] };
   return ok({
     now, window: WINDOW(), ttl: TTL(), block: meta.block, phase: meta.phase, wall: F.on(meta, 'wall'),
     players: rows,
@@ -107,8 +105,8 @@ export async function view(meta, players, slips, dealer) {
     never: rows.filter((r) => !r.seen).map((r) => ({ id: r.id, name: r.name, team: r.team })),
     emptyTeams: teams.filter((t) => !t.members).map((t) => t.id),
     noPin: rows.filter((r) => !r.hasPin).map((r) => ({ id: r.id, name: r.name, team: r.team })),
-    actions: (a.list || []).slice(-8).reverse(),
-    undoTop: (a.stack || []).slice(-1)[0] || null,
+    actions: arr(meta.regieLog).slice().reverse(),
+    undoTop: arr(meta.regieUndo).slice(-1)[0] || null,
   });
 }
 
@@ -171,22 +169,47 @@ export async function dealerOp(b, meta, players, slips, save) {
   return ok({ sent, via });
 }
 
-// ---------- recent dealer actions + what undo reverts ----------
-// The ops that push a backup (see backup() calls in game.js); `undo` pops the newest of them.
-const UNDOABLE = new Set(['marketCard', 'trancheAdd', 'trancheCancel', 'trancheRelease', 'showdown', 'rjReveal', 'revalue', 'nextBlock']);
+// ---------- recent dealer actions + what undo reverts (inside meta: 0 extra commands) ----------
+// meta.regieLog: the last 5 dealer actions { op, label, ts }, written in the op's own meta save.
+// meta.regieUndo: ≤ 15 { op, label, ts } mirroring the backups stack, so the undo confirm can name what it reverts.
+// backup() in game.js calls noteBackup(); dealer ops run one at a time per instance (serial), so the next
+// save of meta belongs to the op that pushed the backup (this also covers the priced-round repricing at „betting“).
+// Neither field is in KEEP_ON_UNDO: the backups hold them as they were before the op, so undo restores both
+// (the reverted op leaves the history together with its effects, and the stack's new top is the previous backup).
+const LOG_MAX = 5, UNDO_MAX = 15;
 const QUIET = new Set(['auth', 'restore', 'regiePlan']);
-export async function track(b) {
-  if (!b || QUIET.has(b.op)) return;
-  try {
-    const cur = (await S.getJSON('regie:acts')) || {};
-    const list = Array.isArray(cur.list) ? cur.list : [], stack = Array.isArray(cur.stack) ? cur.stack : [];
-    const e = { op: String(b.op).slice(0, 30), ts: Date.now() };
-    for (const k of ['phase', 'team', 'screen', 'label', 'minutes']) if (b[k] !== undefined && typeof b[k] !== 'object') e[k] = String(b[k]).slice(0, 40);
-    if (b.all === true) e.all = true;
-    if (b.op === 'undo') { const top = stack.pop(); if (top) e.of = top; }
-    else if (UNDOABLE.has(b.op)) stack.push({ op: e.op, ts: e.ts });
-    if (b.op === 'reset') { list.length = 0; stack.length = 0; }
-    list.push(e);
-    await S.setJSON('regie:acts', { list: list.slice(-30), stack: stack.slice(-15) });
-  } catch (err) { console.error('regie track failed', err?.message); }
+const PH = { lobby: 'Lobby', pitch: 'Pitch', betting: 'Otevřít investování', closed: 'Zavřít investování', final: 'Demo Day' };
+const OPL = {
+  showdown: 'Showdown', rjReveal: 'Odhalení smart money', rjSave: 'Uložení smart money', revalue: 'Přecenění', nextBlock: 'Další blok',
+  reg: 'Registrace', features: 'Funkce', quizStart: 'Start kvízu', quizNext: 'Další otázka', quizReveal: 'Odhalení odpovědi', quizBoard: 'Žebříček kvízu',
+  quizEnd: 'Konec kvízu', quizAdvance: 'Kvíz – další krok', quizSave: 'Uložení kvízu', quizDelete: 'Smazání kvízu', pointsAdd: 'Přidání bodů', pointsRemove: 'Odebrání bodů',
+  award: 'Ocenění', awardRemove: 'Odebrání ocenění', marketCard: 'Karta trhu', trancheAdd: 'Nová tranše RJ', trancheCancel: 'Zrušení tranše', trancheRelease: 'Uvolnění tranše',
+  exitSet: 'Exit', card: 'Karta startupu', milestoneDefs: 'Milníky', roundTerms: 'Podmínky kola', teams: 'Týmy', content: 'Texty', startValuation: 'Startovní ocenění',
+  clearBoard: 'Vyčištění otázek', resetPin: 'Reset PINu', movePlayer: 'Přesun hráče', removePlayer: 'Odebrání hráče', pin: 'Připnutí otázky', qpin: 'Otázka na plátno',
+  qhide: 'Skrytí otázky', unpin: 'Odepnutí',
+};
+const mins = (n) => String(Math.round((Number(n) || 0) * 10) / 10).replace('.', ',');
+export function opLabel(meta, b) {
+  const tn = (id) => meta.teams.find((t) => t.id === id)?.name || id;
+  if (b.op === 'phase') {
+    const base = PH[b.phase] || String(b.phase);
+    return b.phase === 'pitch' && b.team ? `${base}: ${tn(b.team)}` : b.phase === 'betting' && meta.rounds && Object.keys(meta.rounds).length && F.on(meta, 'rounds') ? base + ' (nový kurz kola)' : base;
+  }
+  if (b.op === 'timer') return Number(b.minutes) > 0 ? `Časovač ${mins(b.minutes)} min` : 'Zastavení časovače';
+  if (b.op === 'screen') return b.screen === 'board' ? 'Plátno: žebříček' : 'Plátno: stůl';
+  if (b.op === 'nudge') return 'Připomínka ' + (b.all === true ? 'všem týmům' : 'týmu ' + tn(b.team));
+  return OPL[b.op] || String(b.op).slice(0, 30);
+}
+let pendingBackup = false;
+export function noteBackup() { pendingBackup = true; }
+const arr = (x) => (Array.isArray(x) ? x : []);
+// called from dealerAction's save(): adds this op to meta.regieLog (and to meta.regieUndo when it pushed a backup)
+export function logInMeta(meta, b) {
+  const backed = pendingBackup;
+  pendingBackup = false;
+  if (!b || b.__rg || QUIET.has(b.op) || !F.on(meta, 'regie')) return;
+  b.__rg = true; // an op that saves twice is logged once
+  const e = { op: String(b.op).slice(0, 30), label: opLabel(meta, b).slice(0, 80), ts: Date.now() };
+  meta.regieLog = [...arr(meta.regieLog), e].slice(-LOG_MAX);
+  if (backed) meta.regieUndo = [...arr(meta.regieUndo), e].slice(-UNDO_MAX);
 }
