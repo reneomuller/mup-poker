@@ -61,7 +61,7 @@ async function load(fresh) {
   // v2 adds at most two cheap reads: hash tx (card texts + round terms) and, only while a quiz
   // question is open or revealed, that question's small answers hash.
   const qk = Q.answersKey(meta);
-  const needTx = F.on(meta, 'cards') || F.on(meta, 'rounds');
+  const needTx = F.on(meta, 'cards') || F.on(meta, 'rounds') || F.on(meta, 'wall'); // v3: tx also holds the wall badge counters
   const [players, slips, content, qs, qv, qr, tx, qa] = await Promise.all([
     S.hgetall('players'), S.hgetall('slip:' + meta.block), S.getJSON('content'), S.hgetall('qs'), S.hgetall('qv'), S.hgetall('qr'),
     needTx ? S.hgetall('tx') : {}, qk ? S.hgetall(qk) : {},
@@ -557,7 +557,7 @@ async function restoreFrom(d) {
   if (d.tx && typeof d.tx === 'object') {
     const cur = await S.hgetall('tx');
     for (const [f, v] of Object.entries(d.tx)) {
-      if (!v || typeof v !== 'object' || !/^(card|rt):/.test(f)) continue;
+      if (!v || typeof v !== 'object' || !/^(card|rt|wr):/.test(f)) continue;
       const c = cur[f];
       if (!c || (Number(v.updatedAt || v.ts) || 0) > (Number(c.updatedAt || c.ts) || 0)) await S.hset('tx', f, v);
     }
@@ -1082,7 +1082,7 @@ export default async function handler(req, res) {
           viewer = { role: 'student', p };
         } else if (req.headers['x-dealer'] !== undefined && dealerOk(req)) viewer = { role: 'dealer' }; // header required even on an open dealer
         else return send(res, 401, { ok: false, error: 'Špatné heslo dealera.' });
-        const r = await W.view(meta, viewer, url.searchParams.get('team'));
+        const r = await W.view(meta, viewer, url.searchParams.get('team'), tx);
         return send(res, r.status, r.body);
       }
       const proj = D.project(meta, slips, players);
@@ -1093,12 +1093,12 @@ export default async function handler(req, res) {
         const p = players[sid];
         if (p && p.pin && p.pin === pinHash(p.id, pin)) out.me = meState(meta, p, slips, bd, players, qa, proj);
         else out.meError = p ? 'pin' : 'unknown';
-        if (out.me && F.on(meta, 'wall')) out.me.wallRev = W.rev(meta, p.team); // v3 §4: badge, read from meta only
+        if (out.me && F.on(meta, 'wall')) out.me.wallRev = W.rev(meta, p.team, tx); // v3 §4: badge, from the tx hash the GET already read
       }
       const asP = AC.asPlayer(req, players); // v3 §10: dealer preview, GET ?as=<sid> with x-dealer
       if (asP) {
         out.me = meState(meta, asP, slips, bd, players, qa, proj); out.asDealer = true; delete out.meError;
-        if (F.on(meta, 'wall')) out.me.wallRev = W.rev(meta, asP.team);
+        if (F.on(meta, 'wall')) out.me.wallRev = W.rev(meta, asP.team, tx);
       }
       if (url.searchParams.get('view') === 'log' && dealerOk(req)) {
         return send(res, 200, { ok: true, storage: S.storageMode, pgEnv: S.pgEnvKey, log: await S.readLog(Number(url.searchParams.get('limit')) || 5000) });
