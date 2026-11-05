@@ -833,7 +833,8 @@
       const mine = SK(t.id);
       const ms = cards ? defs.map((d) => `<span class="p-ms ${c.milestones?.[d.key] ? 'done' : ''}" data-key="ms${esc(d.key)}">${c.milestones?.[d.key] ? '✓' : '○'} ${esc(d.label)}</span>`).join('') : '';
       const locked = tr.filter((x) => x.team === t.id && x.status === 'locked');
-      const capF = feat('captable') && t.cap ? t.cap.founders : null;
+      // own team: the live founders % from myTeam, so Startupy matches the Tým header while trades are pending
+      const capF = feat('captable') && t.cap ? (t.id === me.team && me.myTeam?.founders != null ? me.myTeam.founders : t.cap.founders) : null;
       return `<article class="s-card p-card p-su ${t.id === me.team ? 'mine' : ''}" data-key="su${t.id}" style="--tc:${esc(t.color)}">
         <div class="p-su-h"><span class="p-su-ic">${esc(initials(t.name))}</span><div class="p-su-n"><b>${esc(t.name)}</b>${t.id === me.team ? '<span class="s-badge">Tvůj tým</span>' : ''}</div>
           <div class="p-su-v">${tw('suV' + t.id, Vn(t))}${multChip(t, true)}${r && r.kind && r.kind !== 'flat' ? `<span class="s-badge ${r.kind === 'up' ? 's-ok' : r.kind === 'down' ? 's-bad' : ''}">${esc(ROUND[r.kind] || '')}${r.pct ? ' ' + esc(spct(r.pct)) : ''}</span>` : '<span class="s-label">ocenění</span>'}</div></div>
