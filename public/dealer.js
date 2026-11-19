@@ -91,6 +91,8 @@
     ['tape', 'Burza na plátně', 'Při investování běží dole na plátně páska obchodů (jména jako iniciály), u\u00a0showdownu „Burza uzavřena“ s\u00a0násobky a v\u00a0pořadí malé grafy ocenění.'],
     ['recap', 'Rekapitulace', 'Na konci hry si každý projde své karty s\u00a0výsledky (i\u00a0obrázek ke sdílení) a\u00a0vy máte třídní report k\u00a0tisku a\u00a0do CSV.'], // v4 recap (review: the flag had no switch)
     ['guard', 'Ochrana PINu a\u00a0signálu', 'Po opakovaně špatném PINu se účet na pár minut zamkne (odemkne ho QR přihlášení); mobil bez signálu ukáže pruh a\u00a0odeslání sám zopakuje.'], // v4 guard (review: the flag had no switch)
+    ['simple', 'Jen investice (Blok 4)', 'Mobil ukáže jen přihlášení → rozdělení peněz → potvrzení. Rozdělit jde libovolnou část 1\u00a0000\u00a0000\u00a0$, zbytek zůstane v\u00a0hotovosti. Stůl ukáže Minule → Dnes.'],
+    ['pinFallback', 'Zapomněli jste PIN? (jméno + tým)', 'Student napíše jméno a tým (překlepy nevadí), potvrdí tým a hraje. Záznam je „neověřený“ – seznam a export v\u00a0záložce Hráči.'],
   ];
   const featKnown = () => !!(S && S.features && typeof S.features === 'object');
   const F = (k) => !!(S && S.features && S.features[k]);
@@ -285,6 +287,11 @@
     }
     if (F('quiz') && q && q.state === 'done') return { kick: 'Kvíz skončil · plátno ukazuje pořadí', label: 'Skrýt kvíz z plátna', run: () => quiz('quizEnd'), quiz: 'qzend' };
     if (s.phase === 'final') return { kick: 'Finále', label: 'Hra je u konce', run: null, step: -1 };
+    // Blok 4 invest-only round: no pitches, no smart money – open, close, showdown, then the Minule → Dnes table
+    if (F('simple') && s.movement) {
+      if (sc) return { kick: 'Kolo je vyhodnocené', label: s.screen === 'board' ? 'Zpět na stůl' : 'Ukázat Minule → Dnes', run: () => act('screen', { screen: s.screen === 'board' ? 'table' : 'board' }), step: -1 };
+      if (!['betting', 'closed'].includes(s.phase)) return { kick: `${s.playerCount} hráčů u stolu`, label: tx('dealer.btn.open'), run: openBetting, step: 2 };
+    }
     if (sc && sr) return s.block < s.maxBlock
       ? { kick: `Blok ${s.block} je hotový`, label: tx('dealer.btn.next'), run: doNext, step: 6 }
       : { kick: 'Poslední blok je hotový', label: tx('dealer.btn.final'), run: doFinal, step: 6 };
@@ -1759,8 +1766,99 @@
   }
 
   // ---------- panels ----------
+  // ---------- Blok 4: simple round (PLUGG, invest-only, new round with $1M, Minule → Dnes) ----------
+  let b4Prev = 'shown', b4Label = 'Blok 4 · investiční kolo';
+  function renderB4() {
+    const mv = S.movement || null, dmv = D.movement || null;
+    const el = gate('b4box', [S.teams.map((t) => [t.id, t.name, t.color, t.V, t.Vnow]), S.features, S.phase, S.block, S.screen, mv, dmv, (D.voided || []).length, !!D.featuresBefore, b4Prev]);
+    if (!el) return;
+    const betting = S.phase === 'betting';
+    const full = S.teams.length >= 7;
+    const simpleOn = F('simple');
+    const last = (D.voided || [])[(D.voided || []).length - 1];
+    el.innerHTML = `<div class="ch"><h3>Blok 4 · jednoduché kolo</h3><span class="s-label">${S.teams.length} týmů · ${simpleOn ? 'jen investice' : 'plná hra'} · poptávka ${F('demand') ? 'zap.' : 'vyp.'}</span></div>
+      <div class="b4grid">
+        <div class="b4step ${mv ? 'done' : ''}"><div class="stt">1 · Nové kolo, všem 1 000 000 $</div>
+          <p class="hint">Otevřené investice bloku ${S.block} se vrátí (bez showdownu, nikdo nic nezíská ani neztratí), každý má znovu celý milion. Hra přejde na blok ${S.block + 1} v lobby. Předtím se uloží archiv.${last ? ` <b>Naposledy:</b> ${when(last.at)}, vráceno ${last.open} investic (${esc(fmtM(last.openTotal))}).` : ''}</p>
+          ${mv ? '' : `<div class="lab">„Minule“ na stole =</div>
+          <div class="seg"><button id="b4pshown" class="${b4Prev === 'shown' ? 'on' : ''}">co teď ukazuje stůl</button><button id="b4pbase" class="${b4Prev === 'base' ? 'on' : ''}">současné ocenění</button></div>
+          <div class="inl"><input class="s-input sm grow" id="b4label" data-nodirty value="${esc(b4Label)}" maxlength="40" aria-label="Název kola na plátně"></div>`}
+          ${mv ? '<p class="hint"><b>Hotovo</b> – kolo běží. Omyl vrátí ↶ Zpět nahoře.</p>' : `<button class="s-btn s-sm" id="b4round" ${betting ? 'disabled' : ''}>Nové kolo: vrátit investice, všem 1 M $</button>`}
+        </div>
+        <div class="b4step ${full ? 'done' : ''}"><div class="stt">2 · Sedmý tým</div>
+          ${full ? `<p class="hint">Na stole je 7 týmů (${S.teams.map((t) => esc(t.name)).join(', ')}).</p>` : `
+          <div class="inl"><input class="s-input sm grow" id="b4name" placeholder="Název, např. PLUGG" maxlength="30"><span class="unit"><input class="s-input sm num" id="b4v" value="1 000 000" inputmode="numeric" aria-label="Výchozí ocenění"> $</span></div>
+          <input class="s-input sm" id="b4one" placeholder="One-liner (nepovinné)" maxlength="90">
+          <input class="s-input sm" id="b4sub" placeholder="Popis (nepovinné)" maxlength="220">
+          <button class="s-btn s-sm" id="b4add" ${betting ? 'disabled' : ''}>Přidat tým</button>`}
+        </div>
+        <div class="b4step ${simpleOn ? 'done' : ''}"><div class="stt">3 · Jen investice</div>
+          <p class="hint">Vypne kvíz, karty, nástěnky, pásku, zvuk, rekapitulaci… a cenu podle poptávky. Zapne „Zapomněli jste PIN?“ (jméno + tým).</p>
+          ${simpleOn ? `<button class="s-btn s-sm s-ghost" id="b4restore" ${D.featuresBefore ? '' : 'disabled'}>Vrátit původní funkce</button>` : `<button class="s-btn s-sm" id="b4simple">Zapnout režim jen investice</button>`}
+        </div>
+      </div>
+      ${mv ? `<div class="sep"></div>
+      <div class="lab">Minule → Dnes (${esc(mv.label || '')}) · ${mv.done ? 'po showdownu' : mv.live ? 'živě' : 'před investováním'} · plátno: <button class="linkb" id="b4board">${S.screen === 'board' ? 'skrýt tabulku' : 'ukázat tabulku Minule → Dnes'}</button></div>
+      <div class="b4mv">${S.teams.map((t) => { const x = mv.teams[t.id] || {}; return `<div class="b4mvr">${tlabel(t.id)}<span class="unit"><input class="s-input sm num" data-b4prev="${t.id}" value="${plain(x.prev)}" inputmode="numeric" aria-label="Minule ${esc(t.name)}"> $</span><b>${esc(fmtM(x.now || 0))}</b><span class="${x.diff > 0 ? 's-up' : x.diff < 0 ? 's-down' : 's-faint'}">${x.diff ? (x.diff > 0 ? '▲ ' : '▼ ') + esc(pct(Math.abs(x.pct))) : '±0 %'}</span></div>`; }).join('')}</div>
+      <button class="s-btn s-sm s-ghost" id="b4saveprev">Uložit „Minule“</button>` : ''}`;
+    watchDirty(el, 'b4box');
+    if ($('b4add')) $('b4add').onclick = async () => {
+      const name = $('b4name').value.trim();
+      if (!name) return toast('Zadejte název týmu.', true);
+      if (!confirm(`Přidat tým ${name}?`)) return;
+      const r = await act('teamAdd', { name, startV: parseAmt($('b4v').value) || 1000000, oneLiner: $('b4one').value, sub: $('b4sub').value }, `Tým ${name} přidán`);
+      if (r.ok) redraw('b4box');
+    };
+    if ($('b4simple')) $('b4simple').onclick = () => confirm('Zapnout režim jen investice? Vypne všechno kromě investování (a cenu podle poptávky). Původní nastavení jde vrátit.') && act('features', { preset: 'investOnly' }, 'Režim jen investice').then(() => redraw('b4box'));
+    if ($('b4restore')) $('b4restore').onclick = () => confirm('Vrátit funkce, jak byly před režimem jen investice?') && act('features', { preset: 'restore' }, 'Funkce vráceny').then(() => redraw('b4box'));
+    if ($('b4pshown')) $('b4pshown').onclick = () => { b4Prev = 'shown'; redraw('b4box'); renderB4(); };
+    if ($('b4pbase')) $('b4pbase').onclick = () => { b4Prev = 'base'; redraw('b4box'); renderB4(); };
+    if ($('b4label')) $('b4label').oninput = (e) => { b4Label = e.target.value; };
+    if ($('b4round')) $('b4round').onclick = async () => {
+      const n = S.betCount;
+      if (!confirm(`Nové kolo?\n\n• ${n} otevřených investic bloku ${S.block} se vrátí (archiv se uloží předem).\n• Každý hráč má znovu 1 000 000 $.\n• Hra přejde na blok ${S.block + 1} v lobby.\n\nVrátit jde tlačítkem ↶ Zpět.`)) return;
+      const r = await act('newRound', { confirm: 'NOVE KOLO', prev: b4Prev, label: b4Label.trim() || 'Investiční kolo' }, 'Nové kolo připravené');
+      if (r.ok) redraw('b4box');
+    };
+    if ($('b4board')) $('b4board').onclick = () => act('screen', { screen: S.screen === 'board' ? 'table' : 'board' });
+    if ($('b4saveprev')) $('b4saveprev').onclick = async () => {
+      const prev = {};
+      all(el, '[data-b4prev]').forEach((i) => { const v = parseAmt(i.value); if (v > 0) prev[i.dataset.b4prev] = v; });
+      const r = await act('movementPrev', { prev }, '„Minule“ uloženo');
+      if (r.ok) redraw('b4box');
+    };
+  }
+
+  // Hráči: who signed in with name + team instead of the PIN (to check after class)
+  function renderUnverified() {
+    const rows = (D.rows || []).filter((r) => r.unverified).sort((a, b) => (b.unverified.last || 0) - (a.unverified.last || 0));
+    const el = gate('unverified', [rows.map((r) => [r.id, r.name, r.team, r.unverified, r.slip?.submitted, r.slip?.ts]), S.teams.map((t) => [t.id, t.name])]);
+    if (!el) return;
+    el.hidden = !rows.length && !F('pinFallback');
+    const inv = (r) => (r.slip?.submitted ? Object.values(r.slip.in || {}).reduce((a, e) => a + (e.amt || 0), 0) : 0);
+    el.innerHTML = `<div class="ch"><h3>Přihlášení bez PINu (${rows.length})</h3><span class="s-badge ${rows.filter((r) => !r.unverified.checked).length ? 's-warn' : 's-ok'}">${rows.filter((r) => !r.unverified.checked).length} ke kontrole</span></div>
+      <p class="hint">Studenti, kteří zadali jméno a tým místo PINu. „napsal(a)“ je přesně to, co napsali; tým je ten, který potvrdili. „stávající“ = připojeno k hráči se stejným jménem (dostal nový PIN), „nový“ = nový hráč.</p>
+      ${rows.length ? `<div class="uvt">${rows.map((r) => { const u = r.unverified; return `<div class="uvr ${u.checked ? 'ok' : ''}" data-uv="${r.id}">
+        <span><b>${esc(r.name)}</b><span class="s-faint sm"> · napsal(a) „${esc(u.rawName)}“ / „${esc(u.rawTeam)}“</span></span>
+        <span>${tlabel(r.team)}${u.events?.some((e) => e.teamDiffers) ? ' <span class="s-down sm">jiný tým než v záznamu</span>' : ''}</span>
+        <span class="s-badge">${u.matched === 'existing' ? 'stávající' : 'nový'}</span>
+        <span class="sm">${esc(when(u.last))}${(u.events || []).length > 1 ? ` · ${u.events.length}×` : ''}</span>
+        <span class="sm">${inv(r) ? 'investoval(a) ' + esc(fmtM(inv(r))) : 'zatím neinvestoval(a)'}</span>
+        <button class="s-btn s-sm ${u.checked ? 's-ghost' : ''}" data-uvok>${u.checked ? 'Ověřeno ✓' : 'Ověřit'}</button></div>`; }).join('')}</div>` : '<p class="hint">Zatím nikdo.</p>'}
+      <button class="s-btn s-sm s-ghost" id="uvcsv" ${rows.length ? '' : 'disabled'}>Export CSV</button>`;
+    all(el, '[data-uv]').forEach((row) => {
+      const id = row.dataset.uv, r = rows.find((x) => x.id === id);
+      row.querySelector('[data-uvok]').onclick = () => act('unverifiedMark', { sid: id, checked: !r.unverified.checked }, r.unverified.checked ? 'Zrušeno' : 'Ověřeno');
+    });
+    $('uvcsv').onclick = () => {
+      const head = ['Hráč', 'Tým', 'Napsané jméno', 'Napsaný tým', 'Připojeno', 'Poprvé', 'Naposledy', 'Počet', 'Investice $', ...S.teams.map((t) => t.name + ' $'), 'Ověřeno'];
+      const out = rows.map((r) => { const u = r.unverified; return [r.name, team(r.team).name, u.rawName, u.rawTeam, u.matched === 'existing' ? 'stávající' : 'nový', when(u.first), when(u.last), (u.events || []).length, inv(r), ...S.teams.map((t) => (r.slip?.submitted ? r.slip.in?.[t.id]?.amt || 0 : '')), u.checked ? when(u.checked) : '']; });
+      download(`bez-pinu-${stamp()}.csv`, csvText([head, ...out]), 'text/csv;charset=utf-8');
+    };
+  }
+
   const PANELS = {
-    hra: [renderFlow, renderClock, renderReg],
+    hra: [renderB4, renderFlow, renderClock, renderReg],
     investice: [renderLive, renderBets, renderQBoard],
     rj: [renderFund, renderRJ, renderTranches],
     oceneni: [renderVals, renderDrivers, renderMarket, renderExit, renderOcNote],
@@ -1768,7 +1866,7 @@
     startupy: [renderStLive, renderCards, renderTeams, renderRounds, renderMdefs, renderStNote],
     kviz: [renderQuizLive, renderQuizSets],
     body: [renderPointsAdd, renderPointsTop, renderLedger],
-    hraci: [renderPlayers, renderAwards, renderGhost],
+    hraci: [renderUnverified, renderPlayers, renderAwards, renderGhost],
     funkce: [renderFeatures],
     data: [renderArchives, renderTables, renderExports, renderDanger],
     texty: [],

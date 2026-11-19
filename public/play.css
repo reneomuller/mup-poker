@@ -561,3 +561,16 @@ body:not(.p-app) .hero .bill { position: absolute; left: 50%; bottom: 0; transfo
 @keyframes qz-fl { 50% { transform: scale(1.18) rotate(-6deg); } }
 .qz-bonus { color: #FFB27A; font-size: .8em; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .qz-fl { animation: none; } }
+
+/* ---------- Blok 4: invest-only round + PIN fallback ---------- */
+body.p-simple { --p-tab: 0px; }
+body.p-simple .p-tabbar, body.p-simple #notes, body.p-simple #board, body.p-simple #msgs { display: none !important; }
+body.p-simple .p-form .why, body.p-simple .p-form .rnotes { display: none; }
+@media (min-width: 1024px) { body.p-simple.p-app { --p-side: 0px; } }
+.p-forgot { display: block; margin: 12px auto 0; background: none; border: 0; color: var(--s-text-2, #B9C0DC); font: inherit; font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; padding: 8px; min-height: 44px; cursor: pointer; }
+.p-fb-h { font-size: 20px; font-weight: 800; margin: 2px 0 6px; }
+.p-fb .p-hint { margin-bottom: 14px; }
+.p-fbq { border: 1px solid var(--s-border, rgba(255,255,255,.14)); border-radius: 14px; padding: 12px; margin-bottom: 12px; }
+.p-fbq-t { font-size: 16px; margin-bottom: 10px; }
+.p-fbq-b { display: flex; gap: 8px; }
+.p-fbq-b .s-btn { flex: 1; min-height: 44px; margin-top: 0; }

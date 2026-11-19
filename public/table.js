@@ -27,6 +27,11 @@
     'table.award.analyst': 'Nejlepší analytik',
     'table.award.contrarian': 'Proti proudu',
     'table.award.custom': 'Zvláštní ocenění',
+    'table.mv.prev': 'Minule',
+    'table.mv.now': 'Dnes',
+    'table.mv.live': 'Dnes · živě',
+    'table.mv.title': 'Minule → Dnes',
+    'table.mv.kick': 'Pohyb ocenění',
   });
   const $ = (id) => document.getElementById(id);
   const stage = $('stage');
@@ -147,6 +152,8 @@
   function buildSeats(s) {
     const box = $('seats');
     box.innerHTML = '';
+    box.dataset.n = s.teams.length; // Blok 4: 7 seats get their own layout (table.css .seats[data-n="7"])
+    toggle(stage, 'n7', s.teams.length >= 7);
     for (const k of Object.keys(seatEls)) delete seatEls[k];
     s.teams.forEach((t, i) => {
       const plate = document.createElement('div');
@@ -283,9 +290,13 @@
     toggle(rk, 'first', r === 1);
     // the badge is the share price move this block in % (what the investors' money did), live while investing
     const settled = !pending(s) && ['showdown', 'rj'].includes(s.phase);
-    const mv = pending(s) || settled || showMult ? moveOf(s, t.id, s.reveal?.kind === 'class' ? s.reveal.block || s.block : s.block) : null;
+    const mvt = s.movement && s.movement.teams && s.movement.teams[t.id];
+    // Blok 4: the chip is the move against "Minule" (always shown once there is a move)
+    const mvShow = mvt && (s.movement.live || s.movement.done); // not in the lobby: nobody has invested yet
+    const mv = mvt ? (mvShow && Math.abs(mvt.pct) >= 0.05 ? mvt.pct / 100 : null)
+      : pending(s) || settled || showMult ? moveOf(s, t.id, s.reveal?.kind === 'class' ? s.reveal.block || s.block : s.block) : null;
     toggle(cg, 'hidden', mv == null);
-    if (mv != null) { setText(cg, chgTxt(mv)); toggle(cg, 'down', mv < 0); cg.title = tx('table.mult.title'); }
+    if (mv != null) { setText(cg, chgTxt(mv)); toggle(cg, 'down', mv < 0); cg.title = mvt ? tx('table.mv.title') : tx('table.mult.title'); }
     toggle(mx, 'hidden', true);
   }
 
@@ -454,7 +465,7 @@
   // ---------- phase banner ----------
   let phNow = null;
   function renderBanner(s) {
-    setText($('blk'), s.phase === 'final' ? tx('table.final') : tx('table.block', { block: s.block, max: s.maxBlock }));
+    setText($('blk'), s.phase === 'final' ? tx('table.final') : s.movement?.label || tx('table.block', { block: s.block, max: s.maxBlock }));
     let ph = PHASES[s.phase] || '';
     const pres = s.phase === 'pitch' && s.presenting ? team(s, s.presenting) : null;
     if (pres) ph = tx('table.pitchTitle', { team: pres.name });
@@ -483,6 +494,7 @@
 
   // ---------- seats ----------
   function renderSeats(s, animate) {
+    toggle(stage, 'simple', on(s, 'simple'));
     const leader = [...s.teams].sort((a, b) => vnow(b) - vnow(a))[0]?.id;
     const rk = ranks(s);
     const cap = on(s, 'captable'), rounds = on(s, 'rounds');
@@ -499,11 +511,14 @@
       const inv = t.cls + t.rj, lv = t.live || 0;
       const sub = P.querySelector('.sub');
       const c = cap && t.cap;
-      setHTML(sub, lv
+      const mvt = s.movement && s.movement.teams && s.movement.teams[t.id];
+      setHTML(sub, mvt // Blok 4: "Minule 3,20 M $ · +0,8 M $" under today's value
+        ? `${esc(tx('table.mv.prev'))} <b>${esc(fmtM(mvt.prev))}</b>`
+        : lv
         ? esc(tx('table.live', { amount: '\u0001' })).replace('\u0001', `<b>${(lv > 0 ? '+' : '−') + esc(fmtM(Math.abs(lv)))}</b>`)
         : c ? `${esc(tx('table.cap.founders'))} <b>${pct(c.founders, false)}</b>`
         : esc(inv > 0 ? tx('table.seat.invested', { amount: fmtM(inv) }) : tx('table.seat.valuation')));
-      toggle(sub, 'live', !!lv); toggle(sub, 'neg', lv < 0);
+      toggle(sub, 'live', !!lv && !mvt); toggle(sub, 'neg', lv < 0 && !mvt); toggle(sub, 'mv', !!mvt);
       toggle(P.querySelector('.star'), 'hidden', !((inv > 0 || lv > 0) && t.id === leader && s.teams.some((x) => vnow(x) !== vnow(t))));
       e._ranks = rk;
       if (!busy) renderVR(s, t, e, false);
@@ -589,8 +604,33 @@
     if (s.exit && on(s, 'exit')) return s.screen === 'board';
     return s.screen === 'board' || s.phase === 'final';
   }
+  // Blok 4: "Minule → Dnes" table (instead of the chart board while a movement round is on)
+  function renderMoves(s, show) {
+    const el = $('mvscreen');
+    toggle(el, 'on', show);
+    if (!show) return;
+    const mv = s.movement;
+    const rows = [...s.teams].map((t) => ({ t, x: mv.teams[t.id] || { prev: t.V, now: vnow(t), diff: 0, pct: 0 } }))
+      .sort((a, b) => b.x.now - a.x.now || a.t.name.localeCompare(b.t.name, 'cs'));
+    const nowLab = mv.done ? tx('table.mv.now') : tx('table.mv.live');
+    const html = `<div class="mv-head"><div class="kick">${esc(mv.label || tx('table.mv.kick'))}</div><h2>${esc(tx('table.mv.prev'))} <span class="mv-arr">→</span> ${esc(nowLab)}</h2></div>
+      <div class="mv-table" role="table">
+        <div class="mv-row mv-th" role="row"><span></span><span>Startup</span><span class="r">${esc(tx('table.mv.prev'))}</span><span></span><span class="r">${esc(nowLab)}</span><span class="r">Změna</span></div>
+        ${rows.map(({ t, x }, i) => `<div class="mv-row" role="row" style="--tc:${esc(t.color)}">
+          <span class="mv-rk ${i === 0 ? 'first' : ''}">${i + 1}</span>
+          <span class="mv-nm"><i class="dot" style="background:${esc(t.color)}"></i>${esc(t.name)}</span>
+          <span class="r mv-prev tnum">${esc(fmtM(x.prev))}</span>
+          <span class="mv-arr">→</span>
+          <span class="r mv-now tnum">${esc(fmtM(x.now))}</span>
+          <span class="r mv-chg ${x.diff > 0 ? 'up' : x.diff < 0 ? 'dn' : ''} tnum">${Math.abs(x.pct) >= 0.05 ? esc(chgTxt(x.pct / 100)) : '±0 %'}<small>${x.diff ? (x.diff > 0 ? '+' : '−') + esc(fmtM(Math.abs(x.diff))) : ''}</small></span>
+        </div>`).join('')}
+      </div>`;
+    setHTML(el, html);
+  }
   function renderBoardScreen(s) {
-    const show = boardOn(s);
+    const mvOn = !!(s.movement && boardOn(s));
+    renderMoves(s, mvOn);
+    const show = boardOn(s) && !mvOn;
     toggle($('boardscreen'), 'on', show);
     if (!show) return;
     setText($('bkick'), s.phase === 'final' ? tx('phase.final') : tx('table.board.kick', { block: s.block }));

@@ -16,8 +16,9 @@ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const sum = (a) => a.reduce((x, y) => x + y, 0);
 export const sumAmt = (m) => sum(Object.values(m || {}).map((e) => Number(e?.amt) || 0));
 export const OFF = 'Tato funkce je vypnutá.';
-export const FEATURE_DEFAULTS = { captable: true, cards: true, drivers: true, track: true, quiz: true, points: true, rounds: false, market: false, tranches: false, exit: false, wall: true, demand: true, startupPage: true, quizplus: true, wallplus: true, recap: true, regie: true, sound: true, guard: true, tape: true, tapeNames: 'initials' };
-export const ALL_ON = Object.fromEntries(Object.keys(FEATURE_DEFAULTS).map((k) => [k, true]));
+export const FEATURE_DEFAULTS = { captable: true, cards: true, drivers: true, track: true, quiz: true, points: true, rounds: false, market: false, tranches: false, exit: false, wall: true, demand: true, startupPage: true, quizplus: true, wallplus: true, recap: true, regie: true, sound: true, guard: true, tape: true, tapeNames: 'initials', simple: false, pinFallback: false };
+// "all on" = every v2–v4 feature; the Blok 4 invest-only mode (simple) changes the investing rules, so it stays off
+export const ALL_ON = Object.fromEntries(Object.keys(FEATURE_DEFAULTS).map((k) => [k, k !== 'simple']));
 export const REASON_LABELS = { milestone: 'Splněný milník', traction: 'Trakce', team: 'Tým', risk: 'Riziko', market: 'Trh', other: 'Jiné' };
 export const MILESTONES = [
   ['m1a', 'Potvrzený problém a one-liner', 1], ['m1b', 'Tři nejrizikovější předpoklady', 1], ['m2a', 'Byznys model v2', 2],

@@ -16,6 +16,8 @@ import * as RC from './_lib/recap.js';
 import * as PR from './_lib/presence.js'; // v4 regie
 import * as GU from './_lib/guard.js'; // v4 guard: PIN brute-force limits, rid dedupe
 import * as SF from './_lib/safe.js';
+import * as B4 from './_lib/blok4.js'; // Blok 4: 7th team, invest-only round, Minule → Dnes, PIN fallback
+import * as Z from './_lib/fuzzy.js';
 
 // Dealer is open (no password) unless DEALER_LOCK=1 and DEALER_PASSWORD are set in Vercel.
 const DEALER_PW = process.env.DEALER_LOCK === '1' ? process.env.DEALER_PASSWORD || 'mup-dealer' : '';
@@ -156,6 +158,9 @@ function publicState(meta, players, slips, bd, tx = {}, qa = {}, proj = D.projec
     ...t, V: r0(G.valuation(meta, t.id)), cls: r0(r[t.id].cls), rj: r0(r[t.id].rj), live: r0(live[t.id] || 0), ...now[t.id],
     ...(capOn ? { cap: F.capOf(meta, t.id, players) } : {}),
   }));
+  // Blok 4: "Minule → Dnes" – prev value per team; the ▲/▼ chip (chg) then measures the move against it
+  const movement = B4.publicMovement(meta, teams);
+  if (movement) for (const t of teams) { const x = movement.teams[t.id]; t.prevV = x.prev; t.chg = Math.round((x.pct / 100) * 1e4) / 1e4; }
   const plist = Object.values(players).filter((p) => !p.ghost).map((p) => ({ id: p.id, name: p.name, team: p.team }));
   const betCount = Object.entries(slips).filter(([k, s]) => k !== G.RJ && players[k] && !players[k].ghost && s?.submitted).length;
   const leaders = plist
@@ -180,6 +185,7 @@ function publicState(meta, players, slips, bd, tx = {}, qa = {}, proj = D.projec
   Object.assign(v2, TP.publicTape(meta, slips, players));
   return {
     ...v2,
+    ...(movement ? { movement } : {}),
     now: Date.now(), teams, block: meta.block, maxBlock: G.CFG.MAX_BLOCK, phase: meta.phase,
     presenting: meta.presenting, timerEnd: meta.timerEnd, timerTotal: meta.timerTotal, timerLabel: meta.timerLabel,
     screen: meta.screen, regOpen: meta.regOpen, history: meta.history, reveal: meta.reveal,
@@ -207,7 +213,7 @@ function meState(meta, p, slips, bd, players = {}, qa = {}, proj = D.project(met
     id: p.id, name: p.name, team: p.team, stakes, portfolio: r0(G.portfolio(meta, p.id)), invested: G.hasHoldings(meta, p.id),
     start: G.CFG.STUDENT_CAPITAL, series, rules: G.rules(meta, p.id), slip: slips[p.id] || null,
     msgs: ((meta.fb || {})[p.team] || []).slice().reverse(),
-    board: myBoard(meta, p, bd), ghost: !!p.ghost,
+    board: myBoard(meta, p, bd), ghost: !!p.ghost, ...(p.unverified ? { unverified: true } : {}),
     portfolioNow, stakesNow, rankNow, myTeam: D.myTeam(meta, p, players, proj, D.teamNow(meta, proj)),
     ...meV2(meta, p, players, qa),
   };
@@ -258,6 +264,7 @@ function callList(meta, players, slips) {
 function dealerState(meta, players, slips, bd, tx = {}, qa = {}, proj = null) {
   const rows = Object.values(players).filter((p) => !p.ghost).map((p) => ({
     id: p.id, name: p.name, team: p.team, hasPin: !!p.pin, ...(GU.locked(meta, p) ? { locked: true } : {}), // v4 guard
+    ...(p.unverified ? { unverified: p.unverified } : {}), // Blok 4: signed in with name + team instead of the PIN
     portfolio: r0(G.portfolio(meta, p.id)), holdings: G.hasHoldings(meta, p.id), slip: slips[p.id] || null,
     // v3 §2: the live (projected) portfolio while class trades are pending, for the Hráči tab
     ...(proj?.pending ? { portfolioNow: r0(G.portfolio(proj.pm, p.id)), returnNow: F.returnPct(G.portfolio(proj.pm, p.id)) } : {}),
@@ -267,6 +274,7 @@ function dealerState(meta, players, slips, bd, tx = {}, qa = {}, proj = null) {
   for (const [t, v] of Object.entries(st)) stakes[t] = r0(v);
   return {
     rows, dealerDefault: DEALER_DEFAULT, settled: meta.settled,
+    movement: meta.movement || null, voided: meta.voided || [], featuresBefore: meta.featuresBefore || null, // Blok 4
     ghosts: Object.values(players).filter((p) => p.ghost).map((p) => ({ id: p.id, name: p.name, team: p.team })),
     board: boardItems(bd, players, { dealer: true }), qpinId: meta.qpin || null,
     rj: { stakes, portfolio: r0(G.portfolio(meta, G.RJ)), rules: G.rules(meta, G.RJ), slip: slips[G.RJ] || null },
@@ -369,6 +377,7 @@ async function studentAction(b, req) {
     invalidate();
     return ok({ sid: id });
   }
+  if (b.op === 'fallback') return fallbackLogin(b, meta, players);
   if (b.op === 'tokenLogin') { // v3 §9: one-time login QR from the dealer
     const r = await AC.tokenLogin(b, meta.removed, pinHash);
     invalidate();
@@ -546,6 +555,54 @@ async function studentAction(b, req) {
   return fail('Neznámá akce.');
 }
 
+// Blok 4: "Zapomněli jste PIN?" – the student types name + team. Step 1 (no confirm) only suggests the nearest
+// team and a matching existing player; step 2 (confirm) signs them in with a fresh PIN from the server and
+// records them as unverified (raw typed name/team + time) for the dealer to check afterwards.
+async function fallbackLogin(b, meta, players) {
+  if (!F.on(meta, 'pinFallback')) return fail(F.OFF);
+  const name = String(b.name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+  const rawTeam = String(b.team || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  if (name.length < 2) return fail('Napiš své jméno a příjmení.');
+  if (!rawTeam && !b.teamId) return fail('Napiš název svého týmu.');
+  const tm = Z.matchTeam(meta.teams, rawTeam);
+  const pick = meta.teams.some((t) => t.id === b.teamId) ? b.teamId : null;
+  if (!b.confirm) {
+    const teamId = pick || tm.team?.id || null;
+    const pl = Z.matchPlayer(players, name, teamId);
+    return ok({
+      need: 'confirm', sure: tm.sure, team: tm.team ? { id: tm.team.id, name: tm.team.name, score: tm.score } : null,
+      teams: tm.ranked.map(({ id, name: n, score }) => ({ id, name: n, score })),
+      player: pl ? { id: pl.id, name: pl.name, team: pl.team } : null,
+    });
+  }
+  if (!pick) return fail('Vyber svůj tým.');
+  const pin = String(crypto.randomInt(0, 10000)).padStart(4, '0');
+  const at = Date.now();
+  const ev = { at, rawName: name, rawTeam, teamId: pick, guess: tm.team?.id || null, score: tm.score };
+  let p;
+  if (b.playerId) {
+    p = SF.own(players, String(b.playerId));
+    const pl = Z.matchPlayer(players, name, pick);
+    if (!p || p.ghost || !pl || pl.id !== p.id || (meta.removed || []).includes(p.id)) return fail('Tohle jméno se nepodařilo najít. Zkus to znovu, nebo pokračuj jako nový hráč.');
+    ev.matched = 'existing';
+    if (p.team !== pick) ev.teamDiffers = true;
+    p.pin = pinHash(p.id, pin);
+    await GU.clear(p);
+  } else {
+    const id = crypto.randomBytes(6).toString('base64url');
+    p = { id, name, team: pick, created: at, pin: pinHash(id, pin) };
+    ev.matched = 'new';
+    if (Object.values(players).some((x) => !x.ghost && norm(x.name) === norm(name))) ev.sameName = true;
+  }
+  const u = p.unverified && typeof p.unverified === 'object' ? p.unverified : { first: at, events: [] };
+  Object.assign(u, { last: at, rawName: name, rawTeam, teamId: pick, matched: ev.matched, checked: null });
+  u.events = [...(Array.isArray(u.events) ? u.events : []), ev].slice(-10);
+  p.unverified = u;
+  await S.hset('players', p.id, p);
+  invalidate();
+  return ok({ sid: p.id, pin, name: p.name, team: p.team, matched: ev.matched });
+}
+
 async function restoreFrom(d) {
   if (!d?.meta?.teams || !d.meta.ledger) return fail('Záloha je neplatná.');
   const { meta, players, content } = await load(true);
@@ -615,6 +672,14 @@ async function dealerAction(b) {
   switch (b.op) {
     // ---------- v2 ----------
     case 'features': {
+      // Blok 4 presets: 'investOnly' remembers the current switches (once) and turns everything but investing off;
+      // 'restore' brings the remembered switches back
+      if (b.preset === 'investOnly') { if (!meta.featuresBefore) meta.featuresBefore = { ...meta.features }; Object.assign(meta.features, B4.INVEST_ONLY); }
+      else if (b.preset === 'restore') {
+        if (!meta.featuresBefore) return fail('Není co obnovit.');
+        meta.features = { ...F.FEATURE_DEFAULTS, ...meta.featuresBefore };
+        delete meta.featuresBefore;
+      } else if (b.preset !== undefined) return fail('Neznámá předvolba.');
       for (const [k, v] of Object.entries(b.set || {})) if (k in F.FEATURE_DEFAULTS) meta.features[k] = k === 'tapeNames' ? TP.flagValue(v) : !!v;
       await save();
       return ok({ features: meta.features });
@@ -782,6 +847,45 @@ async function dealerAction(b) {
       E.applyExit(meta, r.outcomes);
       setTimer(meta, 0);
       await save();
+      return ok();
+    }
+
+    // ---------- Blok 4 ----------
+    case 'teamAdd': {
+      const err = B4.addTeam(structuredClone(meta), b).error;
+      if (err) return fail(err);
+      await backup(structuredClone(meta));
+      const r = B4.addTeam(meta, b);
+      if (b.oneLiner !== undefined || b.sub !== undefined) {
+        await S.hset('tx', 'card:' + r.team.id, { ...F.cleanCardText(b, {}), updatedAt: Date.now(), updatedBy: 'RainbowJet' });
+      }
+      await save();
+      return ok({ team: r.team, startV: r.startV });
+    }
+    case 'newRound': {
+      if (b.confirm !== 'NOVE KOLO') return fail('Potvrď napsáním NOVE KOLO.');
+      const err = B4.newRound(structuredClone(meta), slips, players, { prev: b.prev }).error;
+      if (err) return fail(err);
+      const archiveId = await archive(`Před novým kolem (blok ${blk}, investice vráceny)`);
+      await backup(structuredClone(meta));
+      const r = B4.newRound(meta, slips, players, { prev: b.prev, label: b.label, archiveId });
+      setTimer(meta, 0);
+      await save();
+      return ok({ block: meta.block, voided: r.entry });
+    }
+    case 'movementPrev': {
+      const r = B4.setPrev(meta, b.prev, slips, players);
+      if (r.error) return fail(r.error);
+      await save();
+      return ok({ prev: r.prev });
+    }
+    case 'unverifiedMark': {
+      const p = SF.own(players, String(b.sid ?? ''));
+      if (!p || !p.unverified) return fail('Hráč nenalezen.');
+      p.unverified.checked = b.checked ? Date.now() : null;
+      if (b.note !== undefined) p.unverified.note = String(b.note || '').trim().slice(0, 200);
+      await S.hset('players', p.id, p);
+      invalidate();
       return ok();
     }
 
@@ -1176,7 +1280,7 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const b = await readBody(req);
       if (b.op === 'hb') { const r = await PR.hb(b, pinHash, req); return send(res, r.status, r.body); } // v4 regie: presence heartbeat, never logged
-      const studentOps = ['register', 'login', 'tokenLogin', 'notes', 'submit', 'reasons', 'restore', 'ask', 'vote', 'answer', 'react', 'quizAnswer', 'quizReady'];
+      const studentOps = ['register', 'fallback', 'login', 'tokenLogin', 'notes', 'submit', 'reasons', 'restore', 'ask', 'vote', 'answer', 'react', 'quizAnswer', 'quizReady'];
       let r;
       // card / roundTerms exist for both: with a sid it is a student editing their own team
       // restore with a `dump` is the dealer's backup push (before v2 it was routed to the phones' restore and never ran)

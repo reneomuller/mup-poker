@@ -10,6 +10,8 @@ export const CFG = {
 };
 export const RJ = 'rj';
 const COLORS = ['#E8505B', '#F39C34', '#E9C046', '#3BB273', '#3A8DDE', '#9B6BE0'];
+// colour for a team added later (Blok 4: PLUGG = t7), first one not used yet
+export const EXTRA_COLORS = ['#2EC4C9', '#F06FB0', '#A3C94A', '#C98A4B'];
 
 export function newMeta(teams, startV) {
   teams = teams || COLORS.map((c, i) => ({ id: 't' + (i + 1), name: 'Tým ' + (i + 1), color: c }));
@@ -78,6 +80,8 @@ export function rules(m, inv) {
     return { mode: 'fund', capital: rjFund(m).available, cashoutMax: 0, exact: false };
   }
   if (!hasHoldings(m, inv)) {
+    // Blok 4 invest-only round (features.simple): any split up to the capital, the rest stays cash
+    if (!isRJ && m.features?.simple) return { mode: 'initial', capital: CFG.STUDENT_CAPITAL, cashoutMax: 0, exact: false, flex: true };
     return { mode: 'initial', capital: isRJ ? CFG.RJ_CAPITAL : CFG.STUDENT_CAPITAL, cashoutMax: 0, exact: false };
   }
   const pv = portfolio(m, inv);
@@ -122,6 +126,9 @@ export function validate(m, inv, ownTeam, raw) {
   }
   if (r.mode === 'fund') {
     if (inTotal > r.capital) errors.push(`Smart money může teď investovat nejvýš ${fmt(r.capital)}.`);
+  } else if (r.mode === 'initial' && r.flex) {
+    if (inTotal > r.capital) errors.push(`Rozdělit můžeš nejvýš ${fmt(r.capital)} (teď ${fmt(inTotal)}).`);
+    if (inTotal <= 0) errors.push('Rozděl aspoň část peněz.');
   } else if (r.mode === 'initial') {
     if (inTotal !== r.capital) errors.push(`Rozděl přesně ${fmt(r.capital)} (zatím ${fmt(inTotal)}).`);
   } else {

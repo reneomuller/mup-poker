@@ -34,6 +34,8 @@
   let sid = PA.on ? PA.sid : localStorage.getItem('mup.sid'), pin = PA.on ? null : localStorage.getItem('mup.pin');
   let S = null, me = null, meFail = 0, formKey = null, draft = null, loginKey = null, notesKey = null, tab = 'new';
   let view = 'invest', lastPhase = null, firstRender = true;
+  // Blok 4 PIN fallback (name + team): fb.sug = server suggestion, fb.teamId / fb.player = what the student confirmed
+  let fb = { name: '', team: '', sug: null, teamId: '', list: false, player: null, err: '' }, fbKey = null, fbBusy = false;
 
   // The dealer's "Ghost" button opens /play#ghost=<sid>:<pin>
   const gh = /^#ghost=([\w-]+):(\d{4})$/.exec(location.hash);
@@ -76,6 +78,7 @@
   const plain = (n) => Math.round(n).toLocaleString('cs-CZ');
   const sumOf = (m) => Object.values(m).reduce((a, e) => a + (e.amt || 0), 0);
   const feat = (k) => !!(S && S.features && S.features[k]);
+  const SIMPLE = () => feat('simple');
   const NB = ' ';
   const num = (n, d = 0) => (Number(n) || 0).toLocaleString('cs-CZ', { maximumFractionDigits: d, minimumFractionDigits: 0 }).replace(/\s/g, NB);
   const pct = (n, d = 1) => num(n, d) + NB + '%';
@@ -140,9 +143,11 @@
     document.body.classList.remove('p-ingame');
     const el = $('login');
     el.classList.remove('hidden');
+    if (tab === 'fb' && feat('pinFallback')) { showFallback(el); return; }
+    if (tab === 'fb') tab = 'old';
     if (!S.regOpen) tab = 'old';
     // the "new" form doesn't depend on who else is playing, so classmates joining never rebuild it
-    const key = JSON.stringify([S.teams.map((t) => [t.id, t.name]), tab === 'old' ? S.players.map((p) => [p.id, p.name, p.team]) : 0, S.regOpen, tab, MUP.cv()]);
+    const key = JSON.stringify([S.teams.map((t) => [t.id, t.name]), tab === 'old' ? S.players.map((p) => [p.id, p.name, p.team]) : 0, S.regOpen, tab, MUP.cv(), feat('pinFallback')]);
     if (key === loginKey) return;
     // never rebuild under someone's fingers (it rebuilds on the next poll after they leave the field)
     const a = document.activeElement;
@@ -173,6 +178,7 @@
           <button class="s-btn s-primary s-block" id="lgo" type="submit">${E('play.login.goOld')}</button>`}
         </form>
         <div class="p-err" id="lerr" role="alert"></div>
+        ${feat('pinFallback') ? '<button type="button" class="p-forgot" id="lforgot">Zapomněli jste PIN?</button>' : ''}
       </div>
       <p class="p-foot s-faint">Investiční hra kurzu Digitální podnikání v éře AI</p>`;
     if ($('lname') && keep.name) $('lname').value = keep.name;
@@ -183,8 +189,95 @@
     el.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { haptic.tap(); tab = b.dataset.tab; loginKey = null; showLogin(); }));
     $('lpin').addEventListener('input', () => { $('lpin').value = $('lpin').value.replace(/\D/g, '').slice(0, 4); });
     $('lform').onsubmit = (e) => { e.preventDefault(); doLogin(); };
+    if ($('lforgot')) $('lforgot').onclick = () => { haptic.tap(); tab = 'fb'; loginKey = null; fbKey = null; showLogin(); };
     if (PA.loginError) { $('lerr').textContent = PA.loginError; PA.loginError = null; }
   }
+  // ---------- Blok 4: "Zapomněli jste PIN?" → name + team (fuzzy matched on the server), recorded as unverified ----------
+  const FB0 = () => ({ name: '', team: '', sug: null, teamId: '', list: false, player: null, err: '' });
+  function showFallback(el) {
+    const key = JSON.stringify([S.teams.map((t) => [t.id, t.name]), fb, fbBusy, MUP.cv()]);
+    if (key === fbKey) return;
+    const a = document.activeElement;
+    if (fbKey && a && el.contains(a) && /INPUT|TEXTAREA/.test(a.tagName)) return; // never rebuild under someone's fingers
+    fbKey = key;
+    const g = fb.sug;
+    let step2 = '';
+    if (g) {
+      const teamQ = !fb.list && g.team && g.sure
+        ? `<div class="p-fbq"><div class="p-fbq-t">Myslíte <b>${esc(g.team.name)}</b>?</div>
+            <div class="p-fbq-b"><button type="button" class="s-btn s-sm ${fb.teamId === g.team.id ? 's-primary' : 's-ghost'}" data-fbteam="${esc(g.team.id)}">Ano</button><button type="button" class="s-btn s-sm s-ghost" id="fblist">Ne, jiný tým</button></div></div>`
+        : `<label class="s-field"><span class="s-label">${g.team ? 'Myslíte některý z těchto týmů?' : 'Tým jsme nenašli. Vyber ho:'}</span>
+            <select class="s-input p-select" id="fbteamsel"><option value="">Vyber tým…</option>${(g.teams || S.teams).map((t) => `<option value="${esc(t.id)}" ${t.id === fb.teamId ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></label>`;
+      const pq = g.player
+        ? `<div class="p-fbq"><div class="p-fbq-t">Jsi <b>${esc(g.player.name)}</b> (${esc(team(g.player.team).name)})?</div>
+            <div class="p-fbq-b"><button type="button" class="s-btn s-sm ${fb.player === g.player.id ? 's-primary' : 's-ghost'}" data-fbp="${esc(g.player.id)}">Ano, to jsem já</button><button type="button" class="s-btn s-sm ${fb.player === false ? 's-primary' : 's-ghost'}" data-fbp="">Ne, jsem tu nový</button></div></div>`
+        : '';
+      const ready = !!fb.teamId && (!g.player || fb.player !== null);
+      step2 = `${teamQ}${pq}<button class="s-btn s-primary s-block" id="fbplay" type="button" ${ready && !fbBusy ? '' : 'disabled'}>${fbBusy ? 'Přihlašuji…' : 'Hrát'}</button>`;
+    }
+    el.innerHTML = `
+      <div class="p-hero-login">
+        <div class="p-bills">${[0, 1, 2, 3, 4].map((i) => billHTML(i)).join('')}</div>
+        <div class="s-label">${E('play.login.sub')}</div>
+        <h1 class="s-h1">${E('play.login.title')}</h1>
+      </div>
+      <div class="s-card p-card p-login-card p-fb">
+        <h2 class="p-fb-h">Přihlášení bez PINu</h2>
+        <p class="p-hint">Napiš své jméno a název svého týmu. Můžeš hned hrát, dealer to po hodině zkontroluje.</p>
+        <form id="fbform" novalidate>
+          <label class="s-field"><span class="s-label">Jméno a příjmení</span><input class="s-input" id="fbname" autocomplete="name" autocapitalize="words" maxlength="40" enterkeyhint="next" value="${esc(fb.name)}"></label>
+          <label class="s-field"><span class="s-label">Tým</span><input class="s-input" id="fbteam" autocomplete="off" maxlength="60" enterkeyhint="go" placeholder="název týmu" value="${esc(fb.team)}"></label>
+          ${g ? '' : `<button class="s-btn s-primary s-block" id="fbgo" type="submit" ${fbBusy ? 'disabled' : ''}>${fbBusy ? 'Hledám…' : 'Pokračovat'}</button>`}
+        </form>
+        ${step2}
+        <div class="p-err" id="lerr" role="alert">${esc(fb.err)}</div>
+        <button type="button" class="p-forgot" id="fbback">← Zpět k přihlášení s PINem</button>
+      </div>`;
+    el.querySelectorAll('.p-bills .bill').forEach((b, i) => { b.style.transform = `translateX(-50%) rotate(${(i - 2) * 9}deg)`; });
+    // editing the name or team after a suggestion starts over
+    const edit = () => { const n = $('fbname').value, t = $('fbteam').value; if (g && (n !== fb.name || t !== fb.team)) { fb = { ...FB0(), name: n, team: t }; fbKey = null; showFallback(el); } else { fb.name = n; fb.team = t; } };
+    $('fbname').addEventListener('change', edit);
+    $('fbteam').addEventListener('change', edit);
+    $('fbform').onsubmit = (e) => { e.preventDefault(); fb.name = $('fbname').value; fb.team = $('fbteam').value; if (!g) fallbackAsk(); };
+    $('fbback').onclick = () => { haptic.tap(); tab = 'old'; loginKey = null; fbKey = null; fb = FB0(); showLogin(); };
+    el.querySelectorAll('[data-fbteam]').forEach((b) => (b.onclick = () => { haptic.tap(); fb.teamId = b.dataset.fbteam; showFallback(el); }));
+    if ($('fblist')) $('fblist').onclick = () => { haptic.tap(); fb.list = true; fb.teamId = ''; showFallback(el); };
+    if ($('fbteamsel')) $('fbteamsel').onchange = (e) => { fb.teamId = e.target.value; e.target.blur(); fbKey = null; showFallback(el); };
+    el.querySelectorAll('[data-fbp]').forEach((b) => (b.onclick = () => { haptic.tap(); fb.player = b.dataset.fbp || false; showFallback(el); }));
+    if ($('fbplay')) $('fbplay').onclick = fallbackPlay;
+  }
+  async function fallbackAsk() {
+    if (fbBusy) return;
+    fb.err = '';
+    fbBusy = true; fbKey = null; showFallback($('login'));
+    const r = await send({ op: 'fallback', name: fb.name, team: fb.team });
+    fbBusy = false; fbKey = null;
+    if (!r.ok) { fb.err = r.error; haptic.err(); showFallback($('login')); shake($('lerr')); return; }
+    fb.sug = r;
+    fb.teamId = r.team ? r.team.id : '';
+    fb.list = !(r.sure && r.team);
+    if (!fb.list) fb.teamId = ''; // "Myslíte PLUGG?" must be answered
+    fb.player = r.player ? null : false;
+    haptic.ok();
+    showFallback($('login'));
+  }
+  async function fallbackPlay() {
+    if (fbBusy) return;
+    fbBusy = true; fb.err = ''; fbKey = null; showFallback($('login'));
+    const r = await send({ op: 'fallback', name: fb.name, team: fb.team, teamId: fb.teamId, playerId: fb.player || undefined, confirm: true });
+    fbBusy = false; fbKey = null;
+    if (!r.ok) { fb.err = r.error; haptic.err(); showFallback($('login')); return; }
+    haptic.ok();
+    sid = r.sid; pin = r.pin;
+    localStorage.setItem('mup.sid', sid); localStorage.setItem('mup.pin', pin); localStorage.removeItem('mup.profile');
+    fb = FB0();
+    meFail = 0; loginKey = null; formKey = null; notesKey = null; firstRender = true; view = 'invest'; tab = 'old';
+    $('login').classList.add('hidden');
+    $('boot').classList.remove('hidden');
+    toast(`Přihlášeno ✓ Tvůj nový PIN: <b>${esc(r.pin)}</b>`, 'ok');
+    kick(0);
+  }
+
   let logging = false;
   async function doLogin() {
     if (logging) return;
@@ -268,7 +361,9 @@
     ava.style.setProperty('--tc', t.color);
     morph($('who'), `${esc(me.name)}${me.ghost ? ' <span class="s-badge s-warn">Ghost</span>' : ''}`);
     morph($('myteam'), `${dot(t.color)}<span>${esc(t.name)}</span>`);
-    const v = PF() || (INV() ? 0 : me.rules.capital || 0);
+    // Blok 4 invest-only: what you hold plus what you kept as cash (the round starts at $1M for everyone)
+    const cash = SIMPLE() && me.rules.flex ? Math.max(0, me.rules.capital - (me.slip?.submitted ? sumOf(me.slip.in || {}) : 0)) : 0;
+    const v = SIMPLE() && me.rules.flex ? (PF() || 0) + cash : PF() || (INV() ? 0 : me.rules.capital || 0);
     const pf = $('pfv');
     if (pfShown !== null && pfShown !== v) { pf.classList.remove('p-bump'); void pf.offsetWidth; pf.classList.add('p-bump'); }
     pfShown = v;
@@ -304,7 +399,7 @@
     clk.textContent = left === null ? '' : left > 0 ? clock(left) : tx('table.timeUp');
     chip.classList.toggle('p-urgent', left !== null && left > 0 && left <= 30000);
     chip.classList.toggle('p-hasclk', left !== null);
-    el.querySelector('.p-blk').textContent = s.phase === 'final' ? 'Finále' : `Blok ${s.block}/${s.maxBlock}`;
+    el.querySelector('.p-blk').textContent = s.phase === 'final' ? 'Finále' : SIMPLE() && s.movement?.label ? s.movement.label : `Blok ${s.block}/${s.maxBlock}`;
     const bar = $('tbar');
     const frac = left === null || !s.timerTotal ? 0 : Math.max(0, Math.min(1, left / s.timerTotal));
     bar.style.transform = `scaleX(${frac})`;
@@ -318,7 +413,7 @@
     const pres = S.phase === 'pitch' && S.presenting ? team(S.presenting) : null;
     const left = timeLeft(S);
     morph(el, `<div class="s-card p-card p-hero" data-ph="${esc(S.phase)}" ${pres ? `style="--tc:${esc(pres.color)}"` : ''}>
-      <div class="s-label">${S.phase === 'final' ? 'Finále' : `Blok ${S.block} z ${S.maxBlock}`}${S.timerLabel && left ? ` · ${esc(S.timerLabel)}` : ''}</div>
+      <div class="s-label">${S.phase === 'final' ? 'Finále' : SIMPLE() && S.movement?.label ? esc(S.movement.label) : `Blok ${S.block} z ${S.maxBlock}`}${S.timerLabel && left ? ` · ${esc(S.timerLabel)}` : ''}</div>
       <h2 class="p-hero-t">${pres ? dot(pres.color) : ''}${esc(t1)}</h2>
       <p class="p-hero-s">${esc(t2)}</p>
       ${pres && pres.id !== me.team ? `<button type="button" class="s-btn s-ghost s-sm p-hero-btn" data-act="note-jump" data-team="${esc(pres.id)}">Psát poznámky k pitchi</button>` : ''}
@@ -392,7 +487,7 @@
     }
     el.querySelectorAll('.p-nrow').forEach((r) => r.classList.toggle('on', S.phase === 'pitch' && S.presenting === r.dataset.nt));
     // in the first investing round the notes sit inside the investing form
-    el.classList.toggle('hidden', (S.phase === 'betting' && me.rules.mode === 'initial') || !!(feat('exit') && S.exit));
+    el.classList.toggle('hidden', SIMPLE() || (S.phase === 'betting' && me.rules.mode === 'initial') || !!(feat('exit') && S.exit));
   }
   const collectNotes = () => {
     const n = {};
@@ -446,7 +541,13 @@
     const others = S.teams.filter((t) => t.id !== me.team);
     draft = loadDraft();
     let html = '';
-    if (R.mode === 'initial') {
+    if (R.mode === 'initial' && R.flex) {
+      // Blok 4 invest-only: any split up to the capital, no reasons / notes
+      html = `<div class="s-card p-card p-form p-flex"><div class="s-label">${esc(S.movement?.label || 'Investiční kolo')}</div><h2 class="p-form-t">Rozděl až ${esc(fmt(R.capital))}</h2>
+        <p class="p-hint">Rozděl peníze mezi týmy, klidně jen do jednoho. Do vlastního týmu nemůžeš. Co nerozdělíš, zůstane ti v hotovosti.</p>
+        <div id="done"></div>
+        ${others.map((t) => rowHTML('in', t, draft.in[t.id] || {})).join('')}</div>`;
+    } else if (R.mode === 'initial') {
       html = `<div class="s-card p-card p-form"><div class="s-label">Blok ${S.block} · první investice</div><h2 class="p-form-t">${E('play.form.initTitle', { capital: fmt(R.capital) })}</h2>
         <p class="p-hint">${E('play.form.initHint')}</p>
         <div id="done"></div>
@@ -467,7 +568,7 @@
     $('dock').innerHTML = `<div class="p-dock-in">
         <div class="p-sum" id="sum"></div>
         <div class="p-dock-row"><div class="p-ferr" id="ferr" role="alert"></div></div>
-        <div class="p-dock-btns">${R.mode !== 'initial' && !R.exact ? `<button type="button" class="s-btn s-ghost" id="hold">${E('play.form.hold')}</button>` : ''}<button type="button" class="s-btn s-primary p-go" id="go">${R.mode === 'initial' ? E('play.form.go') : E('play.form.confirm')}</button></div>
+        <div class="p-dock-btns">${R.mode !== 'initial' && !R.exact ? `<button type="button" class="s-btn s-ghost" id="hold">${E('play.form.hold')}</button>` : ''}<button type="button" class="s-btn s-primary p-go" id="go">${R.flex ? 'Potvrdit investici' : R.mode === 'initial' ? E('play.form.go') : E('play.form.confirm')}</button></div>
       </div>`;
     dockBuilt = true;
     $('main').querySelectorAll('.arow').forEach(wireRow);
@@ -575,7 +676,8 @@
   function clientErrors() {
     const R = me.rules, errs = [];
     const inT = sumOf(draft.in), outT = sumOf(draft.out);
-    if (R.mode === 'initial' && inT !== R.capital) errs.unshift(`Zbývá rozdělit ${fmt(R.capital - inT)}.`);
+    if (R.mode === 'initial' && R.flex) { if (inT <= 0) errs.unshift('Rozděl aspoň část peněz.'); else if (inT > R.capital) errs.unshift(`Nejvýš ${fmt(R.capital)}.`); }
+    else if (R.mode === 'initial' && inT !== R.capital) errs.unshift(`Zbývá rozdělit ${fmt(R.capital - inT)}.`);
     if (R.mode !== 'initial' && inT !== outT) errs.unshift(inT < outT ? `Zbývá vložit ${fmt(outT - inT)}.` : 'Vkládáš víc, než vybíráš.');
     if (R.mode !== 'initial' && R.exact && outT !== R.cashoutMax) errs.unshift(`Vyber ještě ${fmt(R.cashoutMax - outT)}.`);
     if (R.mode !== 'initial' && !R.exact && outT === 0) errs.unshift('Nejdřív vyber, z čeho bereš.');
@@ -593,7 +695,9 @@
     const errs = clientErrors();
     const bar = (v, max, cls = '') => `<div class="s-progress p-prog ${cls}"><i style="width:${Math.min(100, max ? (v / max) * 100 : 0)}%"></i></div>`;
     let html;
-    if (R.mode === 'initial') {
+    if (R.mode === 'initial' && R.flex) {
+      html = `<div class="p-sum-l"><span>Investuješ <b class="s-num">${esc(fmt(inT))}</b></span><span>v hotovosti <b class="s-num">${esc(fmt(Math.max(0, R.capital - inT)))}</b></span></div>${bar(inT, R.capital, inT > 0 ? 'full' : '')}`;
+    } else if (R.mode === 'initial') {
       html = `<div class="p-sum-l"><span>Rozděleno <b class="s-num">${esc(fmt(inT))}</b> z ${esc(fmt(R.capital))}</span></div>${bar(inT, R.capital, inT === R.capital ? 'full' : '')}`;
     } else {
       const max = R.cashoutMax;
@@ -611,7 +715,7 @@
     go.classList.toggle('p-dim', blocked && !sending);
     go.classList.toggle('p-sent', same && !sending);
     go.classList.toggle('p-busy', sending);
-    go.textContent = sending ? 'Odesílám…' : same ? 'Odesláno ✓' : me.slip?.submitted ? 'Odeslat změnu' : R.mode === 'initial' ? tx('play.form.go') : tx('play.form.confirm');
+    go.textContent = sending ? 'Odesílám…' : same ? 'Odesláno ✓' : me.slip?.submitted ? 'Odeslat změnu' : R.flex ? 'Potvrdit investici' : R.mode === 'initial' ? tx('play.form.go') : tx('play.form.confirm');
     const ferr = $('ferr');
     if (!ferr.dataset.sticky) { ferr.textContent = errs.length ? errs[0] : ''; ferr.dataset.st = errs.length ? 'hint' : ''; }
     const sub = me.slip?.submitted;
@@ -669,7 +773,7 @@
     } else if (S.phase === 'lobby' || S.phase === 'pitch') {
       const R = me.rules;
       html = `<div class="s-card p-card p-wait"><div class="p-wait-ic">${R.mode === 'initial' ? '$' : '⇄'}</div><div><h3 class="s-h3">${R.mode === 'initial' ? E('play.wait.initTitle', { capital: fmt(R.capital) }) : E('play.wait.rebTitle')}</h3>
-        <p class="p-hint">${R.mode === 'initial' ? E('play.wait.initHint') : E('play.wait.rebHint', { max: fmt(R.cashoutMax) })}</p></div></div>`;
+        <p class="p-hint">${R.flex ? 'Až dealer otevře investování, rozdělíš je mezi týmy – klidně jen část. Co nerozdělíš, zůstane ti v hotovosti.' : R.mode === 'initial' ? E('play.wait.initHint') : E('play.wait.rebHint', { max: fmt(R.cashoutMax) })}</p></div></div>`;
     } else if (['closed', 'showdown', 'rj'].includes(S.phase)) {
       html = `<div class="s-card p-card p-wait p-wait-dim"><div class="p-wait-ic">–</div><div><h3 class="s-h3">${s?.submitted ? 'V tomto bloku nic neměníš' : 'V tomto bloku jsi nic neodeslal(a)'}</h3><p class="p-hint">Tvoje investice zůstávají, jak byly.</p></div></div>`;
     }
@@ -1295,6 +1399,8 @@
     }
     if (firstRender) { applyView(); firstRender = false; }
     document.body.classList.toggle('p-bet', S.phase === 'betting');
+    document.body.classList.toggle('p-simple', SIMPLE()); // Blok 4: only the investing view, no tab bar
+    if (SIMPLE() && view !== 'invest') go('invest', { silent: true });
     renderHeader(); renderStatus(); renderExit(); renderHero(); renderMsgs(); renderNotes(); renderMain(); renderDock();
     renderPortfolio(); renderCap(); renderStartups(); renderTeam(); renderProfile(); renderBoard(); renderQuiz(); renderDots(); renderReveal();
     window.PlayStartup?.render(); // v4 startup detail sheet

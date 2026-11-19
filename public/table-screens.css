@@ -225,3 +225,56 @@
 .qz-st b { color: var(--cream); }
 /* v4 readability: answer counts sit on a dark pill so they keep 4.5:1 on every tile colour */
 .qz-n { background: rgba(11,16,48,.58); padding: .1rem .7rem; border-radius: .6rem; }
+
+/* ---------- Blok 4: seven seats (PLUGG = 7th team) ---------- */
+/* top row stays two plates around the banner; the bottom row takes three, the 7th sits bottom centre */
+.seats[data-n="7"] .plate.s4 { left: 19.5%; }
+.seats[data-n="7"] .plate.s3 { left: 80.5%; }
+.seats[data-n="7"] .plate.s6 { bottom: 1.4rem; left: 50%; transform: translateX(-50%); }
+.seats[data-n="7"] .plate.s6 .delta, .seats[data-n="7"] .plate.s6 .badge { bottom: auto; top: 0; transform: translate(-50%, -72%) scale(.85); }
+.seats[data-n="7"] .plate.s6 .delta.on { transform: translate(-50%, -72%); }
+.seats[data-n="7"] .plate.s6 .badge { transform: translate(-50%, -50%); }
+.seats[data-n="7"] .plate.s6 .rnd { top: auto; bottom: 0; transform: translateY(50%); }
+.seats[data-n="7"] .plate.s6.presenting { transform: translateX(-50%) scale(1.06); }
+.seats[data-n="7"] .spot.s4 { left: 22%; top: 67%; }
+.seats[data-n="7"] .spot.s3 { left: 78%; top: 67%; }
+.seats[data-n="7"] .spot.s6 { left: 50%; top: 71%; }
+.seats[data-n="7"] .plate { width: 17.6rem; }
+.stage.n7 .brand { display: none; }
+.stage.n7 .felt-print { bottom: auto; top: 6%; }
+.stage.n7 .board { top: 34%; }
+.stage.n7 .pot { top: 52%; }
+.stage.n7.simple .pot { top: 47%; }
+@media (max-aspect-ratio: 3/2) {
+  .seats[data-n="7"] .plate { width: 18.6rem; }
+}
+/* "Minule 3,20 M $ · +0,8 M $" under today's value */
+.plate .sub.mv { white-space: nowrap; }
+.plate .sub.mv b { color: var(--cream); }
+.plate .sub.mv b.mvup { color: #9ff0c3; }
+.plate .sub.mv b.mvdn { color: #ffb4ba; }
+
+/* Minule → Dnes table (dealer: Plátno ukazuje → Žebříček, or B on the projector) */
+.mvscreen { position: absolute; inset: 0; z-index: 51; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.4rem;
+  padding: 1.6rem 6rem; background: radial-gradient(ellipse 80% 70% at 50% 40%, #1f1a12, #0a0907) #0a0907; opacity: 0; pointer-events: none; transition: opacity .5s; }
+.mvscreen.on { opacity: 1; pointer-events: auto; }
+.mvscreen .mv-head { text-align: center; }
+.mvscreen .kick { font-size: max(1.45rem, 2.2vh); letter-spacing: .26em; text-transform: uppercase; color: var(--gold-2); font-weight: 700; margin-bottom: .4rem; }
+.mvscreen h2 { font-family: var(--serif); font-size: 3.6rem; font-weight: 900; line-height: 1.05; color: var(--cream); }
+.mvscreen .mv-arr { color: var(--gold-2); }
+.mv-table { width: min(100%, 84rem); display: flex; flex-direction: column; gap: .45rem; }
+.mv-row { display: grid; grid-template-columns: 3.6rem minmax(0, 1fr) 12rem 3rem 12rem 15rem; align-items: center; gap: 1.2rem;
+  padding: .4rem 1.6rem; min-height: 5.4rem; border-radius: 1rem; background: rgba(255,255,255,.05); border-left: .45rem solid var(--tc, #888); font-size: 2.4rem; line-height: 1.15; }
+.mv-row.mv-th { background: none; border-left-color: transparent; font-size: max(1.45rem, 2vh); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); padding-top: 0; padding-bottom: .2rem; }
+.mv-row .r { text-align: right; }
+.mv-rk { width: 3.2rem; height: 3.2rem; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 1.8rem; background: rgba(255,255,255,.08); color: var(--cream); }
+.mv-rk.first { background: var(--gold-2); color: #1d1606; }
+.mv-nm { display: flex; align-items: center; gap: .8rem; font-weight: 800; color: var(--cream); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mv-nm .dot { width: 1.2rem; height: 1.2rem; border-radius: 50%; flex: none; }
+.mv-prev { color: var(--muted); }
+.mv-now { font-family: var(--serif); font-weight: 900; color: var(--cream); font-size: 2.7rem; }
+.mv-chg { font-weight: 800; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; }
+.mv-chg small { font-size: 1.5rem; font-weight: 700; opacity: .9; }
+.mv-chg.up { color: #9ff0c3; }
+.mv-chg.dn { color: #ffb4ba; }
+.stage.simple .board { display: none; } /* Blok 4 invest-only: no "Blok 1–5" cards */

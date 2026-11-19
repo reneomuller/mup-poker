@@ -17,6 +17,8 @@ export const FEATURE_DEFAULTS = {
   sound: true, // v4 sound lane: quiz/investing jingles on the projector only (phones stay silent)
   guard: true, // v4: PIN brute-force limits (api/_lib/guard.js) + the phone's offline banner / retry queue (public/play-net.js)
   tape: true, tapeNames: 'initials', // v4 market tape on the projector; tapeNames: 'initials' | 'first' | 'off'
+  simple: false, // Blok 4: invest-only round – /play shows login → allocate (any split up to $1M) → confirm
+  pinFallback: false, // Blok 4: „Zapomněli jste PIN?“ – name + team instead of the PIN, recorded as unverified
 };
 export const OFF = 'Tato funkce je vypnutá.';
 export const REASON_LABELS = { milestone: 'Splněný milník', traction: 'Trakce', team: 'Tým', risk: 'Riziko', market: 'Trh', other: 'Jiné' };
@@ -38,7 +40,7 @@ export const QUIZ_IDLE = { runId: null, setId: null, idx: -1, state: 'idle', sta
 
 // Fields that belong to the course rather than to one game round: undo keeps them, and restoring an
 // old-shaped dump (without them) keeps the server's current ones.
-export const KEEP_ON_UNDO = ['features', 'quizSets', 'quiz', 'quizLog', 'points', 'awards', 'cards', 'milestoneDefs', 'v2ArchivedAt', 'wallTpl', 'regie'];
+export const KEEP_ON_UNDO = ['features', 'featuresBefore', 'quizSets', 'quiz', 'quizLog', 'points', 'awards', 'cards', 'milestoneDefs', 'v2ArchivedAt', 'wallTpl', 'regie'];
 export const V2_FIELDS = [...KEEP_ON_UNDO, 'drivers', 'rounds', 'market', 'tranches', 'rjPrincipal', 'lots', 'exit'];
 
 export const seedSets = () => [{ id: 'blok2', title: 'Blok 2 – slovník', questions: structuredClone(QUIZ_SEED) }];

@@ -481,3 +481,18 @@ body.qrm-open { overflow: hidden; }
   .pr.wp { grid-template-columns: minmax(0, 1fr) 100px 80px 64px minmax(0, 2.2fr); }
 }
 .ptable { margin-top: 6px; }
+
+/* ---------- Blok 4 ---------- */
+#b4box { margin-bottom: 16px; }
+.b4grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.b4step { border: 1px solid var(--s-border, rgba(255,255,255,.12)); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.b4step.done { border-color: rgba(63,191,122,.55); }
+.b4step .stt { font-weight: 800; }
+.b4step .hint { margin: 0; }
+.b4mv { display: grid; gap: 6px; margin: 8px 0; }
+.b4mvr { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, .9fr) minmax(0, .7fr); gap: 10px; align-items: center; }
+.uvt { display: grid; gap: 6px; margin-bottom: 10px; }
+.uvr { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.2fr) auto minmax(0, .9fr) minmax(0, 1.1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 10px; background: rgba(255,200,80,.07); }
+.uvr.ok { background: rgba(63,191,122,.07); }
+@media (max-width: 760px) { .uvr, .b4mvr { grid-template-columns: 1fr 1fr; } }
+.b4mvr input.num { width: 8.5em; }

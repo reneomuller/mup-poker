@@ -11,7 +11,7 @@ await main(async () => {
   const ctx = { S, G };
   const inv = (label) => invariants(c, ctx, label);
   let st = await c.get();
-  ok(Object.values(st.features || {}).length >= 10 && Object.keys(ALL_ON).every((k) => st.features[k] === (k !== 'demand')), 'all 10 v2 features switched on (demand off)');
+  ok(Object.values(st.features || {}).length >= 10 && Object.keys(ALL_ON).every((k) => st.features[k] === (k !== 'demand' && ALL_ON[k])), 'all 10 v2 features switched on (demand off)');
   const members = (t) => S.filter((s) => s.team === t);
   const QSET = { id: 'fg', title: 'Kvíz celé hry', questions: [
     { q: 'Co znamená MVP?', a: ['Most Valuable Player', 'Minimální životaschopný produkt', 'Marketingový plán', 'Měsíční výnos'], correct: 1, time: 30 },

@@ -19,6 +19,7 @@
       "v2-*": false,
       "v3-*": false,
       "v4-*": false,
+      "blok4-*": false,
       "v2-base": false,
       "v2-server": false,
       "v2-phone": false,
