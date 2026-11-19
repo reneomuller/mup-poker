@@ -1,0 +1,226 @@
+/* Hyper-real material layer for the projector table (Blok 4, 19 Nov 2026).
+   Loaded LAST by table.html, so it only restyles: no layout of the seats, no IDs/classes JS relies on.
+   Materials: walnut rail with lacquer highlights, leather welt + brass bead, baize felt under an overhead lamp,
+   brass-framed placards with engraved type, clay chips in 3D stacks, linen-finish cards.
+   Textures are tiny procedural tiles from tools/gen-textures.py (public/img/real, ~50 KB). Remove the <link> to roll back. */
+
+:root {
+  --brass-hi: #f6e2a6;
+  --brass: #c9a24a;
+  --brass-lo: #6f5220;
+  --brass-frame: linear-gradient(180deg, #f7e4a8 0%, #c9a24a 22%, #7a5a22 48%, #b38a3c 70%, #f0d58e 88%, #8c6a2c 100%);
+  --felt-hi: #2b8a63;
+  --felt-mid: #1b6a4a;
+  --felt-lo: #0d3b28;
+  --felt-edge: #062015;
+}
+
+/* ---------- room: one warm lamp over the table, the rest falls into darkness ---------- */
+body {
+  background:
+    radial-gradient(ellipse 62% 58% at 50% 50%, rgba(255, 210, 140, .13), rgba(255, 210, 140, .04) 48%, transparent 72%),
+    radial-gradient(ellipse 130% 100% at 50% 48%, #1a140d 0%, #0e0b08 52%, #050404 100%);
+}
+/* vignette: above the table, below the cards, plates and texts */
+.stage::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: radial-gradient(ellipse 78% 74% at 50% 50%, transparent 52%, rgba(0, 0, 0, .42) 82%, rgba(0, 0, 0, .7) 100%); }
+
+/* ---------- table body: a slight tilt away from the viewer, real drop shadow on the floor ---------- */
+.tbl { transform: perspective(170rem) rotateX(11deg); transform-origin: 50% 58%;
+  box-shadow: 0 .5rem .8rem rgba(0, 0, 0, .65), 0 2.6rem 3.4rem -.6rem rgba(0, 0, 0, .8), 0 5rem 9rem rgba(0, 0, 0, .6); }
+
+/* walnut rail: grain tile + top-lit lacquer (specular from the lamp on the far side, darker near side) */
+.rail {
+  background:
+    radial-gradient(ellipse 46% 16% at 50% 2.5%, rgba(255, 238, 205, .42), rgba(255, 238, 205, .08) 55%, transparent 72%),
+    radial-gradient(ellipse 30% 9% at 50% 98.5%, rgba(255, 226, 180, .16), transparent 72%),
+    radial-gradient(ellipse 10% 30% at 1.5% 50%, rgba(255, 226, 180, .10), transparent 72%),
+    radial-gradient(ellipse 10% 30% at 98.5% 50%, rgba(255, 226, 180, .10), transparent 72%),
+    linear-gradient(180deg, rgba(255, 228, 190, .10) 0%, rgba(0, 0, 0, 0) 28%, rgba(0, 0, 0, .28) 70%, rgba(0, 0, 0, .5) 100%),
+    url(/img/real/wood.webp) 0 0 / 36rem auto repeat,
+    #3a1d0e;
+  box-shadow:
+    inset 0 .16rem .06rem rgba(255, 236, 205, .34),
+    inset 0 .55rem .9rem -.3rem rgba(255, 230, 190, .10),
+    inset 0 -.3rem .6rem rgba(0, 0, 0, .7),
+    inset 0 0 1.1rem .15rem rgba(0, 0, 0, .45),
+    0 0 0 .1rem #1d0f06;
+}
+/* leather welt between the wood and the brass */
+.rail::before { content: ''; position: absolute; inset: 2.05rem; border-radius: inherit;
+  background: url(/img/real/leather.webp) 0 0 / 7rem, linear-gradient(180deg, #2a1a12, #140c08);
+  background-blend-mode: overlay, normal;
+  box-shadow: 0 0 0 .08rem rgba(0, 0, 0, .7), 0 -.06rem 0 .08rem rgba(255, 228, 190, .10), inset 0 .12rem .2rem rgba(255, 230, 200, .12), inset 0 -.2rem .3rem rgba(0, 0, 0, .6); }
+/* polished brass bead (the felt covers the middle, so only the ring shows) */
+.rail::after { inset: 2.6rem; border-radius: inherit;
+  background: linear-gradient(180deg, #fff1c4 0%, #d7b45e 18%, #8a6626 45%, #6a4c1a 60%, #c49a48 82%, #f2d68c 100%);
+  box-shadow: 0 0 0 .06rem rgba(0, 0, 0, .65), 0 0 .8rem rgba(232, 205, 134, .18); }
+
+/* baize: fabric tile (overlay) + lamp hotspot + darker edges; the rail throws a soft shadow onto the felt */
+.felt { inset: 2.9rem;
+  background:
+    url(/img/real/felt.webp) 0 0 / 14rem 14rem repeat,
+    radial-gradient(ellipse 44% 52% at 50% 40%, rgba(255, 246, 214, .17), rgba(255, 246, 214, .05) 55%, transparent 75%),
+    radial-gradient(ellipse 70% 75% at 50% 44%, var(--felt-hi) 0%, var(--felt-mid) 34%, var(--felt-lo) 72%, var(--felt-edge) 100%);
+  background-blend-mode: overlay, normal, normal;
+  box-shadow:
+    inset 0 0 0 .08rem rgba(0, 0, 0, .55),
+    inset 0 1.1rem 1.6rem -.2rem rgba(0, 0, 0, .55),
+    inset 0 -.5rem 1rem rgba(0, 0, 0, .35),
+    inset 0 0 4.5rem rgba(0, 0, 0, .5); }
+/* printed betting line: gold ink, double rule */
+.track { border: .14rem solid rgba(222, 190, 112, .5); outline: .07rem solid rgba(222, 190, 112, .26); outline-offset: .42rem;
+  box-shadow: inset 0 0 2.4rem rgba(0, 0, 0, .12); }
+.felt-print { color: rgba(232, 205, 134, .2); text-shadow: 0 .06rem 0 rgba(0, 0, 0, .25); letter-spacing: .4em; }
+
+/* ---------- placards: brass bevel frame, smoked-glass face, engraved type, real drop shadow ---------- */
+.plate {
+  border: .22rem solid transparent;
+  background:
+    radial-gradient(circle at .75rem .75rem, #fff0c0 0 .07rem, #c9a24a .12rem, #5c4318 .2rem, rgba(0, 0, 0, .5) .23rem, transparent .27rem) padding-box,
+    radial-gradient(circle at calc(100% - .75rem) .75rem, #fff0c0 0 .07rem, #c9a24a .12rem, #5c4318 .2rem, rgba(0, 0, 0, .5) .23rem, transparent .27rem) padding-box,
+    radial-gradient(circle at .75rem calc(100% - .75rem), #fff0c0 0 .07rem, #c9a24a .12rem, #5c4318 .2rem, rgba(0, 0, 0, .5) .23rem, transparent .27rem) padding-box,
+    radial-gradient(circle at calc(100% - .75rem) calc(100% - .75rem), #fff0c0 0 .07rem, #c9a24a .12rem, #5c4318 .2rem, rgba(0, 0, 0, .5) .23rem, transparent .27rem) padding-box,
+    linear-gradient(162deg, rgba(255, 255, 255, .10) 0%, rgba(255, 255, 255, .03) 34%, rgba(255, 255, 255, 0) 35%) padding-box,
+    url(/img/real/leather.webp) 0 0 / 8rem padding-box,
+    radial-gradient(ellipse 90% 70% at 50% 0%, #2c241b, #16120e 70%) padding-box,
+    var(--brass-frame) border-box;
+  background-blend-mode: normal, normal, normal, normal, normal, soft-light, normal, normal;
+  box-shadow:
+    inset 0 .12rem 0 rgba(255, 240, 205, .16),
+    inset 0 0 0 .08rem rgba(0, 0, 0, .7),
+    inset 0 -.5rem 1rem rgba(0, 0, 0, .45),
+    0 .15rem .25rem rgba(0, 0, 0, .6),
+    0 1.1rem 2rem rgba(0, 0, 0, .55),
+    0 2.6rem 4rem -1.2rem rgba(0, 0, 0, .6);
+}
+/* team colour as an enamel inlay in the top of the frame */
+.plate::before { left: 1.4rem; right: 1.4rem; top: -.22rem; height: .42rem; border-radius: 0 0 .35rem .35rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .5), rgba(255, 255, 255, .08) 55%, rgba(0, 0, 0, .18)), var(--tc, #888);
+  box-shadow: 0 .12rem .25rem rgba(0, 0, 0, .55), 0 0 1.2rem color-mix(in srgb, var(--tc, #888) 40%, transparent); }
+.plate .nm { text-shadow: 0 -.07rem 0 rgba(0, 0, 0, .85), 0 .07rem .02rem rgba(255, 236, 200, .14); }
+.plate .nm .dot { box-shadow: inset 0 .12rem .1rem rgba(255, 255, 255, .45), inset 0 -.12rem .15rem rgba(0, 0, 0, .35), 0 0 0 .12rem rgba(0, 0, 0, .55); }
+/* the big number: warm ivory with a soft engraved shadow (crisp at the back of the room) */
+.plate .val { color: #fbf3df; text-shadow: 0 .14rem 0 rgba(0, 0, 0, .7), 0 0 1.4rem rgba(255, 220, 150, .10); }
+.plate .sub { color: #b9ae93; }
+.plate .sub b { color: #f6eedb; }
+
+/* rank + Minule → Dnes chips: enamel badges with a brass hairline */
+.plate .vr > span { border-width: .12rem; box-shadow: inset 0 .1rem 0 rgba(255, 255, 255, .14), inset 0 -.12rem .2rem rgba(0, 0, 0, .35), 0 .12rem .25rem rgba(0, 0, 0, .5); }
+.plate .rk { background: linear-gradient(180deg, #332b22, #1a1510); border-color: rgba(232, 205, 134, .42); color: #f6eedb; }
+.plate .rk.first { color: #241804; background: linear-gradient(180deg, #fff2c6 0%, #ecd08a 40%, #c79d48 100%); border-color: #f6e2a6;
+  box-shadow: inset 0 .1rem 0 rgba(255, 255, 255, .7), inset 0 -.12rem .2rem rgba(120, 80, 20, .35), 0 .12rem .3rem rgba(0, 0, 0, .55), 0 0 1rem rgba(232, 205, 134, .3); }
+.plate .chg { color: #c4fadb; background: linear-gradient(180deg, #1a6a45, #0c3d27); border-color: #56d695; }
+.plate .chg.down { color: #ffd0d4; background: linear-gradient(180deg, #7a1b26, #450d15); border-color: #f0646e; }
+.plate .delta { background: linear-gradient(180deg, #1a6a45, #0c3d27); color: #c4fadb; border-color: #56d695;
+  box-shadow: inset 0 .1rem 0 rgba(255, 255, 255, .2), 0 .5rem 1.2rem rgba(0, 0, 0, .6); }
+.plate .delta.neg { background: linear-gradient(180deg, #7a1b26, #450d15); color: #ffd0d4; border-color: #f0646e; }
+.plate .delta.pink { background: linear-gradient(180deg, #7a2150, #3d0f27); }
+.plate .badge { background: linear-gradient(180deg, #fff2c6, #e8cd86 45%, #c09541); box-shadow: inset 0 .1rem 0 rgba(255, 255, 255, .6), 0 .3rem .7rem rgba(0, 0, 0, .5); }
+.plate.presenting { border-color: transparent; box-shadow: 0 0 0 .22rem var(--gold-2), 0 0 3rem rgba(232, 205, 134, .5), 0 1.1rem 2rem rgba(0, 0, 0, .55); }
+
+/* one light sweep across a placard when its value changes (no continuous animation) */
+.plate::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 244, 214, .16) 48%, rgba(255, 244, 214, .04) 56%, transparent 66%) -18rem 0 / 200% 100% no-repeat; }
+.plate:has(.val.pop)::after, .plate:has(.val.popneg)::after { animation: sheen 1.3s cubic-bezier(.3, .6, .3, 1) both; }
+@keyframes sheen { 0% { opacity: 1; background-position: -18rem 0; } 100% { opacity: 1; background-position: 18rem 0; } }
+
+/* ---------- clay chips ---------- */
+.chip {
+  background:
+    radial-gradient(circle at 38% 30%, rgba(255, 255, 255, .28), rgba(255, 255, 255, 0) 42%),
+    radial-gradient(circle, var(--c) 0 40%, rgba(255, 246, 225, .95) 41% 44%, var(--c) 45% 60%, transparent 61%),
+    repeating-conic-gradient(from 8deg, var(--c) 0 26deg, #f3ecdc 26deg 34deg),
+    var(--c);
+  box-shadow: inset 0 0 0 .08rem rgba(0, 0, 0, .3), inset 0 -.12rem .2rem rgba(0, 0, 0, .3), 0 .12rem .2rem rgba(0, 0, 0, .55);
+}
+.chip.g { --c: #1d7a4a; }
+.chip.p { --c: #cc3b80; }
+.chip.k { --c: #23252b; }
+/* stacked chips are seen at an angle: an elliptical top face over a striped cylinder edge */
+.stack .chip { height: 1.68rem; border-radius: 1.15rem / .63rem;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, .5) 0%, rgba(0, 0, 0, 0) 22%, rgba(255, 255, 255, .16) 46%, rgba(0, 0, 0, 0) 66%, rgba(0, 0, 0, .55) 100%),
+    repeating-linear-gradient(90deg, var(--c) 0 .34rem, #f3ecdc .34rem .5rem),
+    var(--c);
+  box-shadow: 0 .06rem .08rem rgba(0, 0, 0, .55), 0 .12rem .3rem rgba(0, 0, 0, .35); }
+.stack .chip::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1.26rem; border-radius: 50%;
+  background:
+    radial-gradient(ellipse 60% 55% at 40% 28%, rgba(255, 255, 255, .26), rgba(255, 255, 255, 0) 60%),
+    radial-gradient(ellipse, var(--c) 0 40%, rgba(255, 246, 225, .95) 41% 45%, var(--c) 46% 60%, transparent 61%),
+    repeating-conic-gradient(from 8deg, var(--c) 0 26deg, #f3ecdc 26deg 34deg);
+  box-shadow: inset 0 0 0 .06rem rgba(0, 0, 0, .28), inset 0 .06rem .05rem rgba(255, 255, 255, .25); }
+.stack::before { content: ''; position: absolute; left: -.6rem; bottom: -.45rem; width: 3.6rem; height: 1.3rem; border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, .55), rgba(0, 0, 0, 0) 70%); pointer-events: none; }
+.stack:empty::before { display: none; }
+.stack .chip { animation: chipsettle .5s cubic-bezier(.3, 1.35, .5, 1) backwards; }
+@keyframes chipsettle { from { opacity: 0; translate: 0 -1.4rem; } 60% { opacity: 1; } }
+.fly .chip { box-shadow: inset 0 0 0 .08rem rgba(0, 0, 0, .3), 0 .9rem 1.2rem rgba(0, 0, 0, .45); }
+
+/* ---------- cards: linen-finish stock, oxblood backs, layered shadow ---------- */
+.pcard .face, .pcard .back { box-shadow: 0 .06rem .08rem rgba(0, 0, 0, .45), 0 .35rem .8rem rgba(0, 0, 0, .38), 0 .9rem 1.6rem -.4rem rgba(0, 0, 0, .35); }
+.pcard .back {
+  background:
+    url(/img/real/paper.webp) 0 0 / 5rem,
+    repeating-linear-gradient(45deg, rgba(255, 232, 196, .17) 0 .07rem, transparent .07rem .46rem),
+    repeating-linear-gradient(-45deg, rgba(255, 232, 196, .17) 0 .07rem, transparent .07rem .46rem),
+    radial-gradient(ellipse 80% 70% at 50% 40%, #9a2232, #66111f 65%, #470b15);
+  background-blend-mode: overlay, normal, normal, normal;
+  border-color: #f7f2e7;
+  box-shadow: inset 0 0 0 .1rem rgba(122, 22, 36, .75), inset 0 0 0 .2rem rgba(247, 242, 231, .35),
+    0 .06rem .08rem rgba(0, 0, 0, .45), 0 .35rem .8rem rgba(0, 0, 0, .38), 0 .9rem 1.6rem -.4rem rgba(0, 0, 0, .35); }
+.pcard .face { background: url(/img/real/paper.webp) 0 0 / 5rem, linear-gradient(160deg, #fffdf7 0%, #f6f0e2 60%, #ece3cf 100%); background-blend-mode: soft-light, normal; }
+/* embossed pips / indices */
+.board .pcard .face .s, .board .pcard .face .r { text-shadow: 0 .06rem 0 rgba(255, 255, 255, .85), 0 -.05rem .02rem rgba(0, 0, 0, .22); }
+.board .pcard.cur { box-shadow: 0 0 0 .22rem var(--gold-2), 0 0 2.4rem rgba(232, 205, 134, .5); }
+/* hole cards are dealt in when the round leaves the lobby */
+.stage:not(.lobby) .rjcards .pcard { animation: deal .7s cubic-bezier(.2, .8, .25, 1) backwards; }
+.stage:not(.lobby) .rjcards .pcard:nth-child(2) { animation-delay: .12s; }
+@keyframes deal { from { opacity: 0; translate: 0 -2.4rem; } 55% { opacity: 1; } }
+
+/* investment slips landing in the pot: ivory tickets with a brass rule */
+.pot .mini { background: url(/img/real/paper.webp) 0 0 / 5rem, repeating-radial-gradient(ellipse at 50% 50%, rgba(140, 106, 44, .22) 0 .05rem, transparent .05rem .28rem), linear-gradient(170deg, #fffaf0, #eadfc6);
+  background-blend-mode: soft-light, normal, normal; border: .1rem solid #c9a24a;
+  box-shadow: inset 0 0 0 .22rem #fffaf0, inset 0 0 0 .3rem rgba(201, 162, 74, .7), 0 .1rem .15rem rgba(0, 0, 0, .45), 0 .5rem 1rem rgba(0, 0, 0, .35); }
+.pot .lab { text-shadow: 0 .1rem .3rem #000, 0 0 1rem rgba(0, 0, 0, .6); }
+
+/* ---------- banner, corners, join ---------- */
+.banner .phw { text-shadow: 0 .16rem 0 rgba(0, 0, 0, .55), 0 .3rem 1.6rem rgba(0, 0, 0, .85); }
+.banner .kick { text-shadow: 0 .1rem .4rem rgba(0, 0, 0, .8); }
+.qrbox .qrimg { box-shadow: 0 0 0 .18rem #c9a24a, 0 0 0 .3rem rgba(0, 0, 0, .6), 0 .8rem 1.8rem rgba(0, 0, 0, .65); }
+.join { border: .18rem solid transparent;
+  background:
+    linear-gradient(162deg, rgba(255, 255, 255, .08) 0%, rgba(255, 255, 255, 0) 34%) padding-box,
+    url(/img/real/leather.webp) 0 0 / 8rem padding-box,
+    linear-gradient(180deg, #0f2a1f, #07160f) padding-box,
+    var(--brass-frame) border-box;
+  background-blend-mode: normal, soft-light, normal, normal;
+  box-shadow: inset 0 .12rem 0 rgba(255, 240, 205, .14), inset 0 0 0 .08rem rgba(0, 0, 0, .7), 0 .2rem .3rem rgba(0, 0, 0, .6), 0 1.6rem 3rem rgba(0, 0, 0, .6); }
+.join .qr { box-shadow: inset 0 0 0 .1rem rgba(0, 0, 0, .15), 0 .2rem .5rem rgba(0, 0, 0, .5); }
+
+/* ---------- Minule → Dnes: brass-framed rows on a dark walnut wall under the lamp ---------- */
+.mvscreen { background:
+  radial-gradient(ellipse 70% 60% at 50% 35%, rgba(255, 214, 150, .12), transparent 70%),
+  radial-gradient(ellipse 120% 100% at 50% 40%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, .65) 100%),
+  url(/img/real/wood.webp) 0 0 / 60rem auto,
+  #170d07; background-blend-mode: normal, normal, luminosity, normal; }
+.mvscreen::before { content: ''; position: absolute; inset: 0; background: rgba(10, 7, 5, .72); pointer-events: none; }
+.mvscreen > * { position: relative; }
+.mvscreen h2 { text-shadow: 0 .16rem 0 rgba(0, 0, 0, .6), 0 .4rem 2rem rgba(0, 0, 0, .8); }
+.mv-row:not(.mv-th) { border: .14rem solid transparent; border-left: .5rem solid var(--tc, #888);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, 0) 50%) padding-box,
+    url(/img/real/leather.webp) 0 0 / 8rem padding-box,
+    linear-gradient(180deg, #241d16, #120e0b) padding-box,
+    linear-gradient(180deg, rgba(246, 226, 166, .75), rgba(140, 106, 44, .55) 50%, rgba(240, 213, 142, .7)) border-box;
+  background-blend-mode: normal, soft-light, normal, normal;
+  box-shadow: inset 0 .1rem 0 rgba(255, 240, 205, .12), 0 .2rem .3rem rgba(0, 0, 0, .55), 0 .8rem 1.6rem rgba(0, 0, 0, .45); }
+.mv-rk { background: linear-gradient(180deg, #3a3128, #1c1712); box-shadow: inset 0 .1rem 0 rgba(255, 255, 255, .15), 0 0 0 .1rem rgba(232, 205, 134, .4), 0 .15rem .3rem rgba(0, 0, 0, .5); }
+.mv-rk.first { background: linear-gradient(180deg, #fff2c6, #e8cd86 45%, #c09541); box-shadow: inset 0 .1rem 0 rgba(255, 255, 255, .7), 0 0 0 .1rem #f6e2a6, 0 0 1.2rem rgba(232, 205, 134, .35); }
+.mv-now { text-shadow: 0 .12rem 0 rgba(0, 0, 0, .6); }
+.mv-prev { color: #b9ae93; }
+
+/* ---------- motion preferences ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .stack .chip, .stage:not(.lobby) .rjcards .pcard, .plate:has(.val.pop)::after, .plate:has(.val.popneg)::after { animation: none !important; }
+}

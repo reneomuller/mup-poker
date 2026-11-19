@@ -1,0 +1,103 @@
+/* Hyper-real material layer for the phones (Blok 4, 19 Nov 2026) — the table's materials, kept light.
+   Loaded LAST by play.html. Restyles only: the stand tokens are re-pointed to felt / leather / brass,
+   so every screen follows; no backdrop blur, blending only in the static page background, no continuous animation added.
+   Remove the <link> to roll back. */
+
+body.p-app {
+  --s-bg: #0a1812;
+  --s-bg-2: #13100d;
+  --s-surface: #1b1612;
+  --s-surface-2: #241d17;
+  --s-surface-3: #30271f;
+  --s-border: rgba(214, 180, 104, .26);
+  --s-border-2: rgba(226, 194, 120, .52);
+  --s-text: #f7efdc;
+  --s-muted: #cfc3a8;
+  --s-faint: #a1967d;
+  --s-label: #e0c584;
+  --s-violet: #c9a24a;
+  --s-gold: #f0cf7a;
+  --s-grad: linear-gradient(90deg, #a07a32 0%, #e9cf8a 45%, #c9a24a 70%, #f3dc9c 100%);
+  --s-grad-soft: linear-gradient(160deg, rgba(240, 214, 150, .10), rgba(240, 214, 150, 0) 60%);
+  --s-shadow: 0 10px 26px rgba(0, 0, 0, .5);
+  --brass-frame: linear-gradient(180deg, #f7e4a8 0%, #c9a24a 25%, #7a5a22 55%, #d8b866 85%, #8c6a2c 100%);
+  /* the room: baize under a lamp (a small static tile, no fixed attachment: cheap to scroll) */
+  background:
+    radial-gradient(ellipse 90% 45% at 50% 0%, rgba(255, 236, 190, .10), transparent 70%),
+    radial-gradient(ellipse 120% 80% at 50% 30%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, .55) 100%),
+    url(/img/real/felt.webp) 0 0 / 220px 220px,
+    #0f3a28;
+  background-blend-mode: normal, normal, soft-light, normal;
+  background-attachment: scroll;
+}
+body.p-app .s-label { color: var(--s-label); }
+body.p-app { --s-text-2: #e3d3a8; }
+
+/* cards = leather placards with a brass hairline */
+body.p-app .s-card { border-color: rgba(222, 190, 112, .45);
+  background: linear-gradient(170deg, rgba(255, 240, 210, .05), rgba(255, 240, 210, 0) 40%), linear-gradient(180deg, #211a14, #15110d);
+  box-shadow: inset 0 1px 0 rgba(255, 240, 205, .09), 0 1px 2px rgba(0, 0, 0, .6), 0 10px 24px rgba(0, 0, 0, .45); }
+body.p-app .s-card.s-hero, body.p-app .p-hero { background: var(--s-grad-soft), linear-gradient(180deg, #231b14, #16110d); }
+
+/* header + dock: dark walnut bars with a brass rule (opaque: no backdrop blur on cheap phones) */
+body.p-app .p-top, body.p-app .p-dock, body.p-app .s-tabbar { -webkit-backdrop-filter: none; backdrop-filter: none;
+  background: linear-gradient(180deg, rgba(20, 11, 6, .55), rgba(20, 11, 6, .82)), url(/img/real/wood.webp) 0 0 / 420px auto, #2a160b; }
+body.p-app .p-top { border-bottom: 1px solid rgba(226, 194, 120, .55); box-shadow: 0 1px 0 rgba(0, 0, 0, .6), 0 8px 18px rgba(0, 0, 0, .35); }
+body.p-app .p-dock { border-top: 1px solid rgba(226, 194, 120, .55); box-shadow: 0 -1px 0 rgba(0, 0, 0, .6), 0 -10px 26px rgba(0, 0, 0, .45); }
+body.p-app .s-tabbar { border-top: 1px solid rgba(226, 194, 120, .55); }
+body.p-app .p-pfv { color: #fbf3df; text-shadow: 0 1px 0 rgba(0, 0, 0, .6); }
+
+/* avatar = a clay chip in the team colour */
+body.p-app .p-ava {
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, .26), transparent 55%),
+    radial-gradient(circle, var(--tc) 0 56%, rgba(247, 240, 222, .9) 57% 60%, var(--tc) 61% 66%, transparent 67%),
+    repeating-conic-gradient(from 10deg, var(--tc) 0 30deg, #f3ecdc 30deg 42deg);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .3), 0 2px 5px rgba(0, 0, 0, .55); }
+
+/* phase chip: enamel pill, brass frame while investing is open */
+body.p-app .p-chip { background: linear-gradient(180deg, #2c241c, #1a1511); box-shadow: inset 0 1px 0 rgba(255, 240, 205, .1), 0 2px 5px rgba(0, 0, 0, .45); }
+body.p-app .p-chip[data-ph="betting"] { background: linear-gradient(180deg, #2c241c, #1a1511) padding-box, var(--brass-frame) border-box; }
+
+/* the split form: rows as inset leather pockets, amount fields as recessed brass-rimmed windows */
+body.p-app .arow { background: linear-gradient(180deg, #15110e, #100d0a); border-color: rgba(214, 180, 104, .22); box-shadow: inset 0 2px 6px rgba(0, 0, 0, .5); }
+body.p-app .arow.has { border-color: rgba(226, 194, 120, .6); box-shadow: inset 0 2px 6px rgba(0, 0, 0, .5), 0 0 0 1px rgba(226, 194, 120, .18); }
+body.p-app .arow .an b { text-shadow: 0 -1px 0 rgba(0, 0, 0, .7); }
+body.p-app .amtwrap { background: #0b0907; border-color: rgba(226, 194, 120, .5); box-shadow: inset 0 2px 5px rgba(0, 0, 0, .7); }
+body.p-app .amtwrap:focus-within { border-color: #e9cf8a; box-shadow: inset 0 2px 5px rgba(0, 0, 0, .7), 0 0 0 3px rgba(233, 207, 138, .28); }
+body.p-app .qbtns button { background: linear-gradient(180deg, #2a221b, #1b1612); border-color: rgba(214, 180, 104, .3); box-shadow: inset 0 1px 0 rgba(255, 240, 205, .08), 0 1px 2px rgba(0, 0, 0, .5); }
+body.p-app .qbtns button:active { background: #30271f; }
+
+/* slider: brass groove, clay-chip thumb in the team colour */
+body.p-app .p-range::-webkit-slider-runnable-track { height: 6px; border-radius: 6px;
+  background: linear-gradient(90deg, #8c6a2c, #e9cf8a) 0 0 / var(--pct) 100% no-repeat, #0b0907; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .8), 0 1px 0 rgba(255, 240, 205, .08); }
+body.p-app .p-range::-moz-range-track { background: #0b0907; }
+body.p-app .p-range::-moz-range-progress { background: linear-gradient(90deg, #8c6a2c, #e9cf8a); }
+body.p-app .p-range::-webkit-slider-thumb { width: 30px; height: 30px; margin-top: -12px;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, .3), transparent 52%),
+    radial-gradient(circle, var(--tc, #1d7a4a) 0 40%, rgba(247, 240, 222, .95) 41% 45%, var(--tc, #1d7a4a) 46% 60%, transparent 61%),
+    repeating-conic-gradient(from 8deg, var(--tc, #1d7a4a) 0 26deg, #f3ecdc 26deg 36deg);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .3), 0 3px 6px rgba(0, 0, 0, .6); }
+body.p-app .p-range::-moz-range-thumb { width: 30px; height: 30px;
+  background: radial-gradient(circle, var(--tc, #1d7a4a) 0 40%, #f3ecdc 41% 45%, var(--tc, #1d7a4a) 46% 60%, transparent 61%), repeating-conic-gradient(var(--tc, #1d7a4a) 0 26deg, #f3ecdc 26deg 36deg);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, .6); }
+
+/* buttons: polished brass with dark engraved text (white on brass would not read) */
+body.p-app .s-btn.s-primary { color: #241804; background: linear-gradient(180deg, #fff0c2 0%, #ebd08c 35%, #c9a24a 72%, #a8822f 100%);
+  text-shadow: 0 1px 0 rgba(255, 246, 220, .45); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), inset 0 -2px 0 rgba(110, 78, 22, .45), 0 2px 0 #6e5220, 0 8px 18px rgba(0, 0, 0, .45); }
+body.p-app .s-btn.s-primary:disabled { color: #4a3a1a; }
+body.p-app .p-go.p-dim { background: linear-gradient(180deg, #2c241c, #1d1813); color: var(--s-muted); text-shadow: none; box-shadow: inset 0 1px 0 rgba(255, 240, 205, .08), 0 1px 2px rgba(0, 0, 0, .5); }
+body.p-app .p-go.p-sent { background: var(--s-green-bg); color: var(--s-green); text-shadow: none; box-shadow: none; }
+body.p-app .s-btn.s-ghost { border-color: rgba(226, 194, 120, .5); }
+body.p-app .s-input { background-color: #0b0907; border-color: rgba(226, 194, 120, .45); box-shadow: inset 0 2px 5px rgba(0, 0, 0, .6); }
+body.p-app .s-input:focus { border-color: #e9cf8a; box-shadow: inset 0 2px 5px rgba(0, 0, 0, .6), 0 0 0 3px rgba(233, 207, 138, .28); }
+body.p-app .s-tabs { background: #0b0907; }
+body.p-app .p-select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23E0C584' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); }
+body.p-app .p-select option, body.p-app .p-select optgroup { background: #1b1612; color: #f7efdc; }
+body.p-app .s-progress { background: #0b0907; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .7); }
+
+/* login: the banknote fan sits on the felt with a real shadow */
+body.p-app .p-bills .bill { box-shadow: 0 2px 3px rgba(0, 0, 0, .5), 0 8px 16px rgba(0, 0, 0, .35), inset 0 0 0 2px rgba(42, 74, 44, .55), inset 0 0 0 4px rgba(219, 233, 207, .9), inset 0 0 0 5px rgba(42, 74, 44, .4); }
+body.p-app .p-hero-login .s-h1 { text-shadow: 0 2px 0 rgba(0, 0, 0, .5), 0 6px 18px rgba(0, 0, 0, .6); }
+body.p-app .sk { background: linear-gradient(90deg, #1b1612 0%, #2a221b 50%, #1b1612 100%); background-size: 200% 100%; }
