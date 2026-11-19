@@ -98,7 +98,7 @@ curl -s -H "$X" "$B?view=dealer&all=1" | python3 -c "import json,sys; print(len(
 
 Vercel → Deployments → previous production deployment (de5b39f) → Instant Rollback. The data stays. The old code ignores `movement`, `voided`, `featuresBefore` and the `simple`/`pinFallback` flags. Block 2 then runs with the old exact-$1M rule. PLUGG (t7) still works, but the old table has no CSS for a 7th seat (it would sit unstyled). Undo the ops first if you need the October state back (`undo` ×N, then `features preset restore`).
 
-## Rehearsal on a copy of production (done 19 Nov ~03:40, local memory server, dump deleted afterwards)
+## Rehearsal on a copy of production (done 19 Nov ~02:30, local memory server, dump deleted afterwards)
 
 The production dealer dump (GET) was restored into a local in-memory server, and steps 1–3 were run there. The projection matched the numbers above to the dollar. 19 open slips ($19M) were handed back and block 2 started in the lobby with 7 teams. „Minule“ = the October projection with PLUGG at 1.00M. The block-1 slips were kept. A real student name typed in lowercase with a 6-letter team prefix matched the right team and player. A flexible 400k investment went through, and the showdown with demand off moved that team by exactly +400k. Then `undo` ×3 + `preset restore` returned the exact October state (block 1 closed, 19 bets, 6 teams, demand on).
 
