@@ -25,7 +25,7 @@ curl -s -H "$X" "$B?view=dealer&dump=1&all=1" -o ~/mup-poker-backups/blok4-$TS-d
 curl -s -H "$X" "$B?view=log&limit=5000"       -o ~/mup-poker-backups/blok4-$TS-action-log.json  # action log (no PINs)
 curl -s -H "$X" "$B?view=archives"             -o ~/mup-poker-backups/blok4-$TS-archives.json    # archive index
 python3 -c "import json;d=json.load(open('$HOME/mup-poker-backups/blok4-$TS-dealer-dump.json'));m=d['dealer']['dump']['meta'];print(m['block'],m['phase'],m['rev'],len(d['dealer']['dump']['players']),len(d['dealer']['all']['1']))"
-# expect: 1 closed <rev≈67> 20 19
+# expect: 1 closed <rev≈67> 21 20   (21 players incl. the dealer's ghost; 20 block-1 slips = 19 sent + 1 notes-only)
 ```
 These files hold real student data. Never commit them (the repo is public).
 
@@ -88,7 +88,7 @@ print('movement', m.get('label'), m.get('prevFrom'), {k:v['prev'] for k,v in (m.
 "
 curl -s -H "$X" "$B?view=dealer" | python3 -c "import json,sys; D=json.load(sys.stdin)['dealer']; v=D['voided'][-1]; print(v['open'], v['openTotal'], v['archiveId'], bool(D['featuresBefore']))"   # 19 19000000 <id> True
 curl -s -H "$X" "$B?view=archives" | python3 -c "import json,sys; print([a['label'] for a in json.load(sys.stdin)['archives']][:3])"   # „Před novým kolem (blok 1, investice vráceny)“ on top
-curl -s -H "$X" "$B?view=dealer&all=1" | python3 -c "import json,sys; print(len(json.load(sys.stdin)['dealer']['all']['1']))"   # 19 (October slips kept)
+curl -s -H "$X" "$B?view=dealer&all=1" | python3 -c "import json,sys; print(len(json.load(sys.stdin)['dealer']['all']['1']))"   # 20 (October slips kept: 19 sent + 1 notes-only)
 ```
 - `/table` on the projector at 1920×1080 shows 7 plates (PLUGG bottom centre), the kicker „BLOK 4 · INVESTIČNÍ KOLO“ and „Minule …“ under each value. The ▲/▼ chips appear once investing opens.
 - `/play` on a phone: the login card has „Zapomněli jste PIN?“. A logged-in student sees one screen: „Máš 1 000 000 $“ (lobby), then „Rozděl až 1 000 000 $“ when investing opens.
@@ -97,6 +97,10 @@ curl -s -H "$X" "$B?view=dealer&all=1" | python3 -c "import json,sys; print(len(
 ## Rollback
 
 Vercel → Deployments → previous production deployment (de5b39f) → Instant Rollback. The data stays. The old code ignores `movement`, `voided`, `featuresBefore` and the `simple`/`pinFallback` flags. Block 2 then runs with the old exact-$1M rule. PLUGG (t7) still works, but the old table has no CSS for a 7th seat (it would sit unstyled). Undo the ops first if you need the October state back (`undo` ×N, then `features preset restore`).
+
+## Rehearsal on a copy of production (done 19 Nov ~03:40, local memory server, dump deleted afterwards)
+
+The production dealer dump (GET) was restored into a local in-memory server, and steps 1–3 were run there. The projection matched the numbers above to the dollar. 19 open slips ($19M) were handed back and block 2 started in the lobby with 7 teams. „Minule“ = the October projection with PLUGG at 1.00M. The block-1 slips were kept. A real student name typed in lowercase with a 6-letter team prefix matched the right team and player. A flexible 400k investment went through, and the showdown with demand off moved that team by exactly +400k. Then `undo` ×3 + `preset restore` returned the exact October state (block 1 closed, 19 bets, 6 teams, demand on).
 
 ## Tests (local, memory storage)
 
